@@ -59,4 +59,42 @@ export class MailerService {
       return false;
     }
   }
+  async sendCollaborationRequestEmail(email: string, requesterName: string, collaborationTitle: string): Promise<boolean> {
+    try {
+      await this.mailer.sendMail({
+        to: email,
+        subject: `New Collaboration Request: ${collaborationTitle}`,
+        html: `
+          <div style="font-family: sans-serif; padding: 20px;">
+            <h2>You have a new collaboration request!</h2>
+            <p><strong>${requesterName}</strong> wants to collaborate with you on: <strong>${collaborationTitle}</strong></p>
+            <p>Please log in to your dashboard to view the details and respond.</p>
+          </div>
+        `,
+      });
+      return true;
+    } catch (error) {
+      this.logger.error(`Failed to send collaboration email to ${email}`, error);
+      return false;
+    }
+  }
+
+  async sendVerificationUpdateEmail(email: string, status: string): Promise<boolean> {
+    try {
+      await this.mailer.sendMail({
+        to: email,
+        subject: `Verification Request Update: ${status}`,
+        html: `
+          <div style="font-family: sans-serif; padding: 20px;">
+            <h2>Your verification request has been ${status.toLowerCase()}.</h2>
+            <p>Log in to your profile to see the latest status.</p>
+          </div>
+        `,
+      });
+      return true;
+    } catch (error) {
+      this.logger.error(`Failed to send verification email to ${email}`, error);
+      return false;
+    }
+  }
 }

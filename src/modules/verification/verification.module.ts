@@ -5,8 +5,10 @@ import { InfluencerProfile } from '../../database/entities/influencer-profile.en
 import { VerificationController } from './verification.controller';
 import { VerificationService } from './verification.service';
 
+import { MailerConfigModule } from '../mailer/mailer.module';
+
 @Module({
-    imports: [TypeOrmModule.forFeature([VerificationRequest, InfluencerProfile])],
+    imports: [TypeOrmModule.forFeature([VerificationRequest, InfluencerProfile]), MailerConfigModule],
     controllers: [VerificationController],
     providers: [VerificationService],
     exports: [VerificationService],

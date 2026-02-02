@@ -5,6 +5,7 @@ import { VerificationRequest } from '../../database/entities/verification-reques
 import { InfluencerProfile } from '../../database/entities/influencer-profile.entity';
 import { CreateVerificationRequestDto } from './dto/create-verification-request.dto';
 import { VerificationStatus } from '../../database/entities/enums';
+import { MailerService } from '../mailer/mailer.service';
 
 @Injectable()
 export class VerificationService {
@@ -14,6 +15,7 @@ export class VerificationService {
         @InjectRepository(InfluencerProfile)
         private readonly influencerRepo: Repository<InfluencerProfile>,
         private readonly dataSource: DataSource,
+        private readonly mailerService: MailerService,
     ) { }
 
     async createRequest(userId: string, createDto: CreateVerificationRequestDto): Promise<VerificationRequest> {
@@ -64,7 +66,7 @@ export class VerificationService {
         return await this.dataSource.transaction(async (manager) => {
             const request = await manager.findOne(VerificationRequest, {
                 where: { id },
-                relations: ['influencerProfile'],
+                relations: ['influencerProfile', 'influencerProfile.user'],
             });
 
             if (!request) throw new NotFoundException('Verification request not found');
@@ -78,6 +80,14 @@ export class VerificationService {
             } else if (status === VerificationStatus.REJECTED) {
                 request.influencerProfile.verified = false;
                 await manager.save(InfluencerProfile, request.influencerProfile);
+            }
+
+            // Notify Influencer via Email
+            if (request.influencerProfile?.user?.email) {
+                await this.mailerService.sendVerificationUpdateEmail(
+                    request.influencerProfile.user.email,
+                    status,
+                );
             }
 
             return savedRequest;

@@ -2,6 +2,8 @@ import { Injectable, NotFoundException, ForbiddenException, BadRequestException 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Collaboration } from '../../database/entities/collaboration.entity';
+import { User } from '../../database/entities/user.entity';
+import { MailerService } from '../mailer/mailer.service';
 import { CreateCollaborationDto } from './dto/create-collaboration.dto';
 import { UpdateCollaborationStatusDto } from './dto/update-collaboration-status.dto';
 import { CollaborationStatus } from '../../database/entities/enums';
@@ -13,9 +15,15 @@ export class CollaborationService {
     constructor(
         @InjectRepository(Collaboration)
         private readonly collaborationRepo: Repository<Collaboration>,
+        @InjectRepository(User)
+        private readonly userRepo: Repository<User>,
+        private readonly mailerService: MailerService,
     ) { }
 
     async createCollaboration(requesterId: string, createDto: CreateCollaborationDto): Promise<Collaboration> {
+        const requester = await this.userRepo.findOne({ where: { id: requesterId }, relations: ['profile'] });
+        const influencerUser = await this.userRepo.findOne({ where: { id: createDto.influencerId } });
+
         const collaboration = this.collaborationRepo.create({
             requester: { id: requesterId } as any,
             influencer: { id: createDto.influencerId } as any,
@@ -27,7 +35,18 @@ export class CollaborationService {
             status: CollaborationStatus.REQUESTED,
         });
 
-        return await this.collaborationRepo.save(collaboration);
+        const savedCollaboration = await this.collaborationRepo.save(collaboration);
+
+        // Notify Influencer via Email
+        if (influencerUser && requester) {
+            await this.mailerService.sendCollaborationRequestEmail(
+                influencerUser.email,
+                requester.profile?.fullName || 'A brand/user',
+                createDto.title,
+            );
+        }
+
+        return savedCollaboration;
     }
 
     async getMyCollaborations(userId: string): Promise<Collaboration[]> {
