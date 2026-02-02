@@ -10,6 +10,8 @@ import { AttachmentsModule } from './modules/attachments/attachments.module';
 import { AwsModule } from './modules/aws/aws.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { UserAuthModule } from './modules/user-auth/user-auth.module';
+import { ProfileModule } from './modules/profile/profile.module';
+import { InfluencerModule } from './modules/influencer/influencer.module';
 
 @Module({
   imports: [
@@ -19,6 +21,8 @@ import { UserAuthModule } from './modules/user-auth/user-auth.module';
 
     // Core modules
     UserAuthModule,
+    ProfileModule,
+    InfluencerModule,
 
     // Utility modules
     AttachmentsModule,
