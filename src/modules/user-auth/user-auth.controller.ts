@@ -13,14 +13,14 @@ import {
 } from '@nestjs/swagger';
 
 import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto';
-import { SignupDto, LoginDto, CreateInfluencerDto } from './dto/auth.dto';
+import { SignupDto, CreateInfluencerDto } from './dto/auth.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/Guards/roles.guard';
 
 
 
 @ApiTags('User Auth')
-@Controller('user-auth')
+@Controller('v1/user-auth')
 export class UserAuthController {
   constructor(private readonly auth: UserAuthService) { }
 
