@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { UserAuthService } from './user-auth.service';
@@ -24,6 +25,7 @@ export class UserAuthController {
   constructor(private readonly auth: UserAuthService) { }
 
   @AllowUnauthorized()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('signup')
   @ApiOperation({ summary: 'Sign up a new user (regular users only)' })
   @ApiCreatedResponse({ description: 'User registered and JWT returned in cookie' })
@@ -40,6 +42,7 @@ export class UserAuthController {
   }
 
   @AllowUnauthorized()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @UseGuards(AuthGuard('local-user'))
   @Post('login')
   @ApiOperation({ summary: 'Login for all user types (USER, INFLUENCER, ADMIN)' })
@@ -124,6 +127,7 @@ export class UserAuthController {
   }
 
   @AllowUnauthorized()
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
   @Post('forgot-password')
   @ApiOperation({ summary: 'Request password reset email' })
   @ApiOkResponse({ description: 'Password reset email sent if account exists' })
@@ -132,6 +136,7 @@ export class UserAuthController {
   }
 
   @AllowUnauthorized()
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
   @Post('reset-password')
   @ApiOperation({ summary: 'Reset password using token from email' })
   @ApiOkResponse({ description: 'Password successfully reset' })
