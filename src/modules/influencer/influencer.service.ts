@@ -58,12 +58,19 @@ export class InfluencerService {
     }
 
     async searchInfluencers(searchDto: SearchInfluencersDto) {
-        const { niche, platform, minFollowers, page, limit } = searchDto;
+        const { niche, platform, minFollowers, page, limit, search } = searchDto;
         const query = this.influencerRepo.createQueryBuilder('influencer')
             .innerJoinAndSelect('influencer.user', 'user')
             .leftJoinAndSelect('user.profile', 'profile')
             .where('user.role = :role', { role: UserRole.INFLUENCER })
             .andWhere('user.status = :status', { status: UserStatus.ACTIVE });
+
+        if (search) {
+            query.andWhere(
+                '(profile.fullName ILIKE :search OR profile.username ILIKE :search OR influencer.bio ILIKE :search)',
+                { search: `%${search}%` }
+            );
+        }
 
         if (niche) {
             query.andWhere('influencer.niche ILIKE :niche', { niche: `%${niche}%` });

@@ -8,6 +8,11 @@ export class SearchInfluencersDto {
     @IsString()
     niche?: string;
 
+    @ApiPropertyOptional({ example: 'fitness' })
+    @IsOptional()
+    @IsString()
+    search?: string;
+
     @ApiPropertyOptional({ example: 'Instagram' })
     @IsOptional()
     @IsString()
