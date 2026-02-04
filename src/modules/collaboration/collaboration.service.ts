@@ -32,6 +32,10 @@ export class CollaborationService {
             throw new BadRequestException('You cannot request a collaboration with yourself');
         }
 
+        if (createDto.startDate && createDto.endDate && new Date(createDto.startDate) > new Date(createDto.endDate)) {
+            throw new BadRequestException('Start date cannot be after end date');
+        }
+
         const collaboration = this.collaborationRepo.create({
             requester: { id: requesterId } as any,
             influencer: { id: createDto.influencerId } as any,
