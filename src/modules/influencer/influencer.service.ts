@@ -1,7 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InfluencerProfile } from '../../database/entities/influencer-profile.entity';
+import { User } from '../../database/entities/user.entity';
+import { UserRole, UserStatus } from '../../database/entities/enums';
 import { SaveInfluencerProfileDto } from './dto/save-influencer-profile.dto';
 import { SearchInfluencersDto } from './dto/search-influencers.dto';
 import { isEntityNotFoundError } from '../../database/errors/entity-not-found.type-guard';
@@ -12,6 +14,8 @@ export class InfluencerService {
     constructor(
         @InjectRepository(InfluencerProfile)
         private readonly influencerRepo: Repository<InfluencerProfile>,
+        @InjectRepository(User)
+        private readonly userRepo: Repository<User>,
     ) { }
 
     async getInfluencerProfile(userId: string): Promise<InfluencerProfile> {
@@ -32,6 +36,11 @@ export class InfluencerService {
     }
 
     async saveInfluencerProfile(userId: string, saveDto: SaveInfluencerProfileDto): Promise<InfluencerProfile> {
+        const user = await this.userRepo.findOneBy({ id: userId });
+        if (!user || user.role !== UserRole.INFLUENCER) {
+            throw new ForbiddenException('Only users with INFLUENCER role can have an influencer profile');
+        }
+
         let profile = await this.influencerRepo.findOne({
             where: { user: { id: userId } },
         });
@@ -51,8 +60,10 @@ export class InfluencerService {
     async searchInfluencers(searchDto: SearchInfluencersDto) {
         const { niche, platform, minFollowers, page, limit } = searchDto;
         const query = this.influencerRepo.createQueryBuilder('influencer')
-            .leftJoinAndSelect('influencer.user', 'user')
-            .leftJoinAndSelect('user.profile', 'profile');
+            .innerJoinAndSelect('influencer.user', 'user')
+            .leftJoinAndSelect('user.profile', 'profile')
+            .where('user.role = :role', { role: UserRole.INFLUENCER })
+            .andWhere('user.status = :status', { status: UserStatus.ACTIVE });
 
         if (niche) {
             query.andWhere('influencer.niche ILIKE :niche', { niche: `%${niche}%` });

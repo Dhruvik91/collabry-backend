@@ -7,30 +7,39 @@ import {
     CreateDateColumn,
     UpdateDateColumn,
     JoinColumn,
+    Index,
 } from 'typeorm';
+import { ApiProperty } from '@nestjs/swagger';
 import { User } from './user.entity';
 import { CollaborationStatus } from './enums';
 import { Review } from './review.entity';
 
 @Entity('collaborations')
 export class Collaboration {
+    @ApiProperty()
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
+    @Index()
     @ManyToOne(() => User)
     @JoinColumn({ name: 'requesterId' })
     requester: User;
 
+    @Index()
     @ManyToOne(() => User)
     @JoinColumn({ name: 'influencerId' })
     influencer: User;
 
+    @ApiProperty()
     @Column({ nullable: true })
     title: string;
 
+    @ApiProperty()
     @Column({ type: 'text', nullable: true })
     description: string;
 
+    @ApiProperty({ enum: CollaborationStatus })
+    @Index()
     @Column({
         type: 'enum',
         enum: CollaborationStatus,
@@ -38,15 +47,19 @@ export class Collaboration {
     })
     status: CollaborationStatus;
 
+    @ApiProperty()
     @Column({ type: 'jsonb', nullable: true })
     proposedTerms: any;
 
+    @ApiProperty()
     @Column({ type: 'jsonb', nullable: true })
     agreedTerms: any;
 
+    @ApiProperty()
     @Column({ type: 'date', nullable: true })
     startDate: Date;
 
+    @ApiProperty()
     @Column({ type: 'date', nullable: true })
     endDate: Date;
 

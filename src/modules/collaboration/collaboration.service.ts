@@ -6,7 +6,7 @@ import { User } from '../../database/entities/user.entity';
 import { MailerService } from '../mailer/mailer.service';
 import { CreateCollaborationDto } from './dto/create-collaboration.dto';
 import { UpdateCollaborationStatusDto } from './dto/update-collaboration-status.dto';
-import { CollaborationStatus } from '../../database/entities/enums';
+import { CollaborationStatus, UserRole } from '../../database/entities/enums';
 import { isEntityNotFoundError } from '../../database/errors/entity-not-found.type-guard';
 import { cif } from '../../database/errors/tryQuery';
 
@@ -23,6 +23,14 @@ export class CollaborationService {
     async createCollaboration(requesterId: string, createDto: CreateCollaborationDto): Promise<Collaboration> {
         const requester = await this.userRepo.findOne({ where: { id: requesterId }, relations: ['profile'] });
         const influencerUser = await this.userRepo.findOne({ where: { id: createDto.influencerId } });
+
+        if (!influencerUser || influencerUser.role !== UserRole.INFLUENCER) {
+            throw new BadRequestException('Target user must be an influencer');
+        }
+
+        if (requesterId === createDto.influencerId) {
+            throw new BadRequestException('You cannot request a collaboration with yourself');
+        }
 
         const collaboration = this.collaborationRepo.create({
             requester: { id: requesterId } as any,
@@ -84,21 +92,36 @@ export class CollaborationService {
     async updateStatus(id: string, userId: string, statusDto: UpdateCollaborationStatusDto): Promise<Collaboration> {
         const collaboration = await this.getCollaborationById(id, userId);
 
-        // Only influencer can accept/reject
-        if ([CollaborationStatus.ACCEPTED, CollaborationStatus.REJECTED].includes(statusDto.status)) {
-            if (collaboration.influencer.id !== userId) {
-                throw new ForbiddenException('Only the influencer can accept or reject the collaboration');
-            }
-            if (collaboration.status !== CollaborationStatus.REQUESTED) {
-                throw new BadRequestException(`Cannot transition from ${collaboration.status} to ${statusDto.status}`);
-            }
-        }
+        const isInfluencer = collaboration.influencer.id === userId;
+        const isRequester = collaboration.requester.id === userId;
 
-        // Completion or Cancellation
-        if (statusDto.status === CollaborationStatus.COMPLETED) {
-            if (collaboration.status !== CollaborationStatus.ACCEPTED && collaboration.status !== CollaborationStatus.IN_PROGRESS) {
-                throw new BadRequestException('Collaboration must be accepted or in progress to be completed');
-            }
+        // Validation based on current status and new status
+        switch (statusDto.status) {
+            case CollaborationStatus.ACCEPTED:
+            case CollaborationStatus.REJECTED:
+                if (!isInfluencer) throw new ForbiddenException('Only the influencer can accept or reject');
+                if (collaboration.status !== CollaborationStatus.REQUESTED) {
+                    throw new BadRequestException(`Cannot ${statusDto.status.toLowerCase()} from current state: ${collaboration.status}`);
+                }
+                break;
+
+            case CollaborationStatus.IN_PROGRESS:
+                if (collaboration.status !== CollaborationStatus.ACCEPTED) {
+                    throw new BadRequestException('Collaboration must be accepted before starting');
+                }
+                break;
+
+            case CollaborationStatus.COMPLETED:
+                if (collaboration.status !== CollaborationStatus.IN_PROGRESS && collaboration.status !== CollaborationStatus.ACCEPTED) {
+                    throw new BadRequestException('Collaboration must be in progress or accepted to be completed');
+                }
+                break;
+
+            case CollaborationStatus.CANCELLED:
+                if (collaboration.status === CollaborationStatus.COMPLETED) {
+                    throw new BadRequestException('Cannot cancel a completed collaboration');
+                }
+                break;
         }
 
         collaboration.status = statusDto.status;

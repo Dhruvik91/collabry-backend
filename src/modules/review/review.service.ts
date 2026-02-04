@@ -58,25 +58,23 @@ export class ReviewService {
 
             const savedReview = await manager.save(Review, review);
 
-            // Update Influencer Rating within the same transaction
+            // Update Influencer Rating within the same transaction using aggregate query
             const influencerProfile = await manager.findOne(InfluencerProfile, {
                 where: { user: { id: collaboration.influencer.id } },
             });
 
             if (influencerProfile) {
-                const reviews = await manager.find(Review, {
-                    where: { influencer: { id: collaboration.influencer.id } },
-                });
+                const stats = await manager
+                    .createQueryBuilder(Review, 'review')
+                    .select('AVG(review.rating)', 'avg')
+                    .addSelect('COUNT(review.id)', 'count')
+                    .where('review.influencerId = :influencerId', {
+                        influencerId: collaboration.influencer.id,
+                    })
+                    .getRawOne();
 
-                // Note: savedReview is already in the DB but transaction is not committed.
-                // Depending on isolation level, we might need to manually add savedReview if find doesn't return it yet,
-                // but usually find within transaction works. To be safe/accurate:
-                const allReviews = [...reviews];
-                const total = allReviews.length;
-                const sum = allReviews.reduce((acc, r) => acc + r.rating, 0);
-
-                influencerProfile.avgRating = Number((sum / total).toFixed(1));
-                influencerProfile.totalReviews = total;
+                influencerProfile.avgRating = Number(Number(stats.avg || 0).toFixed(1));
+                influencerProfile.totalReviews = Number(stats.count || 0);
 
                 await manager.save(InfluencerProfile, influencerProfile);
             }

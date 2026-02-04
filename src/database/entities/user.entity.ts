@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToOne, DeleteDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToOne, DeleteDateColumn, Index } from 'typeorm';
+import { ApiProperty } from '@nestjs/swagger';
 import { UserRole, UserStatus } from './enums';
 import { InfluencerProfile } from './influencer-profile.entity';
 import { Profile } from './profile.entity';
@@ -6,9 +7,11 @@ import { Exclude } from 'class-transformer';
 
 @Entity('users')
 export class User {
+    @ApiProperty()
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
+    @ApiProperty()
     @Column({ unique: true })
     email: string;
 
@@ -16,6 +19,8 @@ export class User {
     @Column({ nullable: true, select: false })
     passwordHash: string;
 
+    @ApiProperty({ enum: UserRole })
+    @Index()
     @Column({
         type: 'enum',
         enum: UserRole,
@@ -23,6 +28,8 @@ export class User {
     })
     role: UserRole;
 
+    @ApiProperty({ enum: UserStatus })
+    @Index()
     @Column({
         type: 'enum',
         enum: UserStatus,
