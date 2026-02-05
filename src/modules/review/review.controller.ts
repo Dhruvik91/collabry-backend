@@ -24,4 +24,20 @@ export class ReviewController {
     async findForInfluencer(@Param('influencerId') influencerId: string) {
         return this.reviewService.getInfluencerReviews(influencerId);
     }
+
+    @ApiBearerAuth()
+    @Post(':id')
+    @ApiOperation({ summary: 'Update a review' })
+    @ApiOkResponse({ description: 'Review updated successfully' })
+    async update(@Req() req: any, @Param('id') id: string, @Body() updateDto: CreateReviewDto) {
+        return this.reviewService.updateReview(req.user.id, id, updateDto);
+    }
+
+    @ApiBearerAuth()
+    @Post(':id/delete')
+    @ApiOperation({ summary: 'Delete a review' })
+    @ApiOkResponse({ description: 'Review deleted successfully' })
+    async delete(@Req() req: any, @Param('id') id: string) {
+        return this.reviewService.deleteReview(req.user.id, id);
+    }
 }

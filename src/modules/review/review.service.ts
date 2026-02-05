@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Review } from '../../database/entities/review.entity';
@@ -6,8 +6,6 @@ import { Collaboration } from '../../database/entities/collaboration.entity';
 import { InfluencerProfile } from '../../database/entities/influencer-profile.entity';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { CollaborationStatus } from '../../database/entities/enums';
-import { isEntityNotFoundError } from '../../database/errors/entity-not-found.type-guard';
-import { cif } from '../../database/errors/tryQuery';
 
 @Injectable()
 export class ReviewService {
@@ -91,4 +89,63 @@ export class ReviewService {
         });
     }
 
+    async updateReview(userId: string, id: string, updateDto: Partial<CreateReviewDto>): Promise<Review> {
+        const review = await this.reviewRepo.findOne({
+            where: { id },
+            relations: ['reviewer', 'influencer'],
+        });
+
+        if (!review) {
+            throw new NotFoundException('Review not found');
+        }
+
+        if (review.reviewer.id !== userId) {
+            throw new ForbiddenException('You can only update your own reviews');
+        }
+
+        if (updateDto.rating) review.rating = updateDto.rating;
+        if (updateDto.comment) review.comment = updateDto.comment;
+
+        const savedReview = await this.reviewRepo.save(review);
+        await this.updateInfluencerAverageRating(review.influencer.id);
+        return savedReview;
+    }
+
+    async deleteReview(userId: string, id: string): Promise<void> {
+        const review = await this.reviewRepo.findOne({
+            where: { id },
+            relations: ['reviewer', 'influencer'],
+        });
+
+        if (!review) {
+            throw new NotFoundException('Review not found');
+        }
+
+        if (review.reviewer.id !== userId) {
+            throw new ForbiddenException('You can only delete your own reviews');
+        }
+
+        const influencerId = review.influencer.id;
+        await this.reviewRepo.remove(review);
+        await this.updateInfluencerAverageRating(influencerId);
+    }
+
+    private async updateInfluencerAverageRating(influencerId: string): Promise<void> {
+        const stats = await this.reviewRepo
+            .createQueryBuilder('review')
+            .select('AVG(review.rating)', 'avg')
+            .addSelect('COUNT(review.id)', 'count')
+            .where('review.influencerId = :influencerId', { influencerId })
+            .getRawOne();
+
+        const influencerProfile = await this.influencerProfileRepo.findOne({
+            where: { user: { id: influencerId } },
+        });
+
+        if (influencerProfile) {
+            influencerProfile.avgRating = Number(Number(stats.avg || 0).toFixed(1));
+            influencerProfile.totalReviews = Number(stats.count || 0);
+            await this.influencerProfileRepo.save(influencerProfile);
+        }
+    }
 }

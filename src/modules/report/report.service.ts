@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Report } from '../../database/entities/report.entity';
@@ -48,5 +48,18 @@ export class ReportService {
     }
 
     return await this.reportRepo.save(report);
+  }
+
+  async deleteReport(userId: string, id: string): Promise<void> {
+    const report = await this.reportRepo.findOne({ where: { id }, relations: ['reporter'] });
+    if (!report) {
+      throw new NotFoundException('Report not found');
+    }
+
+    if (report.reporter.id !== userId) {
+      throw new ForbiddenException('You can only delete your own reports');
+    }
+
+    await this.reportRepo.remove(report);
   }
 }

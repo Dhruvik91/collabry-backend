@@ -43,4 +43,29 @@ export class MessagingController {
     async getMessages(@Req() req: any, @Param('conversationId') conversationId: string) {
         return this.messagingService.getMessageHistory(conversationId, req.user.id);
     }
+
+    @Post('message/:messageId')
+    @ApiOperation({ summary: 'Update a message' })
+    @ApiOkResponse({ description: 'Message updated successfully', type: Message })
+    async updateMessage(
+        @Req() req: any,
+        @Param('messageId') messageId: string,
+        @Body() updateDto: SendMessageDto,
+    ) {
+        return this.messagingService.updateMessage(messageId, req.user.id, updateDto);
+    }
+
+    @Post('message/:messageId/delete')
+    @ApiOperation({ summary: 'Delete a message' })
+    @ApiOkResponse({ description: 'Message deleted successfully' })
+    async deleteMessage(@Req() req: any, @Param('messageId') messageId: string) {
+        return this.messagingService.deleteMessage(messageId, req.user.id);
+    }
+
+    @Post('conversation/:conversationId/delete')
+    @ApiOperation({ summary: 'Delete a conversation' })
+    @ApiOkResponse({ description: 'Conversation deleted successfully' })
+    async deleteConversation(@Req() req: any, @Param('conversationId') conversationId: string) {
+        return this.messagingService.deleteConversation(conversationId, req.user.id);
+    }
 }
