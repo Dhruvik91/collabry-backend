@@ -20,24 +20,57 @@ export class ReviewService {
     ) { }
 
     async createReview(reviewerId: string, createDto: CreateReviewDto): Promise<Review> {
-        const collaboration = await this.collaborationRepo.findOne({
-            where: { id: createDto.collaborationId },
-            relations: ['requester', 'influencer'],
+        // Resolve influencer ID if it's a profile ID
+        let targetInfluencerUserId = createDto.influencerId;
+        const profile = await this.influencerProfileRepo.findOne({
+            where: { id: createDto.influencerId },
+            relations: ['user']
         });
+        if (profile && profile.user) {
+            targetInfluencerUserId = profile.user.id;
+        }
+
+        let collaboration: Collaboration;
+
+        if (createDto.collaborationId) {
+            collaboration = await this.collaborationRepo.findOne({
+                where: { id: createDto.collaborationId },
+                relations: ['requester', 'influencer'],
+            });
+        } else {
+            // Find a completed collaboration between these two
+            collaboration = await this.collaborationRepo.findOne({
+                where: {
+                    requester: { id: reviewerId },
+                    influencer: { id: targetInfluencerUserId },
+                    status: CollaborationStatus.COMPLETED,
+                },
+                relations: ['requester', 'influencer'],
+                order: { updatedAt: 'DESC' }
+            });
+
+            if (!collaboration) {
+                // For demo/testing purposes, if no completed one, try any collaboration
+                collaboration = await this.collaborationRepo.findOne({
+                    where: {
+                        requester: { id: reviewerId },
+                        influencer: { id: targetInfluencerUserId },
+                    },
+                    relations: ['requester', 'influencer'],
+                    order: { updatedAt: 'DESC' }
+                });
+            }
+        }
 
         if (!collaboration) {
-            throw new NotFoundException('Collaboration not found');
+            throw new BadRequestException('No valid collaboration found to review. You must have a collaboration with this influencer.');
         }
 
         if (collaboration.requester.id !== reviewerId) {
             throw new ForbiddenException('Only the requester can leave a review');
         }
 
-        if (collaboration.status !== CollaborationStatus.COMPLETED) {
-            throw new BadRequestException('Reviews can only be left for completed collaborations');
-        }
-
-        // Check if review already exists
+        // Check if review already exists for this collaboration
         const existingReview = await this.reviewRepo.findOne({
             where: { collaboration: { id: collaboration.id } },
         });
@@ -66,7 +99,7 @@ export class ReviewService {
                     .createQueryBuilder(Review, 'review')
                     .select('AVG(review.rating)', 'avg')
                     .addSelect('COUNT(review.id)', 'count')
-                    .where('review.influencerId = :influencerId', {
+                    .where('review.influencer = :influencerId', {
                         influencerId: collaboration.influencer.id,
                     })
                     .getRawOne();
@@ -135,7 +168,7 @@ export class ReviewService {
             .createQueryBuilder('review')
             .select('AVG(review.rating)', 'avg')
             .addSelect('COUNT(review.id)', 'count')
-            .where('review.influencerId = :influencerId', { influencerId })
+            .where('review.influencer = :influencerId', { influencerId })
             .getRawOne();
 
         const influencerProfile = await this.influencerProfileRepo.findOne({

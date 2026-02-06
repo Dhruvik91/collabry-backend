@@ -21,6 +21,9 @@ export class Report {
     targetUser: User;
 
     @Column({ nullable: true })
+    targetType: string;
+
+    @Column({ nullable: true })
     reason: string;
 
     @Column({ type: 'text', nullable: true })

@@ -22,13 +22,25 @@ export class CollaborationService {
 
     async createCollaboration(requesterId: string, createDto: CreateCollaborationDto): Promise<Collaboration> {
         const requester = await this.userRepo.findOne({ where: { id: requesterId }, relations: ['profile'] });
-        const influencerUser = await this.userRepo.findOne({ where: { id: createDto.influencerId } });
+
+        // Try to find if influencerId is actually a profile ID
+        let targetUserId = createDto.influencerId;
+        const profile = await this.userRepo.manager.getRepository('InfluencerProfile').findOne({
+            where: { id: createDto.influencerId },
+            relations: ['user']
+        }) as any;
+
+        if (profile && profile.user) {
+            targetUserId = profile.user.id;
+        }
+
+        const influencerUser = await this.userRepo.findOne({ where: { id: targetUserId } });
 
         if (!influencerUser || influencerUser.role !== UserRole.INFLUENCER) {
             throw new BadRequestException('Target user must be an influencer');
         }
 
-        if (requesterId === createDto.influencerId) {
+        if (requesterId === targetUserId) {
             throw new BadRequestException('You cannot request a collaboration with yourself');
         }
 
@@ -38,7 +50,7 @@ export class CollaborationService {
 
         const collaboration = this.collaborationRepo.create({
             requester: { id: requesterId } as any,
-            influencer: { id: createDto.influencerId } as any,
+            influencer: { id: targetUserId } as any,
             title: createDto.title,
             description: createDto.description,
             proposedTerms: createDto.proposedTerms,
