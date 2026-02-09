@@ -20,6 +20,8 @@ import { ReportModule } from './modules/report/report.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { VerificationModule } from './modules/verification/verification.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { RankingModule } from './modules/ranking/ranking.module';
+
 
 @Module({
   imports: [
@@ -42,8 +44,10 @@ import { AdminModule } from './modules/admin/admin.module';
     SubscriptionModule,
     VerificationModule,
     AdminModule,
+    RankingModule,
 
     // Utility modules
+
     AwsModule,
     UploadsModule,
   ],
