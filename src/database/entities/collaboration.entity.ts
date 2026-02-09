@@ -71,4 +71,20 @@ export class Collaboration {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    @ApiProperty({ description: 'Proof of completion URLs', type: [String], required: false })
+    @Column({ type: 'text', array: true, nullable: true })
+    proofUrls: string[];
+
+    @ApiProperty({ description: 'Timestamp when proof was submitted', required: false })
+    @Column({ type: 'timestamp', nullable: true })
+    proofSubmittedAt: Date;
+
+    @ApiProperty({ description: 'Timestamp when proof was verified', required: false })
+    @Column({ type: 'timestamp', nullable: true })
+    proofVerifiedAt: Date;
+
+    @ApiProperty({ description: 'Admin who verified the proof', required: false })
+    @Column({ type: 'uuid', nullable: true })
+    proofVerifiedBy: string;
 }
