@@ -27,7 +27,7 @@ export class MessagingService {
                 userOne: { id: userOneId },
                 userTwo: { id: userTwoId },
             },
-            relations: ['userOne', 'userTwo', 'userOne.profile', 'userTwo.profile'],
+            relations: ['userOne', 'userTwo', 'userOne.profile', 'userTwo.profile', 'userOne.influencerProfile', 'userTwo.influencerProfile'],
         });
 
         if (!conversation) {
@@ -45,7 +45,7 @@ export class MessagingService {
                             userOne: { id: userOneId },
                             userTwo: { id: userTwoId },
                         },
-                        relations: ['userOne', 'userTwo', 'userOne.profile', 'userTwo.profile'],
+                        relations: ['userOne', 'userTwo', 'userOne.profile', 'userTwo.profile', 'userOne.influencerProfile', 'userTwo.influencerProfile'],
                     });
                 } else {
                     throw error;
@@ -57,7 +57,7 @@ export class MessagingService {
                 // Reload to get relations if they weren't fetched yet
                 conversation = await this.conversationRepo.findOne({
                     where: { id: conversation.id },
-                    relations: ['userOne', 'userTwo', 'userOne.profile', 'userTwo.profile'],
+                    relations: ['userOne', 'userTwo', 'userOne.profile', 'userTwo.profile', 'userOne.influencerProfile', 'userTwo.influencerProfile'],
                 });
             }
         }
@@ -71,7 +71,7 @@ export class MessagingService {
                 { userOne: { id: userId } },
                 { userTwo: { id: userId } },
             ],
-            relations: ['userOne', 'userTwo', 'userOne.profile', 'userTwo.profile'],
+            relations: ['userOne', 'userTwo', 'userOne.profile', 'userTwo.profile', 'userOne.influencerProfile', 'userTwo.influencerProfile'],
             order: { lastMessageAt: 'DESC' },
         });
     }
@@ -122,7 +122,7 @@ export class MessagingService {
         return await this.messageRepo.find({
             where: { conversation: { id: conversationId } },
             order: { createdAt: 'ASC' },
-            relations: ['sender', 'sender.profile'],
+            relations: ['sender', 'sender.profile', 'sender.influencerProfile'],
         });
     }
 
