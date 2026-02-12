@@ -67,7 +67,7 @@ export class InfluencerService {
 
         if (search) {
             query.andWhere(
-                '(profile.fullName ILIKE :search OR profile.username ILIKE :search OR influencer.bio ILIKE :search)',
+                '(profile.fullName ILIKE :search OR profile.username ILIKE :search OR profile.bio ILIKE :search)',
                 { search: `%${search}%` }
             );
         }

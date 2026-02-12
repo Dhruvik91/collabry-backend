@@ -69,7 +69,16 @@ export class RankingService {
             });
 
             if (!influencer) {
-                throw new NotFoundException('Influencer profile not found');
+                return {
+                    completedCollaborations: { count: 0, score: 0 },
+                    paidPromotions: { count: 0, score: 0 },
+                    averageRating: { value: 0, score: 0 },
+                    responseSpeed: { hours: 24, score: 0 },
+                    completionRate: { percentage: 0, score: 0 },
+                    verificationBonus: { isVerified: false, score: 0 },
+                    penalties: { count: 0, score: 0 },
+                    totalScore: 0,
+                };
             }
 
             // 1. Calculate completed collaborations
