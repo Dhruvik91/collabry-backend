@@ -28,4 +28,14 @@ export class UpdateCollaborationDto {
     @IsDateString()
     @IsOptional()
     endDate?: string;
+
+    @ApiPropertyOptional({ type: [String] })
+    @IsString({ each: true })
+    @IsOptional()
+    proofUrls?: string[];
+
+    @ApiPropertyOptional()
+    @IsDateString()
+    @IsOptional()
+    proofSubmittedAt?: string;
 }

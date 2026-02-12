@@ -49,8 +49,8 @@ export class RankingService {
             responseSpeed: 20,
             completionRate: 30,
             verificationBonus: 100,
-            cancellationPenalty: -50,
-            rejectionPenalty: -30,
+            cancellationPenalty: 0,
+            rejectionPenalty: 0,
             lowRatingPenalty: -50,
         };
     }
@@ -193,7 +193,7 @@ export class RankingService {
                     score: isVerified ? this.weights.verificationBonus : 0,
                 },
                 penalties: {
-                    count: cancelledCollabs + rejectedCollabs,
+                    count: cancelledCollabs + rejectedCollabs + (averageRating < 3.0 && reviews.length > 0 ? 1 : 0),
                     score:
                         cancelledCollabs * this.weights.cancellationPenalty +
                         rejectedCollabs * this.weights.rejectionPenalty +

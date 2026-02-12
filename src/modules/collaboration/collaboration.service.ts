@@ -134,6 +134,7 @@ export class CollaborationService {
                 break;
 
             case CollaborationStatus.COMPLETED:
+                if (!isInfluencer) throw new ForbiddenException('Only the influencer can mark the collaboration as completed');
                 if (collaboration.status !== CollaborationStatus.IN_PROGRESS && collaboration.status !== CollaborationStatus.ACCEPTED) {
                     throw new BadRequestException('Collaboration must be in progress or accepted to be completed');
                 }
@@ -163,16 +164,37 @@ export class CollaborationService {
             throw new ForbiddenException('Only the requester can update collaboration details');
         }
 
-        if (collaboration.status === CollaborationStatus.COMPLETED || collaboration.status === CollaborationStatus.CANCELLED) {
-            throw new BadRequestException(`Cannot update details of a ${collaboration.status.toLowerCase()} collaboration`);
+        if (collaboration.status === CollaborationStatus.CANCELLED) {
+            throw new BadRequestException(`Cannot update a cancelled collaboration`);
         }
 
-        if (updateDto.startDate && updateDto.endDate && new Date(updateDto.startDate) > new Date(updateDto.endDate)) {
-            throw new BadRequestException('Start date cannot be after end date');
+        const isCompleted = collaboration.status === CollaborationStatus.COMPLETED;
+
+        if (isCompleted) {
+            // For completed collaborations, ONLY proof fields are allowed to be updated
+            const updateKeys = Object.keys(updateDto);
+            const allowedProofFields = ['proofUrls', 'proofSubmittedAt'];
+            const containsForbiddenFields = updateKeys.some(key => !allowedProofFields.includes(key));
+
+            if (containsForbiddenFields) {
+                throw new BadRequestException('Only proof of completion can be updated after a collaboration is completed');
+            }
+
+            if (updateDto.proofUrls) collaboration.proofUrls = updateDto.proofUrls;
+            if (updateDto.proofSubmittedAt) collaboration.proofSubmittedAt = new Date(updateDto.proofSubmittedAt);
+        } else {
+            // For active collaborations, allow general updates
+            Object.assign(collaboration, updateDto);
         }
 
-        Object.assign(collaboration, updateDto);
-        return await this.collaborationRepo.save(collaboration);
+        const updated = await this.collaborationRepo.save(collaboration);
+
+        // If proof was submitted, we might want to trigger a ranking update or notification
+        if (updateDto.proofUrls) {
+            await this.rankingService.updateRanking(collaboration.influencer.id);
+        }
+
+        return updated;
     }
 
     async deleteCollaboration(id: string, userId: string): Promise<void> {
@@ -185,12 +207,8 @@ export class CollaborationService {
             throw new ForbiddenException('You do not have permission to delete this collaboration');
         }
 
-        // Only allow hard delete if it's REQUESTED
-        // REJECTED and CANCELLED should not be deleted to preserve ranking integrity (penalties)
-        if (collaboration.status !== CollaborationStatus.REQUESTED) {
-            throw new BadRequestException(`Cannot delete a collaboration that is ${collaboration.status.toLowerCase()}. Only pending requests can be deleted to preserve ranking history.`);
-        }
-
+        // Allow deletion regardless of status as requested
+        // Note: For historical integrity, we might want to soft-delete in a real production app
         await this.collaborationRepo.remove(collaboration);
 
         // Update Ranking (though for REQUESTED it might not change much)
