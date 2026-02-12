@@ -2,10 +2,20 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsNotEmpty, IsUUID, IsString, IsOptional } from 'class-validator';
 
 export class CreateReportDto {
-  @ApiProperty({ example: 'uuid-of-target-user' })
+  @ApiPropertyOptional({ example: 'uuid-of-target-user' })
+  @IsOptional()
+  @IsUUID()
+  targetUserId?: string;
+
+  @ApiProperty({ example: 'uuid-of-target' })
   @IsNotEmpty()
   @IsUUID()
-  targetUserId: string;
+  targetId: string;
+
+  @ApiProperty({ example: 'influencer', enum: ['influencer', 'review', 'user'] })
+  @IsNotEmpty()
+  @IsString()
+  targetType: string;
 
   @ApiProperty({ example: 'Inappropriate content' })
   @IsNotEmpty()
@@ -16,4 +26,9 @@ export class CreateReportDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @ApiPropertyOptional({ example: 'Additional context' })
+  @IsOptional()
+  @IsString()
+  details?: string;
 }

@@ -7,13 +7,16 @@ import {
     OneToMany,
     CreateDateColumn,
     UpdateDateColumn,
+    Index,
 } from 'typeorm';
+import { ApiProperty } from '@nestjs/swagger';
 import { User } from './user.entity';
 import { AvailabilityStatus, CollaborationType } from './enums';
 import { Collaboration } from './collaboration.entity';
 
 @Entity('influencer_profiles')
 export class InfluencerProfile {
+    @ApiProperty()
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
@@ -21,21 +24,29 @@ export class InfluencerProfile {
     @JoinColumn()
     user: User;
 
+    @ApiProperty()
+    @Index()
     @Column({ nullable: true })
     niche: string;
 
+    @ApiProperty()
     @Column({ type: 'jsonb', nullable: true })
     platforms: any;
 
+    @ApiProperty()
     @Column({ type: 'bigint', default: 0 })
     followersCount: number;
 
+    @ApiProperty()
     @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
     engagementRate: number;
 
+    @ApiProperty()
     @Column({ type: 'text', array: true, nullable: true })
     collaborationTypes: string[];
 
+    @ApiProperty({ enum: AvailabilityStatus })
+    @Index()
     @Column({
         type: 'enum',
         enum: AvailabilityStatus,
@@ -43,15 +54,20 @@ export class InfluencerProfile {
     })
     availability: AvailabilityStatus;
 
+    @ApiProperty()
     @Column({ type: 'decimal', precision: 2, scale: 1, default: 0 })
     avgRating: number;
 
+    @ApiProperty()
     @Column({ default: 0 })
     totalReviews: number;
 
+    @ApiProperty()
     @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
     rankingScore: number;
 
+    @ApiProperty()
+    @Index()
     @Column({ default: false })
     verified: boolean;
 

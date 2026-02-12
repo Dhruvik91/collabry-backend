@@ -7,13 +7,16 @@ import {
     UpdateDateColumn,
     Unique,
     OneToMany,
+    Index,
 } from 'typeorm';
+import { ApiProperty } from '@nestjs/swagger';
 import { User } from './user.entity';
 import { Message } from './message.entity';
 
 @Entity('conversations')
 @Unique(['userOne', 'userTwo']) // Enforce unique conversation between two users
 export class Conversation {
+    @ApiProperty()
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
@@ -23,6 +26,8 @@ export class Conversation {
     @ManyToOne(() => User, { onDelete: 'CASCADE' })
     userTwo: User;
 
+    @ApiProperty()
+    @Index()
     @Column({ nullable: true })
     lastMessageAt: Date;
 

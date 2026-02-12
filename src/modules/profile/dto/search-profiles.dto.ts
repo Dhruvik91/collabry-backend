@@ -2,28 +2,21 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString, IsNumber, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export class SearchInfluencersDto {
-    @ApiPropertyOptional({ example: 'Lifestyle' })
+export class SearchProfilesDto {
+    @ApiPropertyOptional({ example: 'John' })
     @IsOptional()
     @IsString()
-    niche?: string;
+    name?: string;
 
-    @ApiPropertyOptional({ example: 'fitness' })
+    @ApiPropertyOptional({ example: 'johndoe' })
     @IsOptional()
     @IsString()
-    search?: string;
+    username?: string;
 
-    @ApiPropertyOptional({ example: 'Instagram' })
+    @ApiPropertyOptional({ example: 'New York' })
     @IsOptional()
     @IsString()
-    platform?: string;
-
-    @ApiPropertyOptional({ example: 1000 })
-    @IsOptional()
-    @Type(() => Number)
-    @IsNumber()
-    @Min(0)
-    minFollowers?: number;
+    location?: string;
 
     @ApiPropertyOptional({ example: 1 })
     @IsOptional()

@@ -4,9 +4,11 @@ import { Repository } from 'typeorm';
 import { Collaboration } from '../../database/entities/collaboration.entity';
 import { User } from '../../database/entities/user.entity';
 import { MailerService } from '../mailer/mailer.service';
+import { RankingService } from '../ranking/ranking.service';
 import { CreateCollaborationDto } from './dto/create-collaboration.dto';
 import { UpdateCollaborationStatusDto } from './dto/update-collaboration-status.dto';
-import { CollaborationStatus } from '../../database/entities/enums';
+import { UpdateCollaborationDto } from './dto/update-collaboration.dto';
+import { CollaborationStatus, UserRole } from '../../database/entities/enums';
 import { isEntityNotFoundError } from '../../database/errors/entity-not-found.type-guard';
 import { cif } from '../../database/errors/tryQuery';
 
@@ -18,15 +20,40 @@ export class CollaborationService {
         @InjectRepository(User)
         private readonly userRepo: Repository<User>,
         private readonly mailerService: MailerService,
+        private readonly rankingService: RankingService,
     ) { }
 
     async createCollaboration(requesterId: string, createDto: CreateCollaborationDto): Promise<Collaboration> {
         const requester = await this.userRepo.findOne({ where: { id: requesterId }, relations: ['profile'] });
-        const influencerUser = await this.userRepo.findOne({ where: { id: createDto.influencerId } });
+
+        // Try to find if influencerId is actually a profile ID
+        let targetUserId = createDto.influencerId;
+        const profile = await this.userRepo.manager.getRepository('InfluencerProfile').findOne({
+            where: { id: createDto.influencerId },
+            relations: ['user']
+        }) as any;
+
+        if (profile && profile.user) {
+            targetUserId = profile.user.id;
+        }
+
+        const influencerUser = await this.userRepo.findOne({ where: { id: targetUserId } });
+
+        if (!influencerUser || influencerUser.role !== UserRole.INFLUENCER) {
+            throw new BadRequestException('Target user must be an influencer');
+        }
+
+        if (requesterId === targetUserId) {
+            throw new BadRequestException('You cannot request a collaboration with yourself');
+        }
+
+        if (createDto.startDate && createDto.endDate && new Date(createDto.startDate) > new Date(createDto.endDate)) {
+            throw new BadRequestException('Start date cannot be after end date');
+        }
 
         const collaboration = this.collaborationRepo.create({
             requester: { id: requesterId } as any,
-            influencer: { id: createDto.influencerId } as any,
+            influencer: { id: targetUserId } as any,
             title: createDto.title,
             description: createDto.description,
             proposedTerms: createDto.proposedTerms,
@@ -36,6 +63,9 @@ export class CollaborationService {
         });
 
         const savedCollaboration = await this.collaborationRepo.save(collaboration);
+
+        // Update Ranking
+        await this.rankingService.updateRanking(targetUserId);
 
         // Notify Influencer via Email
         if (influencerUser && requester) {
@@ -84,24 +114,104 @@ export class CollaborationService {
     async updateStatus(id: string, userId: string, statusDto: UpdateCollaborationStatusDto): Promise<Collaboration> {
         const collaboration = await this.getCollaborationById(id, userId);
 
-        // Only influencer can accept/reject
-        if ([CollaborationStatus.ACCEPTED, CollaborationStatus.REJECTED].includes(statusDto.status)) {
-            if (collaboration.influencer.id !== userId) {
-                throw new ForbiddenException('Only the influencer can accept or reject the collaboration');
-            }
-            if (collaboration.status !== CollaborationStatus.REQUESTED) {
-                throw new BadRequestException(`Cannot transition from ${collaboration.status} to ${statusDto.status}`);
-            }
-        }
+        const isInfluencer = collaboration.influencer.id === userId;
+        const isRequester = collaboration.requester.id === userId;
 
-        // Completion or Cancellation
-        if (statusDto.status === CollaborationStatus.COMPLETED) {
-            if (collaboration.status !== CollaborationStatus.ACCEPTED && collaboration.status !== CollaborationStatus.IN_PROGRESS) {
-                throw new BadRequestException('Collaboration must be accepted or in progress to be completed');
-            }
+        // Validation based on current status and new status
+        switch (statusDto.status) {
+            case CollaborationStatus.ACCEPTED:
+            case CollaborationStatus.REJECTED:
+                if (!isInfluencer) throw new ForbiddenException('Only the influencer can accept or reject');
+                if (collaboration.status !== CollaborationStatus.REQUESTED) {
+                    throw new BadRequestException(`Cannot ${statusDto.status.toLowerCase()} from current state: ${collaboration.status}`);
+                }
+                break;
+
+            case CollaborationStatus.IN_PROGRESS:
+                if (collaboration.status !== CollaborationStatus.ACCEPTED) {
+                    throw new BadRequestException('Collaboration must be accepted before starting');
+                }
+                break;
+
+            case CollaborationStatus.COMPLETED:
+                if (!isInfluencer) throw new ForbiddenException('Only the influencer can mark the collaboration as completed');
+                if (collaboration.status !== CollaborationStatus.IN_PROGRESS && collaboration.status !== CollaborationStatus.ACCEPTED) {
+                    throw new BadRequestException('Collaboration must be in progress or accepted to be completed');
+                }
+                break;
+
+            case CollaborationStatus.CANCELLED:
+                if (collaboration.status === CollaborationStatus.COMPLETED) {
+                    throw new BadRequestException('Cannot cancel a completed collaboration');
+                }
+                break;
         }
 
         collaboration.status = statusDto.status;
-        return await this.collaborationRepo.save(collaboration);
+        const updatedCollaboration = await this.collaborationRepo.save(collaboration);
+
+        // Update Ranking for the influencer
+        await this.rankingService.updateRanking(collaboration.influencer.id);
+
+        return updatedCollaboration;
+    }
+
+    async updateCollaboration(id: string, userId: string, updateDto: UpdateCollaborationDto): Promise<Collaboration> {
+        const collaboration = await this.getCollaborationById(id, userId);
+
+        // Only the requester can update the collaboration details (title, description, etc.)
+        if (collaboration.requester.id !== userId) {
+            throw new ForbiddenException('Only the requester can update collaboration details');
+        }
+
+        if (collaboration.status === CollaborationStatus.CANCELLED) {
+            throw new BadRequestException(`Cannot update a cancelled collaboration`);
+        }
+
+        const isCompleted = collaboration.status === CollaborationStatus.COMPLETED;
+
+        if (isCompleted) {
+            // For completed collaborations, ONLY proof fields are allowed to be updated
+            const updateKeys = Object.keys(updateDto);
+            const allowedProofFields = ['proofUrls', 'proofSubmittedAt'];
+            const containsForbiddenFields = updateKeys.some(key => !allowedProofFields.includes(key));
+
+            if (containsForbiddenFields) {
+                throw new BadRequestException('Only proof of completion can be updated after a collaboration is completed');
+            }
+
+            if (updateDto.proofUrls) collaboration.proofUrls = updateDto.proofUrls;
+            if (updateDto.proofSubmittedAt) collaboration.proofSubmittedAt = new Date(updateDto.proofSubmittedAt);
+        } else {
+            // For active collaborations, allow general updates
+            Object.assign(collaboration, updateDto);
+        }
+
+        const updated = await this.collaborationRepo.save(collaboration);
+
+        // If proof was submitted, we might want to trigger a ranking update or notification
+        if (updateDto.proofUrls) {
+            await this.rankingService.updateRanking(collaboration.influencer.id);
+        }
+
+        return updated;
+    }
+
+    async deleteCollaboration(id: string, userId: string): Promise<void> {
+        const collaboration = await this.getCollaborationById(id, userId);
+        const influencerId = collaboration.influencer.id;
+
+        // Allow both influencer and requester to delete if it's already cancelled or rejected?
+        // Usually, only the owner (requester) can delete the request.
+        if (collaboration.requester.id !== userId && collaboration.influencer.id !== userId) {
+            throw new ForbiddenException('You do not have permission to delete this collaboration');
+        }
+
+        // Allow deletion regardless of status as requested
+        // Note: For historical integrity, we might want to soft-delete in a real production app
+        await this.collaborationRepo.remove(collaboration);
+
+        // Update Ranking (though for REQUESTED it might not change much)
+        await this.rankingService.updateRanking(influencerId);
     }
 }

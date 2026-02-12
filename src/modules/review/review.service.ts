@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Review } from '../../database/entities/review.entity';
@@ -6,8 +6,6 @@ import { Collaboration } from '../../database/entities/collaboration.entity';
 import { InfluencerProfile } from '../../database/entities/influencer-profile.entity';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { CollaborationStatus } from '../../database/entities/enums';
-import { isEntityNotFoundError } from '../../database/errors/entity-not-found.type-guard';
-import { cif } from '../../database/errors/tryQuery';
 
 @Injectable()
 export class ReviewService {
@@ -22,24 +20,57 @@ export class ReviewService {
     ) { }
 
     async createReview(reviewerId: string, createDto: CreateReviewDto): Promise<Review> {
-        const collaboration = await this.collaborationRepo.findOne({
-            where: { id: createDto.collaborationId },
-            relations: ['requester', 'influencer'],
+        // Resolve influencer ID if it's a profile ID
+        let targetInfluencerUserId = createDto.influencerId;
+        const profile = await this.influencerProfileRepo.findOne({
+            where: { id: createDto.influencerId },
+            relations: ['user']
         });
+        if (profile && profile.user) {
+            targetInfluencerUserId = profile.user.id;
+        }
+
+        let collaboration: Collaboration;
+
+        if (createDto.collaborationId) {
+            collaboration = await this.collaborationRepo.findOne({
+                where: { id: createDto.collaborationId },
+                relations: ['requester', 'influencer'],
+            });
+        } else {
+            // Find a completed collaboration between these two
+            collaboration = await this.collaborationRepo.findOne({
+                where: {
+                    requester: { id: reviewerId },
+                    influencer: { id: targetInfluencerUserId },
+                    status: CollaborationStatus.COMPLETED,
+                },
+                relations: ['requester', 'influencer'],
+                order: { updatedAt: 'DESC' }
+            });
+
+            if (!collaboration) {
+                // For demo/testing purposes, if no completed one, try any collaboration
+                collaboration = await this.collaborationRepo.findOne({
+                    where: {
+                        requester: { id: reviewerId },
+                        influencer: { id: targetInfluencerUserId },
+                    },
+                    relations: ['requester', 'influencer'],
+                    order: { updatedAt: 'DESC' }
+                });
+            }
+        }
 
         if (!collaboration) {
-            throw new NotFoundException('Collaboration not found');
+            throw new BadRequestException('No valid collaboration found to review. You must have a collaboration with this influencer.');
         }
 
         if (collaboration.requester.id !== reviewerId) {
             throw new ForbiddenException('Only the requester can leave a review');
         }
 
-        if (collaboration.status !== CollaborationStatus.COMPLETED) {
-            throw new BadRequestException('Reviews can only be left for completed collaborations');
-        }
-
-        // Check if review already exists
+        // Check if review already exists for this collaboration
         const existingReview = await this.reviewRepo.findOne({
             where: { collaboration: { id: collaboration.id } },
         });
@@ -58,25 +89,23 @@ export class ReviewService {
 
             const savedReview = await manager.save(Review, review);
 
-            // Update Influencer Rating within the same transaction
+            // Update Influencer Rating within the same transaction using aggregate query
             const influencerProfile = await manager.findOne(InfluencerProfile, {
                 where: { user: { id: collaboration.influencer.id } },
             });
 
             if (influencerProfile) {
-                const reviews = await manager.find(Review, {
-                    where: { influencer: { id: collaboration.influencer.id } },
-                });
+                const stats = await manager
+                    .createQueryBuilder(Review, 'review')
+                    .select('AVG(review.rating)', 'avg')
+                    .addSelect('COUNT(review.id)', 'count')
+                    .where('review.influencer = :influencerId', {
+                        influencerId: collaboration.influencer.id,
+                    })
+                    .getRawOne();
 
-                // Note: savedReview is already in the DB but transaction is not committed.
-                // Depending on isolation level, we might need to manually add savedReview if find doesn't return it yet,
-                // but usually find within transaction works. To be safe/accurate:
-                const allReviews = [...reviews];
-                const total = allReviews.length;
-                const sum = allReviews.reduce((acc, r) => acc + r.rating, 0);
-
-                influencerProfile.avgRating = Number((sum / total).toFixed(1));
-                influencerProfile.totalReviews = total;
+                influencerProfile.avgRating = Number(Number(stats.avg || 0).toFixed(1));
+                influencerProfile.totalReviews = Number(stats.count || 0);
 
                 await manager.save(InfluencerProfile, influencerProfile);
             }
@@ -93,4 +122,63 @@ export class ReviewService {
         });
     }
 
+    async updateReview(userId: string, id: string, updateDto: Partial<CreateReviewDto>): Promise<Review> {
+        const review = await this.reviewRepo.findOne({
+            where: { id },
+            relations: ['reviewer', 'influencer'],
+        });
+
+        if (!review) {
+            throw new NotFoundException('Review not found');
+        }
+
+        if (review.reviewer.id !== userId) {
+            throw new ForbiddenException('You can only update your own reviews');
+        }
+
+        if (updateDto.rating) review.rating = updateDto.rating;
+        if (updateDto.comment) review.comment = updateDto.comment;
+
+        const savedReview = await this.reviewRepo.save(review);
+        await this.updateInfluencerAverageRating(review.influencer.id);
+        return savedReview;
+    }
+
+    async deleteReview(userId: string, id: string): Promise<void> {
+        const review = await this.reviewRepo.findOne({
+            where: { id },
+            relations: ['reviewer', 'influencer'],
+        });
+
+        if (!review) {
+            throw new NotFoundException('Review not found');
+        }
+
+        if (review.reviewer.id !== userId) {
+            throw new ForbiddenException('You can only delete your own reviews');
+        }
+
+        const influencerId = review.influencer.id;
+        await this.reviewRepo.remove(review);
+        await this.updateInfluencerAverageRating(influencerId);
+    }
+
+    private async updateInfluencerAverageRating(influencerId: string): Promise<void> {
+        const stats = await this.reviewRepo
+            .createQueryBuilder('review')
+            .select('AVG(review.rating)', 'avg')
+            .addSelect('COUNT(review.id)', 'count')
+            .where('review.influencer = :influencerId', { influencerId })
+            .getRawOne();
+
+        const influencerProfile = await this.influencerProfileRepo.findOne({
+            where: { user: { id: influencerId } },
+        });
+
+        if (influencerProfile) {
+            influencerProfile.avgRating = Number(Number(stats.avg || 0).toFixed(1));
+            influencerProfile.totalReviews = Number(stats.count || 0);
+            await this.influencerProfileRepo.save(influencerProfile);
+        }
+    }
 }

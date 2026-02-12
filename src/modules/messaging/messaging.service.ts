@@ -5,9 +5,7 @@ import { Conversation } from '../../database/entities/conversation.entity';
 import { Message } from '../../database/entities/message.entity';
 import { StartConversationDto } from './dto/start-conversation.dto';
 import { SendMessageDto } from './dto/send-message.dto';
-import { isEntityNotFoundError } from '../../database/errors/entity-not-found.type-guard';
 import { isUniqueConstraintError } from '../../database/errors/unique-constraint.type-guard';
-import { cif } from '../../database/errors/tryQuery';
 
 @Injectable()
 export class MessagingService {
@@ -29,7 +27,7 @@ export class MessagingService {
                 userOne: { id: userOneId },
                 userTwo: { id: userTwoId },
             },
-            relations: ['userOne', 'userTwo', 'userOne.profile', 'userTwo.profile'],
+            relations: ['userOne', 'userTwo', 'userOne.profile', 'userTwo.profile', 'userOne.influencerProfile', 'userTwo.influencerProfile'],
         });
 
         if (!conversation) {
@@ -47,7 +45,7 @@ export class MessagingService {
                             userOne: { id: userOneId },
                             userTwo: { id: userTwoId },
                         },
-                        relations: ['userOne', 'userTwo', 'userOne.profile', 'userTwo.profile'],
+                        relations: ['userOne', 'userTwo', 'userOne.profile', 'userTwo.profile', 'userOne.influencerProfile', 'userTwo.influencerProfile'],
                     });
                 } else {
                     throw error;
@@ -59,7 +57,7 @@ export class MessagingService {
                 // Reload to get relations if they weren't fetched yet
                 conversation = await this.conversationRepo.findOne({
                     where: { id: conversation.id },
-                    relations: ['userOne', 'userTwo', 'userOne.profile', 'userTwo.profile'],
+                    relations: ['userOne', 'userTwo', 'userOne.profile', 'userTwo.profile', 'userOne.influencerProfile', 'userTwo.influencerProfile'],
                 });
             }
         }
@@ -73,7 +71,7 @@ export class MessagingService {
                 { userOne: { id: userId } },
                 { userTwo: { id: userId } },
             ],
-            relations: ['userOne', 'userTwo', 'userOne.profile', 'userTwo.profile'],
+            relations: ['userOne', 'userTwo', 'userOne.profile', 'userTwo.profile', 'userOne.influencerProfile', 'userTwo.influencerProfile'],
             order: { lastMessageAt: 'DESC' },
         });
     }
@@ -124,7 +122,62 @@ export class MessagingService {
         return await this.messageRepo.find({
             where: { conversation: { id: conversationId } },
             order: { createdAt: 'ASC' },
-            relations: ['sender', 'sender.profile'],
+            relations: ['sender', 'sender.profile', 'sender.influencerProfile'],
         });
+    }
+
+    async updateMessage(messageId: string, userId: string, updateDto: SendMessageDto): Promise<Message> {
+        const message = await this.messageRepo.findOne({
+            where: { id: messageId },
+            relations: ['sender'],
+        });
+
+        if (!message) {
+            throw new NotFoundException('Message not found');
+        }
+
+        if (message.sender.id !== userId) {
+            throw new ForbiddenException('You can only update your own messages');
+        }
+
+        message.message = updateDto.message;
+        message.updatedAt = new Date();
+        return await this.messageRepo.save(message);
+    }
+
+    async deleteMessage(messageId: string, userId: string): Promise<void> {
+        const message = await this.messageRepo.findOne({
+            where: { id: messageId },
+            relations: ['sender'],
+        });
+
+        if (!message) {
+            throw new NotFoundException('Message not found');
+        }
+
+        if (message.sender.id !== userId) {
+            throw new ForbiddenException('You can only delete your own messages');
+        }
+
+        await this.messageRepo.remove(message);
+    }
+
+    async deleteConversation(conversationId: string, userId: string): Promise<void> {
+        const conversation = await this.conversationRepo.findOne({
+            where: { id: conversationId },
+            relations: ['userOne', 'userTwo'],
+        });
+
+        if (!conversation) {
+            throw new NotFoundException('Conversation not found');
+        }
+
+        if (conversation.userOne.id !== userId && conversation.userTwo.id !== userId) {
+            throw new ForbiddenException('You are not a participant in this conversation');
+        }
+
+        // Delete all messages in the conversation first (TypeORM might handle this if cascade is set, but let's be explicit if not sure)
+        await this.messageRepo.delete({ conversation: { id: conversationId } });
+        await this.conversationRepo.remove(conversation);
     }
 }

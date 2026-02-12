@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Report } from '../../database/entities/report.entity';
+import { InfluencerProfile } from '../../database/entities/influencer-profile.entity';
 import { CreateReportDto } from './dto/create-report.dto';
 import { ReportStatus } from '../../database/entities/enums';
 
@@ -10,14 +11,30 @@ export class ReportService {
   constructor(
     @InjectRepository(Report)
     private readonly reportRepo: Repository<Report>,
+    @InjectRepository(InfluencerProfile)
+    private readonly influencerProfileRepo: Repository<InfluencerProfile>,
   ) { }
 
   async createReport(reporterId: string, createDto: CreateReportDto): Promise<Report> {
+    let resolvedTargetUserId = createDto.targetUserId || createDto.targetId;
+
+    // If it's an influencer report, try to resolve the profile ID
+    if (createDto.targetType === 'influencer' || !createDto.targetUserId) {
+      const profile = await this.influencerProfileRepo.findOne({
+        where: { id: createDto.targetId },
+        relations: ['user']
+      });
+      if (profile && profile.user) {
+        resolvedTargetUserId = profile.user.id;
+      }
+    }
+
     const report = this.reportRepo.create({
       reporter: { id: reporterId } as any,
-      targetUser: { id: createDto.targetUserId } as any,
+      targetUser: { id: resolvedTargetUserId } as any,
+      targetType: createDto.targetType,
       reason: createDto.reason,
-      description: createDto.description,
+      description: createDto.description || createDto.details,
       status: ReportStatus.OPEN,
     });
 
@@ -48,5 +65,18 @@ export class ReportService {
     }
 
     return await this.reportRepo.save(report);
+  }
+
+  async deleteReport(userId: string, id: string): Promise<void> {
+    const report = await this.reportRepo.findOne({ where: { id }, relations: ['reporter'] });
+    if (!report) {
+      throw new NotFoundException('Report not found');
+    }
+
+    if (report.reporter.id !== userId) {
+      throw new ForbiddenException('You can only delete your own reports');
+    }
+
+    await this.reportRepo.remove(report);
   }
 }

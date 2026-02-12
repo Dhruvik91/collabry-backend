@@ -12,7 +12,7 @@ import { AwsService } from '../aws/aws.service';
 import { ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('uploads')
-@Controller('uploads')
+@Controller('v1/uploads')
 export class UploadsController {
     constructor(private readonly awsService: AwsService) { }
 

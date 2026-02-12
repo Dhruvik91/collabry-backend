@@ -1,11 +1,13 @@
 import { Controller, Get, Patch, Post, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse, ApiBody } from '@nestjs/swagger';
+import { AdminService } from './admin.service';
 import { ReportService } from '../report/report.service';
 import { VerificationService } from '../verification/verification.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { UpdateReportStatusDto } from './dto/update-report-status.dto';
 import { UpdateVerificationStatusDto } from './dto/update-verification-status.dto';
 import { SaveSubscriptionPlanDto } from '../subscription/dto/save-subscription-plan.dto';
+import { AdminStatsDto } from './dto/admin-stats.dto';
 import { UserRole } from '../../database/entities/enums';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/Guards/roles.guard';
@@ -17,10 +19,19 @@ import { RolesGuard } from '../auth/Guards/roles.guard';
 @Controller('v1/admin')
 export class AdminController {
     constructor(
+        private readonly adminService: AdminService,
         private readonly reportService: ReportService,
         private readonly verificationService: VerificationService,
         private readonly subscriptionService: SubscriptionService,
     ) { }
+
+    // --- Statistics ---
+    @Get('stats')
+    @ApiOperation({ summary: 'Get platform statistics' })
+    @ApiOkResponse({ description: 'Statistics retrieved successfully', type: AdminStatsDto })
+    async getStatistics(): Promise<AdminStatsDto> {
+        return this.adminService.getStatistics();
+    }
 
     // --- Reports ---
     @Get('reports')
