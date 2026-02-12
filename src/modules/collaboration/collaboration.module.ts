@@ -6,9 +6,14 @@ import { CollaborationService } from './collaboration.service';
 
 import { User } from '../../database/entities/user.entity';
 import { MailerConfigModule } from '../mailer/mailer.module';
+import { RankingModule } from '../ranking/ranking.module';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([Collaboration, User]), MailerConfigModule],
+    imports: [
+        TypeOrmModule.forFeature([Collaboration, User]),
+        MailerConfigModule,
+        RankingModule
+    ],
     controllers: [CollaborationController],
     providers: [CollaborationService],
     exports: [CollaborationService],

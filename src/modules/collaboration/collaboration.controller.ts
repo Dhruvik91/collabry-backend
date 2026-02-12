@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Patch, Body, Req, Param } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Req, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
 import { CollaborationService } from './collaboration.service';
 import { CreateCollaborationDto } from './dto/create-collaboration.dto';
 import { UpdateCollaborationStatusDto } from './dto/update-collaboration-status.dto';
+import { UpdateCollaborationDto } from './dto/update-collaboration.dto';
 import { Collaboration } from '../../database/entities/collaboration.entity';
 
 @ApiTags('Collaboration')
@@ -37,5 +38,19 @@ export class CollaborationController {
     @ApiOkResponse({ description: 'Collaboration status updated', type: Collaboration })
     async updateStatus(@Req() req: any, @Param('id') id: string, @Body() statusDto: UpdateCollaborationStatusDto) {
         return this.collaborationService.updateStatus(id, req.user.id, statusDto);
+    }
+
+    @Patch(':id')
+    @ApiOperation({ summary: 'Update collaboration details' })
+    @ApiOkResponse({ description: 'Collaboration details updated', type: Collaboration })
+    async update(@Req() req: any, @Param('id') id: string, @Body() updateDto: UpdateCollaborationDto) {
+        return this.collaborationService.updateCollaboration(id, req.user.id, updateDto);
+    }
+
+    @Delete(':id')
+    @ApiOperation({ summary: 'Delete a collaboration' })
+    @ApiOkResponse({ description: 'Collaboration deleted' })
+    async remove(@Req() req: any, @Param('id') id: string) {
+        return this.collaborationService.deleteCollaboration(id, req.user.id);
     }
 }

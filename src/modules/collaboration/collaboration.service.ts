@@ -4,8 +4,10 @@ import { Repository } from 'typeorm';
 import { Collaboration } from '../../database/entities/collaboration.entity';
 import { User } from '../../database/entities/user.entity';
 import { MailerService } from '../mailer/mailer.service';
+import { RankingService } from '../ranking/ranking.service';
 import { CreateCollaborationDto } from './dto/create-collaboration.dto';
 import { UpdateCollaborationStatusDto } from './dto/update-collaboration-status.dto';
+import { UpdateCollaborationDto } from './dto/update-collaboration.dto';
 import { CollaborationStatus, UserRole } from '../../database/entities/enums';
 import { isEntityNotFoundError } from '../../database/errors/entity-not-found.type-guard';
 import { cif } from '../../database/errors/tryQuery';
@@ -18,6 +20,7 @@ export class CollaborationService {
         @InjectRepository(User)
         private readonly userRepo: Repository<User>,
         private readonly mailerService: MailerService,
+        private readonly rankingService: RankingService,
     ) { }
 
     async createCollaboration(requesterId: string, createDto: CreateCollaborationDto): Promise<Collaboration> {
@@ -60,6 +63,9 @@ export class CollaborationService {
         });
 
         const savedCollaboration = await this.collaborationRepo.save(collaboration);
+
+        // Update Ranking
+        await this.rankingService.updateRanking(targetUserId);
 
         // Notify Influencer via Email
         if (influencerUser && requester) {
@@ -141,6 +147,53 @@ export class CollaborationService {
         }
 
         collaboration.status = statusDto.status;
+        const updatedCollaboration = await this.collaborationRepo.save(collaboration);
+
+        // Update Ranking for the influencer
+        await this.rankingService.updateRanking(collaboration.influencer.id);
+
+        return updatedCollaboration;
+    }
+
+    async updateCollaboration(id: string, userId: string, updateDto: UpdateCollaborationDto): Promise<Collaboration> {
+        const collaboration = await this.getCollaborationById(id, userId);
+
+        // Only the requester can update the collaboration details (title, description, etc.)
+        if (collaboration.requester.id !== userId) {
+            throw new ForbiddenException('Only the requester can update collaboration details');
+        }
+
+        if (collaboration.status === CollaborationStatus.COMPLETED || collaboration.status === CollaborationStatus.CANCELLED) {
+            throw new BadRequestException(`Cannot update details of a ${collaboration.status.toLowerCase()} collaboration`);
+        }
+
+        if (updateDto.startDate && updateDto.endDate && new Date(updateDto.startDate) > new Date(updateDto.endDate)) {
+            throw new BadRequestException('Start date cannot be after end date');
+        }
+
+        Object.assign(collaboration, updateDto);
         return await this.collaborationRepo.save(collaboration);
+    }
+
+    async deleteCollaboration(id: string, userId: string): Promise<void> {
+        const collaboration = await this.getCollaborationById(id, userId);
+        const influencerId = collaboration.influencer.id;
+
+        // Allow both influencer and requester to delete if it's already cancelled or rejected?
+        // Usually, only the owner (requester) can delete the request.
+        if (collaboration.requester.id !== userId && collaboration.influencer.id !== userId) {
+            throw new ForbiddenException('You do not have permission to delete this collaboration');
+        }
+
+        // Only allow hard delete if it's REQUESTED
+        // REJECTED and CANCELLED should not be deleted to preserve ranking integrity (penalties)
+        if (collaboration.status !== CollaborationStatus.REQUESTED) {
+            throw new BadRequestException(`Cannot delete a collaboration that is ${collaboration.status.toLowerCase()}. Only pending requests can be deleted to preserve ranking history.`);
+        }
+
+        await this.collaborationRepo.remove(collaboration);
+
+        // Update Ranking (though for REQUESTED it might not change much)
+        await this.rankingService.updateRanking(influencerId);
     }
 }
