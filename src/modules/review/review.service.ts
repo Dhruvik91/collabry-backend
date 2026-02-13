@@ -105,7 +105,7 @@ export class ReviewService {
 
             // Update Influencer Rating within the same transaction using aggregate query
             const influencerProfile = await manager.findOne(InfluencerProfile, {
-                where: { user: { id: collaboration.influencer.id } },
+                where: { id: targetInfluencerProfileId },
             });
 
             if (influencerProfile) {
