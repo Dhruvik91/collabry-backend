@@ -11,6 +11,7 @@ import {
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { User } from './user.entity';
+import { InfluencerProfile } from './influencer-profile.entity';
 import { CollaborationStatus } from './enums';
 import { Review } from './review.entity';
 
@@ -26,9 +27,9 @@ export class Collaboration {
     requester: User;
 
     @Index()
-    @ManyToOne(() => User)
+    @ManyToOne(() => InfluencerProfile)
     @JoinColumn({ name: 'influencerId' })
-    influencer: User;
+    influencer: InfluencerProfile;
 
     @ApiProperty()
     @Column({ nullable: true })

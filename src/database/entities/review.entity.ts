@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn, ManyToOne
 import { ApiProperty } from '@nestjs/swagger';
 import { Collaboration } from './collaboration.entity';
 import { User } from './user.entity';
+import { InfluencerProfile } from './influencer-profile.entity';
 import { ReviewStatus } from './enums';
 
 @Entity('reviews')
@@ -15,8 +16,9 @@ export class Review {
     reviewer: User;
 
     @Index()
-    @ManyToOne(() => User)
-    influencer: User;
+    @ManyToOne(() => InfluencerProfile)
+    @JoinColumn({ name: 'influencerId' })
+    influencer: InfluencerProfile;
 
     @ApiProperty()
     @OneToOne(() => Collaboration, (collaboration) => collaboration.review)

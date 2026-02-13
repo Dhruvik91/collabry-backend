@@ -20,15 +20,29 @@ export class ReviewService {
     ) { }
 
     async createReview(reviewerId: string, createDto: CreateReviewDto): Promise<Review> {
-        // Resolve influencer ID if it's a profile ID
-        let targetInfluencerUserId = createDto.influencerId;
+        // Resolve influencer Profile ID if a user ID was passed
+        let targetInfluencerProfileId = createDto.influencerId;
+
+        // If the ID provided is not a profile ID but a user ID, find the profile
+        const profileByUserId = await this.influencerProfileRepo.findOne({
+            where: { user: { id: createDto.influencerId } }
+        });
+
+        if (profileByUserId) {
+            targetInfluencerProfileId = profileByUserId.id;
+        }
+
+        // Ensure we actually have a profile ID now
         const profile = await this.influencerProfileRepo.findOne({
-            where: { id: createDto.influencerId },
+            where: { id: targetInfluencerProfileId },
             relations: ['user']
         });
-        if (profile && profile.user) {
-            targetInfluencerUserId = profile.user.id;
+
+        if (!profile) {
+            throw new NotFoundException('Influencer profile not found');
         }
+
+        const targetInfluencerUserId = profile.user.id;
 
         let collaboration: Collaboration;
 
@@ -81,7 +95,7 @@ export class ReviewService {
         return await this.dataSource.transaction(async (manager) => {
             const review = manager.create(Review, {
                 reviewer: { id: reviewerId } as any,
-                influencer: { id: collaboration.influencer.id } as any,
+                influencer: { id: targetInfluencerProfileId } as any,
                 collaboration: { id: collaboration.id } as any,
                 rating: createDto.rating,
                 comment: createDto.comment,
@@ -99,8 +113,8 @@ export class ReviewService {
                     .createQueryBuilder(Review, 'review')
                     .select('AVG(review.rating)', 'avg')
                     .addSelect('COUNT(review.id)', 'count')
-                    .where('review.influencer = :influencerId', {
-                        influencerId: collaboration.influencer.id,
+                    .where('review.influencerId = :influencerProfileId', {
+                        influencerProfileId: targetInfluencerProfileId,
                     })
                     .getRawOne();
 
@@ -114,9 +128,9 @@ export class ReviewService {
         });
     }
 
-    async getInfluencerReviews(influencerUserId: string): Promise<Review[]> {
+    async getInfluencerReviews(influencerProfileId: string): Promise<Review[]> {
         return await this.reviewRepo.find({
-            where: { influencer: { id: influencerUserId } },
+            where: { influencer: { id: influencerProfileId } },
             relations: ['reviewer', 'reviewer.profile'],
             order: { createdAt: 'DESC' },
         });
@@ -158,21 +172,21 @@ export class ReviewService {
             throw new ForbiddenException('You can only delete your own reviews');
         }
 
-        const influencerId = review.influencer.id;
+        const influencerProfileId = review.influencer.id;
         await this.reviewRepo.remove(review);
-        await this.updateInfluencerAverageRating(influencerId);
+        await this.updateInfluencerAverageRating(influencerProfileId);
     }
 
-    private async updateInfluencerAverageRating(influencerId: string): Promise<void> {
+    private async updateInfluencerAverageRating(influencerProfileId: string): Promise<void> {
         const stats = await this.reviewRepo
             .createQueryBuilder('review')
             .select('AVG(review.rating)', 'avg')
             .addSelect('COUNT(review.id)', 'count')
-            .where('review.influencer = :influencerId', { influencerId })
+            .where('review.influencerId = :influencerProfileId', { influencerProfileId })
             .getRawOne();
 
         const influencerProfile = await this.influencerProfileRepo.findOne({
-            where: { user: { id: influencerId } },
+            where: { id: influencerProfileId },
         });
 
         if (influencerProfile) {

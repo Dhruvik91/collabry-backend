@@ -84,7 +84,7 @@ export class RankingService {
             // 1. Calculate completed collaborations
             const completedCollabs = await this.collaborationRepo.count({
                 where: {
-                    influencer: { id: influencerId },
+                    influencer: { user: { id: influencerId } },
                     status: CollaborationStatus.COMPLETED,
                 },
             });
@@ -95,7 +95,7 @@ export class RankingService {
 
             // 3. Calculate average rating
             const reviews = await this.reviewRepo.find({
-                where: { influencer: { id: influencerId } },
+                where: { influencer: { user: { id: influencerId } } },
                 select: ['rating'],
             });
 
@@ -137,7 +137,7 @@ export class RankingService {
             // 5. Calculate completion rate
             const acceptedCollabs = await this.collaborationRepo.count({
                 where: {
-                    influencer: { id: influencerId },
+                    influencer: { user: { id: influencerId } },
                     status: In([
                         CollaborationStatus.ACCEPTED,
                         CollaborationStatus.IN_PROGRESS,
@@ -154,14 +154,14 @@ export class RankingService {
             // 7. Calculate penalties
             const cancelledCollabs = await this.collaborationRepo.count({
                 where: {
-                    influencer: { id: influencerId },
+                    influencer: { user: { id: influencerId } },
                     status: CollaborationStatus.CANCELLED,
                 },
             });
 
             const rejectedCollabs = await this.collaborationRepo.count({
                 where: {
-                    influencer: { id: influencerId },
+                    influencer: { user: { id: influencerId } },
                     status: CollaborationStatus.REJECTED,
                 },
             });
@@ -241,7 +241,7 @@ export class RankingService {
             profile.rankingScore = breakdown.totalScore;
             profile.avgRating = breakdown.averageRating.value;
             profile.totalReviews = await this.reviewRepo.count({
-                where: { influencer: { id: influencerId } },
+                where: { influencer: { id: profile.id } },
             });
 
             await this.influencerRepo.save(profile);
