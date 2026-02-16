@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Review } from '../../database/entities/review.entity';
@@ -10,6 +10,8 @@ import { RankingService } from '../ranking/ranking.service';
 
 @Injectable()
 export class ReviewService {
+    private readonly logger = new Logger(ReviewService.name);
+
     constructor(
         @InjectRepository(Review)
         private readonly reviewRepo: Repository<Review>,
@@ -94,7 +96,7 @@ export class ReviewService {
             throw new BadRequestException('A review has already been submitted for this collaboration');
         }
 
-        return await this.dataSource.transaction(async (manager) => {
+        const savedReview = await this.dataSource.transaction(async (manager) => {
             const review = manager.create(Review, {
                 reviewer: { id: reviewerId } as any,
                 influencer: { id: targetInfluencerProfileId } as any,
@@ -103,7 +105,7 @@ export class ReviewService {
                 comment: createDto.comment,
             });
 
-            const savedReview = await manager.save(Review, review);
+            const saved = await manager.save(Review, review);
 
             // Update Influencer Rating within the same transaction using aggregate query
             const influencerProfile = await manager.findOne(InfluencerProfile, {
@@ -124,13 +126,21 @@ export class ReviewService {
                 influencerProfile.totalReviews = Number(stats.count || 0);
 
                 await manager.save(InfluencerProfile, influencerProfile);
-
-                // Update full ranking breakdown and tier
-                await this.rankingService.updateRanking(targetInfluencerUserId);
             }
 
-            return savedReview;
+            return saved;
         });
+
+        // Update full ranking breakdown and tier OUTSIDE the transaction to avoid deadlocks
+        // The ranking service tries to read/write to the same profile using its own logic
+        try {
+            await this.rankingService.updateRanking(targetInfluencerUserId);
+        } catch (error) {
+            this.logger.error(`Failed to update ranking after review: ${error.message}`);
+            // We don't throw here as the review is already saved and committed
+        }
+
+        return savedReview;
     }
 
     async getInfluencerReviews(influencerProfileId: string): Promise<Review[]> {

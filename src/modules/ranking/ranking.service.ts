@@ -195,8 +195,8 @@ export class RankingService {
             else if (totalScore >= 20) tier = 'Emerging Partner';
 
             return {
-                completedCollaborations: { count: completedCollabs, score: Math.round(scores.completed) },
-                paidPromotions: { count: paidPromotions, score: Math.round(scores.paid) },
+                completedCollaborations: { count: completedCollabs, score: Math.ceil(scores.completed) },
+                paidPromotions: { count: paidPromotions, score: Math.ceil(scores.paid) },
                 averageRating: { value: Math.round(averageRating * 10) / 10, score: Math.round(scores.rating) },
                 responseSpeed: { hours: Math.round(avgResponseHours * 10) / 10, score: Math.round(scores.response) },
                 completionRate: { percentage: Math.round(completionRate * 10) / 10, score: Math.round(scores.completion) },
@@ -205,7 +205,7 @@ export class RankingService {
                 totalScore,
                 rankingTier: tier,
                 requirementsMet: {
-                    completedCollabs: completedCollabs >= (tier === 'Kollabary Icon' ? 50 : tier === 'Elite Creator' ? 30 : tier === 'Pro Influencer' ? 15 : tier === 'Trusted Collaborator' ? 8 : tier === 'Emerging Partner' ? 3 : 1),
+                    completedCollabs: completedCollabs >= (tier === 'Kollabary Icon' ? 20 : tier === 'Elite Creator' ? 10 : tier === 'Pro Influencer' ? 5 : tier === 'Trusted Collaborator' ? 1 : tier === 'Emerging Partner' ? 1 : 1),
                     rating: averageRating >= (tier === 'Kollabary Icon' ? 4.7 : tier === 'Elite Creator' ? 4.5 : tier === 'Pro Influencer' ? 4.2 : tier === 'Trusted Collaborator' ? 4.0 : 3.5),
                     completion: completionRate >= (tier === 'Kollabary Icon' ? 95 : tier === 'Elite Creator' ? 90 : 80),
                     verified: tier === 'Rising Creator' ? true : isVerified, // Simple check
