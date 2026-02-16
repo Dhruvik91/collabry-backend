@@ -78,6 +78,8 @@ export class RankingService {
                     verificationBonus: { isVerified: false, score: 0 },
                     penalties: { count: 0, score: 0 },
                     totalScore: 0,
+                    rankingTier: 'Newbie',
+                    requirementsMet: {},
                 };
             }
 
@@ -89,13 +91,19 @@ export class RankingService {
                 },
             });
 
-            // 2. Calculate paid promotions (for now, same as completed)
-            // TODO: Add collaboration type field to distinguish paid promotions
-            const paidPromotions = completedCollabs;
+            // 2. Calculate paid promotions
+            // Assuming for now that any collaboration with a prize/payment in agreedTerms is paid
+            // This is a placeholder logic if we don't have a specific field yet
+            const paidPromotions = await this.collaborationRepo
+                .createQueryBuilder('collab')
+                .where('collab.influencerId = :profileId', { profileId: influencer.id })
+                .andWhere('collab.status = :status', { status: CollaborationStatus.COMPLETED })
+                // .andWhere('collab.agreedTerms ->> "price" IS NOT NULL') // Example if we use jsonb
+                .getCount();
 
             // 3. Calculate average rating
             const reviews = await this.reviewRepo.find({
-                where: { influencer: { user: { id: influencerId } } },
+                where: { influencer: { id: influencer.id } },
                 select: ['rating'],
             });
 
@@ -103,17 +111,12 @@ export class RankingService {
                 ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
                 : 0;
 
-            // 4. Calculate response speed (average hours to accept/reject)
+            // 4. Calculate response speed (average hours to respond to request)
             const recentCollabs = await this.collaborationRepo
                 .createQueryBuilder('collab')
-                .where('collab.influencerId = :influencerId', { influencerId })
-                .andWhere('collab.status IN (:...statuses)', {
-                    statuses: [
-                        CollaborationStatus.ACCEPTED,
-                        CollaborationStatus.REJECTED,
-                        CollaborationStatus.IN_PROGRESS,
-                        CollaborationStatus.COMPLETED,
-                    ],
+                .where('collab.influencerId = :profileId', { profileId: influencer.id })
+                .andWhere('collab.status NOT IN (:...statuses)', {
+                    statuses: [CollaborationStatus.REQUESTED],
                 })
                 .orderBy('collab.createdAt', 'DESC')
                 .limit(50)
@@ -132,88 +135,83 @@ export class RankingService {
                 }
             }
 
-            const avgResponseHours = responseCount > 0 ? totalResponseTime / responseCount : 24;
+            const avgResponseHours = responseCount > 0 ? totalResponseTime / responseCount : 48; // Default to 48h if no responses
 
             // 5. Calculate completion rate
-            const acceptedCollabs = await this.collaborationRepo.count({
+            const acceptedOrCancelled = await this.collaborationRepo.count({
                 where: {
-                    influencer: { user: { id: influencerId } },
+                    influencer: { id: influencer.id },
                     status: In([
                         CollaborationStatus.ACCEPTED,
                         CollaborationStatus.IN_PROGRESS,
                         CollaborationStatus.COMPLETED,
+                        CollaborationStatus.CANCELLED,
                     ]),
                 },
             });
 
-            const completionRate = acceptedCollabs > 0 ? (completedCollabs / acceptedCollabs) * 100 : 0;
+            const completionRate = acceptedOrCancelled > 0 ? (completedCollabs / acceptedOrCancelled) * 100 : 0;
 
             // 6. Verification status
             const isVerified = influencer.verified || false;
 
-            // 7. Calculate penalties
-            const cancelledCollabs = await this.collaborationRepo.count({
-                where: {
-                    influencer: { user: { id: influencerId } },
-                    status: CollaborationStatus.CANCELLED,
-                },
-            });
+            // 7. Fraud Flags (Active reports)
+            const reportsCount = await this.influencerRepo.manager
+                .getRepository('reports')
+                .count({
+                    where: {
+                        targetUser: { id: influencerId },
+                        status: In(['OPEN', 'UNDER_REVIEW']),
+                    },
+                });
 
-            const rejectedCollabs = await this.collaborationRepo.count({
-                where: {
-                    influencer: { user: { id: influencerId } },
-                    status: CollaborationStatus.REJECTED,
-                },
-            });
+            // --- Normalized Score Calculation (0-100) ---
+            // Max scores for each metric:
+            // Completed Collabs: 50+ -> 20 pts
+            // Paid Promotions: 20+ -> 10 pts
+            // Avg Rating: 5.0 -> 30 pts
+            // Completion Rate: 100% -> 15 pts
+            // Response Speed: <12h -> 15 pts
+            // Verification: true -> 10 pts (Bonus)
 
-            // Calculate individual scores
-            const breakdown: RankingBreakdownDto = {
-                completedCollaborations: {
-                    count: completedCollabs,
-                    score: completedCollabs * this.weights.completedCollaborations,
-                },
-                paidPromotions: {
-                    count: paidPromotions,
-                    score: paidPromotions * this.weights.paidPromotions,
-                },
-                averageRating: {
-                    value: Math.round(averageRating * 10) / 10, // Round to 1 decimal
-                    score: averageRating * this.weights.averageRating,
-                },
-                responseSpeed: {
-                    hours: Math.round(avgResponseHours * 10) / 10,
-                    score: Math.max(0, (100 - avgResponseHours / 24) * this.weights.responseSpeed),
-                },
-                completionRate: {
-                    percentage: Math.round(completionRate * 10) / 10,
-                    score: (completionRate / 100) * this.weights.completionRate,
-                },
-                verificationBonus: {
-                    isVerified,
-                    score: isVerified ? this.weights.verificationBonus : 0,
-                },
-                penalties: {
-                    count: cancelledCollabs + rejectedCollabs + (averageRating < 3.0 && reviews.length > 0 ? 1 : 0),
-                    score:
-                        cancelledCollabs * this.weights.cancellationPenalty +
-                        rejectedCollabs * this.weights.rejectionPenalty +
-                        (averageRating < 3.0 && reviews.length > 0 ? this.weights.lowRatingPenalty : 0),
-                },
-                totalScore: 0,
+            const scores = {
+                completed: Math.min(20, (completedCollabs / 50) * 20),
+                paid: Math.min(10, (paidPromotions / 20) * 10),
+                rating: (averageRating / 5.0) * 30,
+                completion: (completionRate / 100) * 15,
+                response: avgResponseHours < 12 ? 15 : avgResponseHours > 48 ? 0 : ((48 - avgResponseHours) / 36) * 15,
+                verification: isVerified ? 10 : 0,
             };
 
-            // Calculate total score
-            breakdown.totalScore = Math.round(
-                breakdown.completedCollaborations.score +
-                breakdown.paidPromotions.score +
-                breakdown.averageRating.score +
-                breakdown.responseSpeed.score +
-                breakdown.completionRate.score +
-                breakdown.verificationBonus.score +
-                breakdown.penalties.score
-            );
+            let totalScore = Object.values(scores).reduce((a, b) => a + b, 0);
+            totalScore = Math.min(100, Math.round(totalScore));
 
-            return breakdown;
+            // --- Tier Determination (Score-Based) ---
+            let tier = 'Rising Creator';
+            if (totalScore >= 90) tier = 'Kollabary Icon';
+            else if (totalScore >= 75) tier = 'Elite Creator';
+            else if (totalScore >= 60) tier = 'Pro Influencer';
+            else if (totalScore >= 40) tier = 'Trusted Collaborator';
+            else if (totalScore >= 20) tier = 'Emerging Partner';
+
+            return {
+                completedCollaborations: { count: completedCollabs, score: Math.round(scores.completed) },
+                paidPromotions: { count: paidPromotions, score: Math.round(scores.paid) },
+                averageRating: { value: Math.round(averageRating * 10) / 10, score: Math.round(scores.rating) },
+                responseSpeed: { hours: Math.round(avgResponseHours * 10) / 10, score: Math.round(scores.response) },
+                completionRate: { percentage: Math.round(completionRate * 10) / 10, score: Math.round(scores.completion) },
+                verificationBonus: { isVerified, score: scores.verification },
+                penalties: { count: reportsCount, score: reportsCount > 0 ? -10 : 0 },
+                totalScore,
+                rankingTier: tier,
+                requirementsMet: {
+                    completedCollabs: completedCollabs >= (tier === 'Kollabary Icon' ? 50 : tier === 'Elite Creator' ? 30 : tier === 'Pro Influencer' ? 15 : tier === 'Trusted Collaborator' ? 8 : tier === 'Emerging Partner' ? 3 : 1),
+                    rating: averageRating >= (tier === 'Kollabary Icon' ? 4.7 : tier === 'Elite Creator' ? 4.5 : tier === 'Pro Influencer' ? 4.2 : tier === 'Trusted Collaborator' ? 4.0 : 3.5),
+                    completion: completionRate >= (tier === 'Kollabary Icon' ? 95 : tier === 'Elite Creator' ? 90 : 80),
+                    verified: tier === 'Rising Creator' ? true : isVerified, // Simple check
+                    zeroFraud: reportsCount === 0,
+                }
+            };
         } catch (error) {
             this.logger.error(`Error calculating ranking for influencer ${influencerId}:`, error);
             throw error;
@@ -231,6 +229,7 @@ export class RankingService {
 
             const profile = await this.influencerRepo.findOne({
                 where: { user: { id: influencerId } },
+                relations: ['user'],
             });
 
             if (!profile) {
@@ -239,6 +238,7 @@ export class RankingService {
 
             // Update ranking score and related fields
             profile.rankingScore = breakdown.totalScore;
+            profile.rankingTier = breakdown.rankingTier;
             profile.avgRating = breakdown.averageRating.value;
             profile.totalReviews = await this.reviewRepo.count({
                 where: { influencer: { id: profile.id } },
@@ -246,7 +246,7 @@ export class RankingService {
 
             await this.influencerRepo.save(profile);
 
-            this.logger.log(`Updated ranking for influencer ${influencerId}: ${breakdown.totalScore}`);
+            this.logger.log(`Updated ranking for influencer ${influencerId}: ${breakdown.rankingTier} (${breakdown.totalScore})`);
 
             return profile;
         } catch (error) {

@@ -5,9 +5,10 @@ import { Collaboration } from '../../database/entities/collaboration.entity';
 import { InfluencerProfile } from '../../database/entities/influencer-profile.entity';
 import { ReviewController } from './review.controller';
 import { ReviewService } from './review.service';
+import { RankingModule } from '../ranking/ranking.module';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([Review, Collaboration, InfluencerProfile])],
+    imports: [TypeOrmModule.forFeature([Review, Collaboration, InfluencerProfile]), RankingModule],
     controllers: [ReviewController],
     providers: [ReviewService],
     exports: [ReviewService],

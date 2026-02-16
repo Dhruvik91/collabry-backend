@@ -71,6 +71,11 @@ export class InfluencerProfile {
     @Column({ default: false })
     verified: boolean;
 
+    @ApiProperty({ description: 'The tier of the influencer ranking' })
+    @Index()
+    @Column({ nullable: true })
+    rankingTier: string;
+
     @OneToMany(() => Collaboration, (collaboration) => collaboration.influencer)
     collaborations: Collaboration[];
 

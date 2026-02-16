@@ -69,4 +69,16 @@ export class RankingBreakdownDto {
         example: 1113,
     })
     totalScore: number;
+
+    @ApiProperty({
+        description: 'Current ranking tier',
+        example: 'Pro Influencer',
+    })
+    rankingTier: string;
+
+    @ApiProperty({
+        description: 'Status of specific tier requirements',
+        example: { completedCollabs: true, averageRating: true, zeroFraud: true },
+    })
+    requirementsMet: Record<string, boolean>;
 }

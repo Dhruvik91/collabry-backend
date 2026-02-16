@@ -6,6 +6,7 @@ import { InfluencerProfile } from '../../database/entities/influencer-profile.en
 import { CreateVerificationRequestDto } from './dto/create-verification-request.dto';
 import { VerificationStatus } from '../../database/entities/enums';
 import { MailerService } from '../mailer/mailer.service';
+import { RankingService } from '../ranking/ranking.service';
 
 @Injectable()
 export class VerificationService {
@@ -16,6 +17,7 @@ export class VerificationService {
         private readonly influencerRepo: Repository<InfluencerProfile>,
         private readonly dataSource: DataSource,
         private readonly mailerService: MailerService,
+        private readonly rankingService: RankingService,
     ) { }
 
     async createRequest(userId: string, createDto: CreateVerificationRequestDto): Promise<VerificationRequest> {
@@ -81,6 +83,9 @@ export class VerificationService {
                 request.influencerProfile.verified = false;
                 await manager.save(InfluencerProfile, request.influencerProfile);
             }
+
+            // Update Ranking
+            await this.rankingService.updateRanking(request.influencerProfile.user.id);
 
             // Notify Influencer via Email
             if (request.influencerProfile?.user?.email) {

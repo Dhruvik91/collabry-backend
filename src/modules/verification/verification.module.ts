@@ -4,11 +4,11 @@ import { VerificationRequest } from '../../database/entities/verification-reques
 import { InfluencerProfile } from '../../database/entities/influencer-profile.entity';
 import { VerificationController } from './verification.controller';
 import { VerificationService } from './verification.service';
-
 import { MailerConfigModule } from '../mailer/mailer.module';
+import { RankingModule } from '../ranking/ranking.module';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([VerificationRequest, InfluencerProfile]), MailerConfigModule],
+    imports: [TypeOrmModule.forFeature([VerificationRequest, InfluencerProfile]), MailerConfigModule, RankingModule],
     controllers: [VerificationController],
     providers: [VerificationService],
     exports: [VerificationService],

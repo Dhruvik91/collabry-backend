@@ -6,6 +6,7 @@ import { Collaboration } from '../../database/entities/collaboration.entity';
 import { InfluencerProfile } from '../../database/entities/influencer-profile.entity';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { CollaborationStatus } from '../../database/entities/enums';
+import { RankingService } from '../ranking/ranking.service';
 
 @Injectable()
 export class ReviewService {
@@ -17,6 +18,7 @@ export class ReviewService {
         @InjectRepository(InfluencerProfile)
         private readonly influencerProfileRepo: Repository<InfluencerProfile>,
         private readonly dataSource: DataSource,
+        private readonly rankingService: RankingService,
     ) { }
 
     async createReview(reviewerId: string, createDto: CreateReviewDto): Promise<Review> {
@@ -122,6 +124,9 @@ export class ReviewService {
                 influencerProfile.totalReviews = Number(stats.count || 0);
 
                 await manager.save(InfluencerProfile, influencerProfile);
+
+                // Update full ranking breakdown and tier
+                await this.rankingService.updateRanking(targetInfluencerUserId);
             }
 
             return savedReview;
@@ -155,6 +160,16 @@ export class ReviewService {
 
         const savedReview = await this.reviewRepo.save(review);
         await this.updateInfluencerAverageRating(review.influencer.id);
+
+        // Update ranking
+        const profile = await this.influencerProfileRepo.findOne({
+            where: { id: review.influencer.id },
+            relations: ['user'],
+        });
+        if (profile) {
+            await this.rankingService.updateRanking(profile.user.id);
+        }
+
         return savedReview;
     }
 
@@ -173,8 +188,12 @@ export class ReviewService {
         }
 
         const influencerProfileId = review.influencer.id;
+        const influencerUserId = review.influencer.user.id;
         await this.reviewRepo.remove(review);
         await this.updateInfluencerAverageRating(influencerProfileId);
+
+        // Update ranking
+        await this.rankingService.updateRanking(influencerUserId);
     }
 
     private async updateInfluencerAverageRating(influencerProfileId: string): Promise<void> {
