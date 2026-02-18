@@ -30,16 +30,20 @@ export class InfluencerProfile {
     niche: string;
 
     @ApiProperty()
+    @Column({ type: 'text', nullable: true })
+    avatarUrl: string;
+
+    @ApiProperty()
+    @Column({ type: 'text', nullable: true })
+    bio: string;
+
+    @ApiProperty()
+    @Column({ nullable: true })
+    address: string;
+
+    @ApiProperty({ description: 'Platform data with handle, followers, and engagementRate per platform' })
     @Column({ type: 'jsonb', nullable: true })
     platforms: any;
-
-    @ApiProperty()
-    @Column({ type: 'bigint', default: 0 })
-    followersCount: number;
-
-    @ApiProperty()
-    @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
-    engagementRate: number;
 
     @ApiProperty()
     @Column({ type: 'text', array: true, nullable: true })

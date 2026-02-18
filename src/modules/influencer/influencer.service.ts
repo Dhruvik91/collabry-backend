@@ -101,9 +101,8 @@ export class InfluencerService {
             query.andWhere('influencer.platforms::text ILIKE :platform', { platform: `%${platform}%` });
         }
 
-        if (minFollowers) {
-            query.andWhere('influencer.followersCount >= :minFollowers', { minFollowers });
-        }
+        // Note: minFollowers filter removed as followersCount is now calculated from platforms JSONB
+        // Future enhancement: Add JSONB query to filter by total followers across platforms
 
         const [items, total] = await query
             .skip((page - 1) * limit)
