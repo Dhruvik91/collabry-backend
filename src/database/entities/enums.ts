@@ -20,9 +20,10 @@ export enum CollaborationStatus {
 }
 
 export enum CollaborationType {
-    PAID_PROMOTION = 'PAID_PROMOTION',
-    BRAND_DEAL = 'BRAND_DEAL',
-    SPONSORED_POST = 'SPONSORED_POST',
+    PAID_SHOUTOUT = 'PAID_SHOUTOUT',
+    AFFILIATE = 'AFFILIATE',
+    GIFTING = 'GIFTING',
+    LONG_TERM = 'LONG_TERM',
 }
 
 export enum AvailabilityStatus {

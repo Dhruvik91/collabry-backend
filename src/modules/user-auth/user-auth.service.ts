@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, ConflictException, UnauthorizedException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -160,5 +160,30 @@ export class UserAuthService {
     await this.usersRepo.save(matchedUser);
 
     return { message: 'Password has been reset successfully. You can now log in with your new password.' };
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<{ message: string }> {
+    const user = await this.usersRepo.findOne({
+      where: { id: userId },
+      select: ['id', 'passwordHash']
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (!user.passwordHash) {
+      throw new BadRequestException('User does not have a password set (likely a Google user). Please use forgot password to set one.');
+    }
+
+    const isMatch = await this.hashing.compare(currentPassword, user.passwordHash);
+    if (!isMatch) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+
+    user.passwordHash = await this.hashing.hash(newPassword);
+    await this.usersRepo.save(user);
+
+    return { message: 'Password updated successfully' };
   }
 }
