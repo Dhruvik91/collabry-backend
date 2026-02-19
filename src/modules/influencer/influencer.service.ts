@@ -79,7 +79,7 @@ export class InfluencerService {
     }
 
     async searchInfluencers(searchDto: SearchInfluencersDto) {
-        const { niche, platform, minFollowers, page, limit, search } = searchDto;
+        const { niche, platform, minFollowers, page, limit, search, rankingTier, minRating, maxRating, verified } = searchDto;
         const query = this.influencerRepo.createQueryBuilder('influencer')
             .innerJoinAndSelect('influencer.user', 'user')
             .leftJoinAndSelect('user.profile', 'profile')
@@ -88,7 +88,7 @@ export class InfluencerService {
 
         if (search) {
             query.andWhere(
-                '(profile.fullName ILIKE :search OR profile.username ILIKE :search OR profile.bio ILIKE :search)',
+                '(profile.fullName ILIKE :search OR profile.username ILIKE :search OR profile.bio ILIKE :search OR influencer.fullName ILIKE :search)',
                 { search: `%${search}%` }
             );
         }
@@ -99,6 +99,22 @@ export class InfluencerService {
 
         if (platform) {
             query.andWhere('influencer.platforms::text ILIKE :platform', { platform: `%${platform}%` });
+        }
+
+        if (rankingTier) {
+            query.andWhere('influencer.rankingTier = :rankingTier', { rankingTier });
+        }
+
+        if (minRating !== undefined && minRating !== null) {
+            query.andWhere('CAST(influencer.avgRating AS DECIMAL) >= :minRating', { minRating });
+        }
+
+        if (maxRating !== undefined && maxRating !== null) {
+            query.andWhere('CAST(influencer.avgRating AS DECIMAL) <= :maxRating', { maxRating });
+        }
+
+        if (verified !== undefined && verified !== null) {
+            query.andWhere('influencer.verified = :verified', { verified });
         }
 
         // Note: minFollowers filter removed as followersCount is now calculated from platforms JSONB
