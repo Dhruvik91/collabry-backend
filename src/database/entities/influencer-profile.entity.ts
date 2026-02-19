@@ -25,6 +25,10 @@ export class InfluencerProfile {
     user: User;
 
     @ApiProperty()
+    @Column({ nullable: true })
+    fullName: string;
+
+    @ApiProperty()
     @Index()
     @Column({ nullable: true })
     niche: string;

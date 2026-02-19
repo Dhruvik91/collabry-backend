@@ -33,14 +33,14 @@ export class InfluencerService {
                 throw new NotFoundException('Influencer profile not found');
             }
 
-            // Sync ranking if score is null, old system (> 100), or tier is missing
-            const currentScore = Number(profile.rankingScore);
-            if (profile.rankingScore === null || currentScore > 100 || !profile.rankingTier) {
-                this.logger.log(`Syncing ranking for user ${userId} (Score: ${currentScore}, Tier: ${profile.rankingTier})`);
-                return await this.rankingService.updateRanking(userId);
+            // Always sync ranking to ensure tier is up-to-date
+            try {
+                const updatedProfile = await this.rankingService.updateRanking(userId);
+                return updatedProfile;
+            } catch (error) {
+                this.logger.warn(`Failed to sync ranking for user ${userId}: ${error.message}`);
+                return profile; // Return profile even if ranking sync fails
             }
-
-            return profile;
         } catch (error) {
             cif(isEntityNotFoundError, new NotFoundException('Influencer profile not found'))(error);
             throw error;
@@ -109,8 +109,20 @@ export class InfluencerService {
             .take(limit)
             .getManyAndCount();
 
+        // Sync rankings for all returned profiles to ensure tiers are current
+        const syncedItems = await Promise.all(
+            items.map(async (item) => {
+                try {
+                    return await this.rankingService.updateRanking(item.user.id);
+                } catch (error) {
+                    this.logger.warn(`Failed to sync ranking for user ${item.user.id}: ${error.message}`);
+                    return item; // Return original if sync fails
+                }
+            })
+        );
+
         return {
-            items,
+            items: syncedItems,
             meta: {
                 total,
                 page,
@@ -131,7 +143,14 @@ export class InfluencerService {
                 throw new NotFoundException('Influencer not found');
             }
 
-            return profile;
+            // Sync ranking to ensure tier is up-to-date
+            try {
+                const updatedProfile = await this.rankingService.updateRanking(profile.user.id);
+                return updatedProfile;
+            } catch (error) {
+                this.logger.warn(`Failed to sync ranking for influencer ${id}: ${error.message}`);
+                return profile; // Return profile even if ranking sync fails
+            }
         } catch (error) {
             cif(isEntityNotFoundError, new NotFoundException('Influencer not found'))(error);
             throw error;

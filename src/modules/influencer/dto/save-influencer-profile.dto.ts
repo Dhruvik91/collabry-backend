@@ -3,6 +3,11 @@ import { IsOptional, IsString, IsNumber, IsArray, IsEnum, IsObject } from 'class
 import { AvailabilityStatus } from '../../../database/entities/enums';
 
 export class SaveInfluencerProfileDto {
+    @ApiPropertyOptional({ example: 'John Doe' })
+    @IsOptional()
+    @IsString()
+    fullName?: string;
+
     @ApiPropertyOptional({ example: 'Lifestyle' })
     @IsOptional()
     @IsString()
