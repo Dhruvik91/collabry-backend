@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Patch, Req, Res, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
@@ -14,6 +14,7 @@ import {
 
 import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto';
 import { SignupDto, CreateInfluencerDto } from './dto/auth.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/Guards/roles.guard';
 
@@ -142,5 +143,14 @@ export class UserAuthController {
   @ApiOkResponse({ description: 'Password successfully reset' })
   async resetPassword(@Body() body: ResetPasswordDto) {
     return this.auth.resetPassword(body.token, body.newPassword);
+  }
+
+  @UseGuards(AuthGuard('jwt-user'))
+  @Patch('change-password')
+  @ApiOperation({ summary: 'Update password for authenticated user' })
+  @ApiOkResponse({ description: 'Password successfully updated' })
+  async changePassword(@Req() req: Request, @Body() body: ChangePasswordDto) {
+    const user = (req as any).user;
+    return this.auth.changePassword(user.id, body.currentPassword, body.newPassword);
   }
 }

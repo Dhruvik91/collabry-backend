@@ -122,8 +122,8 @@ Calculates influencer score (0–100 scale).
 
 | Endpoint | Method | Description | Edge Cases |
 |-----------|--------|------------|------------|
-| `/breakdown/:id` | GET | View score calculation breakdown. | Influencer not found |
-| `/recalculate/:id` | POST | Admin only. Recalculate specific score. | N/A |
+| `/breakdown/:id` | GET | View score calculation breakdown (0–100 score, 6 tiers). | Influencer not found |
+| `/recalculate/:id` | POST | Admin only. Recalculate specific score & tier. | N/A |
 | `/recalculate-all` | POST | Admin only. Trigger global recalculation. | N/A |
 | `/weights` | GET/PATCH | Admin only. View/update ranking weights. | Weight validation required |
 

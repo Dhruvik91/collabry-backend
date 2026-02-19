@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InfluencerProfile } from '../../database/entities/influencer-profile.entity';
@@ -6,16 +6,20 @@ import { User } from '../../database/entities/user.entity';
 import { UserRole, UserStatus } from '../../database/entities/enums';
 import { SaveInfluencerProfileDto } from './dto/save-influencer-profile.dto';
 import { SearchInfluencersDto } from './dto/search-influencers.dto';
+import { RankingService } from '../ranking/ranking.service';
 import { isEntityNotFoundError } from '../../database/errors/entity-not-found.type-guard';
 import { cif } from '../../database/errors/tryQuery';
 
 @Injectable()
 export class InfluencerService {
+    private readonly logger = new Logger(InfluencerService.name);
+
     constructor(
         @InjectRepository(InfluencerProfile)
         private readonly influencerRepo: Repository<InfluencerProfile>,
         @InjectRepository(User)
         private readonly userRepo: Repository<User>,
+        private readonly rankingService: RankingService,
     ) { }
 
     async getInfluencerProfile(userId: string): Promise<InfluencerProfile> {
@@ -29,9 +33,17 @@ export class InfluencerService {
                 throw new NotFoundException('Influencer profile not found');
             }
 
-            return profile;
+            // Always sync ranking to ensure tier is up-to-date
+            try {
+                const updatedProfile = await this.rankingService.updateRanking(userId);
+                return updatedProfile;
+            } catch (error) {
+                this.logger.warn(`Failed to sync ranking for user ${userId}: ${error.message}`);
+                return profile; // Return profile even if ranking sync fails
+            }
         } catch (error) {
             cif(isEntityNotFoundError, new NotFoundException('Influencer profile not found'))(error);
+            throw error;
         }
     }
 
@@ -54,7 +66,16 @@ export class InfluencerService {
             Object.assign(profile, saveDto);
         }
 
-        return await this.influencerRepo.save(profile);
+        await this.influencerRepo.save(profile);
+
+        // Update ranking after profile changes
+        try {
+            await this.rankingService.updateRanking(userId);
+        } catch (error) {
+            this.logger.error(`Failed to update ranking after profile save for user ${userId}: ${error.message}`);
+        }
+
+        return this.getInfluencerProfile(userId);
     }
 
     async searchInfluencers(searchDto: SearchInfluencersDto) {
@@ -77,21 +98,31 @@ export class InfluencerService {
         }
 
         if (platform) {
-            // Searching inside platforms JSONB
             query.andWhere('influencer.platforms::text ILIKE :platform', { platform: `%${platform}%` });
         }
 
-        if (minFollowers) {
-            query.andWhere('influencer.followersCount >= :minFollowers', { minFollowers });
-        }
+        // Note: minFollowers filter removed as followersCount is now calculated from platforms JSONB
+        // Future enhancement: Add JSONB query to filter by total followers across platforms
 
         const [items, total] = await query
             .skip((page - 1) * limit)
             .take(limit)
             .getManyAndCount();
 
+        // Sync rankings for all returned profiles to ensure tiers are current
+        const syncedItems = await Promise.all(
+            items.map(async (item) => {
+                try {
+                    return await this.rankingService.updateRanking(item.user.id);
+                } catch (error) {
+                    this.logger.warn(`Failed to sync ranking for user ${item.user.id}: ${error.message}`);
+                    return item; // Return original if sync fails
+                }
+            })
+        );
+
         return {
-            items,
+            items: syncedItems,
             meta: {
                 total,
                 page,
@@ -112,9 +143,17 @@ export class InfluencerService {
                 throw new NotFoundException('Influencer not found');
             }
 
-            return profile;
+            // Sync ranking to ensure tier is up-to-date
+            try {
+                const updatedProfile = await this.rankingService.updateRanking(profile.user.id);
+                return updatedProfile;
+            } catch (error) {
+                this.logger.warn(`Failed to sync ranking for influencer ${id}: ${error.message}`);
+                return profile; // Return profile even if ranking sync fails
+            }
         } catch (error) {
             cif(isEntityNotFoundError, new NotFoundException('Influencer not found'))(error);
+            throw error;
         }
     }
 }

@@ -3,27 +3,37 @@ import { IsOptional, IsString, IsNumber, IsArray, IsEnum, IsObject } from 'class
 import { AvailabilityStatus } from '../../../database/entities/enums';
 
 export class SaveInfluencerProfileDto {
+    @ApiPropertyOptional({ example: 'John Doe' })
+    @IsOptional()
+    @IsString()
+    fullName?: string;
+
     @ApiPropertyOptional({ example: 'Lifestyle' })
     @IsOptional()
     @IsString()
     niche?: string;
 
+    @ApiPropertyOptional({ example: 'https://example.com/avatar.jpg' })
+    @IsOptional()
+    @IsString()
+    avatarUrl?: string;
+
+    @ApiPropertyOptional({ example: 'Passionate content creator focused on lifestyle and wellness' })
+    @IsOptional()
+    @IsString()
+    bio?: string;
+
+    @ApiPropertyOptional({ example: 'San Francisco, CA' })
+    @IsOptional()
+    @IsString()
+    address?: string;
+
     @ApiPropertyOptional({
-        example: { instagram: { handle: '@johndoe', followers: 10000 } },
+        example: { instagram: { handle: '@johndoe', followers: 10000, engagementRate: 4.5 } },
     })
     @IsOptional()
     @IsObject()
     platforms?: any;
-
-    @ApiPropertyOptional({ example: 10000 })
-    @IsOptional()
-    @IsNumber()
-    followersCount?: number;
-
-    @ApiPropertyOptional({ example: 4.5 })
-    @IsOptional()
-    @IsNumber()
-    engagementRate?: number;
 
     @ApiPropertyOptional({ example: ['Paid Shoutout', 'Affiliate'] })
     @IsOptional()

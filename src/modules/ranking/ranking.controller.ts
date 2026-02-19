@@ -105,6 +105,16 @@ export class RankingController {
         };
     }
 
+    @Get('tier-guide')
+    @ApiOperation({
+        summary: 'Get tier requirements guide',
+        description: 'Returns comprehensive guide on all ranking tiers, requirements, and how to earn points',
+    })
+    @ApiOkResponse({ description: 'Tier guide retrieved successfully' })
+    async getTierGuide() {
+        return this.rankingService.getTierRequirementsGuide();
+    }
+
     @Get('weights')
     @UseGuards(RolesGuard)
     @Roles(UserRole.ADMIN)

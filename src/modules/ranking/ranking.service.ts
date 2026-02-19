@@ -49,8 +49,8 @@ export class RankingService {
             responseSpeed: 20,
             completionRate: 30,
             verificationBonus: 100,
-            cancellationPenalty: 0,
-            rejectionPenalty: 0,
+            cancellationPenalty: -25,
+            rejectionPenalty: -15,
             lowRatingPenalty: -50,
         };
     }
@@ -70,150 +70,120 @@ export class RankingService {
 
             if (!influencer) {
                 return {
-                    completedCollaborations: { count: 0, score: 0 },
-                    paidPromotions: { count: 0, score: 0 },
-                    averageRating: { value: 0, score: 0 },
-                    responseSpeed: { hours: 24, score: 0 },
-                    completionRate: { percentage: 0, score: 0 },
-                    verificationBonus: { isVerified: false, score: 0 },
-                    penalties: { count: 0, score: 0 },
+                    completedCollaborations: { count: 0, score: 0, maxScore: 0 },
+                    paidPromotions: { count: 0, score: 0, maxScore: 0 },
+                    averageRating: { value: 0, score: 0, maxScore: 0 },
+                    responseSpeed: { hours: 0, score: 0, maxScore: 0 },
+                    completionRate: { percentage: 0, score: 0, maxScore: 0 },
+                    verificationBonus: { isVerified: false, score: 0, maxScore: 50 },
+                    penalties: { count: 0, score: 0, breakdown: { cancellations: 0, rejections: 0, reports: 0 } },
                     totalScore: 0,
+                    rankingTier: 'Rising Creator',
+                    nextTier: 'Emerging Partner',
+                    tierProgress: 0,
+                    requirementsMet: {},
+                    tierRequirements: {},
                 };
             }
 
-            // 1. Calculate completed collaborations
+            // Calculate completed collaborations (1 point each)
             const completedCollabs = await this.collaborationRepo.count({
                 where: {
-                    influencer: { id: influencerId },
+                    influencer: { user: { id: influencerId } },
                     status: CollaborationStatus.COMPLETED,
                 },
             });
 
-            // 2. Calculate paid promotions (for now, same as completed)
-            // TODO: Add collaboration type field to distinguish paid promotions
-            const paidPromotions = completedCollabs;
-
-            // 3. Calculate average rating
-            const reviews = await this.reviewRepo.find({
-                where: { influencer: { id: influencerId } },
-                select: ['rating'],
-            });
-
-            const averageRating = reviews.length > 0
-                ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
-                : 0;
-
-            // 4. Calculate response speed (average hours to accept/reject)
-            const recentCollabs = await this.collaborationRepo
-                .createQueryBuilder('collab')
-                .where('collab.influencerId = :influencerId', { influencerId })
-                .andWhere('collab.status IN (:...statuses)', {
-                    statuses: [
-                        CollaborationStatus.ACCEPTED,
-                        CollaborationStatus.REJECTED,
-                        CollaborationStatus.IN_PROGRESS,
-                        CollaborationStatus.COMPLETED,
-                    ],
-                })
-                .orderBy('collab.createdAt', 'DESC')
-                .limit(50)
-                .getMany();
-
-            let totalResponseTime = 0;
-            let responseCount = 0;
-
-            for (const collab of recentCollabs) {
-                if (collab.updatedAt && collab.createdAt) {
-                    const responseTime =
-                        (collab.updatedAt.getTime() - collab.createdAt.getTime()) /
-                        (1000 * 60 * 60); // Convert to hours
-                    totalResponseTime += responseTime;
-                    responseCount++;
-                }
-            }
-
-            const avgResponseHours = responseCount > 0 ? totalResponseTime / responseCount : 24;
-
-            // 5. Calculate completion rate
-            const acceptedCollabs = await this.collaborationRepo.count({
-                where: {
-                    influencer: { id: influencerId },
-                    status: In([
-                        CollaborationStatus.ACCEPTED,
-                        CollaborationStatus.IN_PROGRESS,
-                        CollaborationStatus.COMPLETED,
-                    ]),
-                },
-            });
-
-            const completionRate = acceptedCollabs > 0 ? (completedCollabs / acceptedCollabs) * 100 : 0;
-
-            // 6. Verification status
+            // Verification status (50 point bonus)
             const isVerified = influencer.verified || false;
 
-            // 7. Calculate penalties
-            const cancelledCollabs = await this.collaborationRepo.count({
-                where: {
-                    influencer: { id: influencerId },
-                    status: CollaborationStatus.CANCELLED,
-                },
-            });
+            // --- Simplified Score Calculation ---
+            // 1 point per completed collaboration + 50 points for verification
+            const collaborationScore = completedCollabs;
+            const verificationScore = isVerified ? 50 : 0;
+            const totalScore = collaborationScore + verificationScore;
 
-            const rejectedCollabs = await this.collaborationRepo.count({
-                where: {
-                    influencer: { id: influencerId },
-                    status: CollaborationStatus.REJECTED,
+            // --- Simplified Tier Determination (Collaboration Count + Verification Only) ---
+            let tier = 'Rising Creator';
+            const tierRequirements = {
+                'Kollabary Icon': {
+                    minCollabs: 100,
+                    verified: true,
                 },
-            });
-
-            // Calculate individual scores
-            const breakdown: RankingBreakdownDto = {
-                completedCollaborations: {
-                    count: completedCollabs,
-                    score: completedCollabs * this.weights.completedCollaborations,
+                'Elite Creator': {
+                    minCollabs: 60,
+                    verified: true,
                 },
-                paidPromotions: {
-                    count: paidPromotions,
-                    score: paidPromotions * this.weights.paidPromotions,
+                'Pro Influencer': {
+                    minCollabs: 30,
+                    verified: true,
                 },
-                averageRating: {
-                    value: Math.round(averageRating * 10) / 10, // Round to 1 decimal
-                    score: averageRating * this.weights.averageRating,
+                'Trusted Collaborator': {
+                    minCollabs: 15,
+                    verified: false,
                 },
-                responseSpeed: {
-                    hours: Math.round(avgResponseHours * 10) / 10,
-                    score: Math.max(0, (100 - avgResponseHours / 24) * this.weights.responseSpeed),
+                'Emerging Partner': {
+                    minCollabs: 5,
+                    verified: false,
                 },
-                completionRate: {
-                    percentage: Math.round(completionRate * 10) / 10,
-                    score: (completionRate / 100) * this.weights.completionRate,
+                'Rising Creator': {
+                    minCollabs: 0,
+                    verified: false,
                 },
-                verificationBonus: {
-                    isVerified,
-                    score: isVerified ? this.weights.verificationBonus : 0,
-                },
-                penalties: {
-                    count: cancelledCollabs + rejectedCollabs + (averageRating < 3.0 && reviews.length > 0 ? 1 : 0),
-                    score:
-                        cancelledCollabs * this.weights.cancellationPenalty +
-                        rejectedCollabs * this.weights.rejectionPenalty +
-                        (averageRating < 3.0 && reviews.length > 0 ? this.weights.lowRatingPenalty : 0),
-                },
-                totalScore: 0,
             };
 
-            // Calculate total score
-            breakdown.totalScore = Math.round(
-                breakdown.completedCollaborations.score +
-                breakdown.paidPromotions.score +
-                breakdown.averageRating.score +
-                breakdown.responseSpeed.score +
-                breakdown.completionRate.score +
-                breakdown.verificationBonus.score +
-                breakdown.penalties.score
-            );
+            // Determine tier based on collaboration count + verification
+            if (completedCollabs >= 100 && isVerified) {
+                tier = 'Kollabary Icon';
+            } else if (completedCollabs >= 60 && isVerified) {
+                tier = 'Elite Creator';
+            } else if (completedCollabs >= 30 && isVerified) {
+                tier = 'Pro Influencer';
+            } else if (completedCollabs >= 15) {
+                tier = 'Trusted Collaborator';
+            } else if (completedCollabs >= 5) {
+                tier = 'Emerging Partner';
+            }
 
-            return breakdown;
+            // Get current tier requirements for display
+            const currentTierReqs = tierRequirements[tier];
+
+            return {
+                completedCollaborations: { count: completedCollabs, score: collaborationScore, maxScore: 0 },
+                paidPromotions: { count: 0, score: 0, maxScore: 0 },
+                averageRating: { value: 0, score: 0, maxScore: 0 },
+                responseSpeed: { hours: 0, score: 0, maxScore: 0 },
+                completionRate: { percentage: 0, score: 0, maxScore: 0 },
+                verificationBonus: { isVerified, score: verificationScore, maxScore: 50 },
+                penalties: { 
+                    count: 0, 
+                    score: 0,
+                    breakdown: {
+                        cancellations: 0,
+                        rejections: 0,
+                        reports: 0,
+                    }
+                },
+                totalScore,
+                rankingTier: tier,
+                nextTier: this.getNextTier(tier),
+                tierProgress: this.calculateTierProgress(
+                    tier, 
+                    totalScore, 
+                    tierRequirements,
+                    completedCollabs,
+                    0,
+                    0,
+                    0,
+                    isVerified,
+                    0
+                ),
+                requirementsMet: {
+                    completedCollabs: completedCollabs >= currentTierReqs.minCollabs,
+                    verified: currentTierReqs.verified ? isVerified : true,
+                },
+                tierRequirements: currentTierReqs,
+            };
         } catch (error) {
             this.logger.error(`Error calculating ranking for influencer ${influencerId}:`, error);
             throw error;
@@ -221,9 +191,156 @@ export class RankingService {
     }
 
     /**
-     * Update ranking score for an influencer
-     * @param influencerId - User ID of the influencer
-     * @returns Updated influencer profile
+     * Get the next tier for progression display
+     */
+    private getNextTier(currentTier: string): string | null {
+        const tierOrder = ['Rising Creator', 'Emerging Partner', 'Trusted Collaborator', 'Pro Influencer', 'Elite Creator', 'Kollabary Icon'];
+        const currentIndex = tierOrder.indexOf(currentTier);
+        if (currentIndex === -1 || currentIndex === tierOrder.length - 1) {
+            return null;
+        }
+        return tierOrder[currentIndex + 1];
+    }
+
+    /**
+     * Calculate progress towards next tier (simplified - collaboration count + verification only)
+     */
+    private calculateTierProgress(
+        currentTier: string, 
+        currentScore: number, 
+        tierRequirements: any,
+        completedCollabs?: number,
+        averageRating?: number,
+        completionRate?: number,
+        avgResponseHours?: number,
+        isVerified?: boolean,
+        totalPenalties?: number
+    ): number {
+        const tierOrder = ['Rising Creator', 'Emerging Partner', 'Trusted Collaborator', 'Pro Influencer', 'Elite Creator', 'Kollabary Icon'];
+        const currentIndex = tierOrder.indexOf(currentTier);
+        
+        if (currentIndex === -1 || currentIndex === tierOrder.length - 1) {
+            return 100;
+        }
+
+        const nextTier = tierOrder[currentIndex + 1];
+        const nextTierReqs = tierRequirements[nextTier];
+        const currentTierReqs = tierRequirements[currentTier];
+
+        if (!nextTierReqs || !currentTierReqs) {
+            return 0;
+        }
+
+        const progressMetrics: number[] = [];
+
+        // Collaborations progress
+        if (completedCollabs !== undefined) {
+            const collabRange = nextTierReqs.minCollabs - currentTierReqs.minCollabs;
+            if (collabRange > 0) {
+                const collabProgress = ((completedCollabs - currentTierReqs.minCollabs) / collabRange) * 100;
+                progressMetrics.push(Math.min(100, Math.max(0, collabProgress)));
+            }
+        }
+
+        // Verification (binary - 0% or 100%)
+        if (nextTierReqs.verified && !currentTierReqs.verified) {
+            progressMetrics.push(isVerified ? 100 : 0);
+        }
+
+        // Return average progress across requirements
+        if (progressMetrics.length === 0) {
+            return 100; // If no requirements to meet, already at 100%
+        }
+
+        const averageProgress = progressMetrics.reduce((sum, val) => sum + val, 0) / progressMetrics.length;
+        return Math.round(averageProgress);
+    }
+
+    /**
+     * Get tier requirements guide for all tiers
+     */
+    async getTierRequirementsGuide(): Promise<any> {
+        return {
+            tiers: [
+                {
+                    name: 'Rising Creator',
+                    description: 'Just getting started on your collaboration journey',
+                    requirements: {
+                        completedCollabs: 0,
+                        verified: false,
+                    },
+                    benefits: ['Access to basic collaborations', 'Profile visibility', 'Community support'],
+                },
+                {
+                    name: 'Emerging Partner',
+                    description: 'Building your reputation with consistent collaborations',
+                    requirements: {
+                        completedCollabs: 5,
+                        verified: false,
+                    },
+                    benefits: ['Priority in search results', 'Access to more campaigns', 'Basic analytics'],
+                },
+                {
+                    name: 'Trusted Collaborator',
+                    description: 'Proven track record of reliable collaborations',
+                    requirements: {
+                        completedCollabs: 15,
+                        verified: false,
+                    },
+                    benefits: ['Featured in recommendations', 'Advanced analytics', 'Priority support'],
+                },
+                {
+                    name: 'Pro Influencer',
+                    description: 'Professional creator with verified excellence',
+                    requirements: {
+                        completedCollabs: 30,
+                        verified: true,
+                    },
+                    benefits: ['Premium campaign access', 'Higher visibility', 'Exclusive opportunities', 'Pro badge'],
+                },
+                {
+                    name: 'Elite Creator',
+                    description: 'Top-tier creator with exceptional performance',
+                    requirements: {
+                        completedCollabs: 60,
+                        verified: true,
+                    },
+                    benefits: ['VIP campaign invitations', 'Maximum visibility', 'Dedicated account manager', 'Elite badge'],
+                },
+                {
+                    name: 'Kollabary Icon',
+                    description: 'The pinnacle of creator excellence',
+                    requirements: {
+                        completedCollabs: 100,
+                        verified: true,
+                    },
+                    benefits: ['Exclusive brand partnerships', 'Featured on platform', 'Premium support', 'Icon badge', 'Revenue share bonuses'],
+                },
+            ],
+            scoringGuide: {
+                completedCollaborations: {
+                    description: 'Total number of successfully completed collaborations',
+                    calculation: '1 point per completed collaboration',
+                    tips: ['Complete all accepted collaborations', 'Deliver quality work on time', 'Maintain good communication'],
+                },
+                verificationBonus: {
+                    description: 'One-time bonus for account verification',
+                    calculation: '50 points when verified',
+                    tips: ['Verify your account to unlock higher tiers', 'Verification shows credibility to brands', 'Required for Pro, Elite, and Icon tiers'],
+                },
+            },
+        };
+    }
+
+    /**
+     * Get ranking breakdown for an influencer
+     */
+    async getRankingBreakdown(influencerId: string): Promise<RankingBreakdownDto> {
+        return this.calculateRanking(influencerId);
+    }
+
+    /**
+     * Update ranking score for an influencer and save to database
      */
     async updateRanking(influencerId: string): Promise<InfluencerProfile> {
         try {
@@ -231,22 +348,20 @@ export class RankingService {
 
             const profile = await this.influencerRepo.findOne({
                 where: { user: { id: influencerId } },
+                relations: ['user'],
             });
 
             if (!profile) {
                 throw new NotFoundException('Influencer profile not found');
             }
 
-            // Update ranking score and related fields
+            // Update ranking score and tier
             profile.rankingScore = breakdown.totalScore;
-            profile.avgRating = breakdown.averageRating.value;
-            profile.totalReviews = await this.reviewRepo.count({
-                where: { influencer: { id: influencerId } },
-            });
+            profile.rankingTier = breakdown.rankingTier;
 
             await this.influencerRepo.save(profile);
 
-            this.logger.log(`Updated ranking for influencer ${influencerId}: ${breakdown.totalScore}`);
+            this.logger.log(`Updated ranking for influencer ${influencerId}: ${breakdown.rankingTier} (${breakdown.totalScore})`);
 
             return profile;
         } catch (error) {
@@ -256,65 +371,48 @@ export class RankingService {
     }
 
     /**
-     * Recalculate rankings for all influencers
-     * Runs daily at midnight
+     * Recalculate ranking for a specific influencer
      */
-    @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
-    async recalculateAllRankings(): Promise<void> {
-        this.logger.log('Starting daily ranking recalculation...');
-
-        try {
-            const influencers = await this.influencerRepo.find({
-                relations: ['user'],
-            });
-
-            let successCount = 0;
-            let errorCount = 0;
-
-            for (const influencer of influencers) {
-                try {
-                    await this.updateRanking(influencer.user.id);
-                    successCount++;
-                } catch (error) {
-                    errorCount++;
-                    this.logger.error(
-                        `Failed to update ranking for influencer ${influencer.user.id}:`,
-                        error.message
-                    );
-                }
-            }
-
-            this.logger.log(
-                `Ranking recalculation complete. Success: ${successCount}, Errors: ${errorCount}`
-            );
-        } catch (error) {
-            this.logger.error('Error during ranking recalculation:', error);
-        }
-    }
-
-    /**
-     * Get ranking breakdown for an influencer
-     * @param influencerId - User ID of the influencer
-     * @returns Ranking breakdown
-     */
-    async getRankingBreakdown(influencerId: string): Promise<RankingBreakdownDto> {
+    async recalculateRanking(influencerId: string): Promise<RankingBreakdownDto> {
         return this.calculateRanking(influencerId);
     }
 
     /**
-     * Update ranking weights (admin only)
-     * @param weights - New weight values
+     * Recalculate rankings for all influencers (admin only)
      */
-    updateWeights(weights: Partial<RankingWeights>): void {
-        this.weights = { ...this.weights, ...weights };
-        this.logger.log('Ranking weights updated:', this.weights);
+    async recalculateAllRankings(): Promise<{ processed: number; errors: number }> {
+        const influencers = await this.influencerRepo.find({
+            relations: ['user'],
+        });
+
+        let processed = 0;
+        let errors = 0;
+
+        for (const influencer of influencers) {
+            try {
+                await this.updateRanking(influencer.user.id);
+                processed++;
+            } catch (error) {
+                this.logger.error(`Error recalculating ranking for influencer ${influencer.user.id}:`, error);
+                errors++;
+            }
+        }
+
+        return { processed, errors };
     }
 
     /**
      * Get current ranking weights
-     * @returns Current weights
      */
     getWeights(): RankingWeightsDto {
-        return { ...this.weights };
+        return this.weights;
+    }
+
+    /**
+     * Update ranking weights (admin only)
+     */
+    updateWeights(newWeights: Partial<RankingWeightsDto>): RankingWeightsDto {
+        this.weights = { ...this.weights, ...newWeights };
+        return this.weights;
     }
 }

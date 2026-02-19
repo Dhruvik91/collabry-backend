@@ -26,16 +26,33 @@ export class CollaborationService {
     async createCollaboration(requesterId: string, createDto: CreateCollaborationDto): Promise<Collaboration> {
         const requester = await this.userRepo.findOne({ where: { id: requesterId }, relations: ['profile'] });
 
-        // Try to find if influencerId is actually a profile ID
-        let targetUserId = createDto.influencerId;
-        const profile = await this.userRepo.manager.getRepository('InfluencerProfile').findOne({
+        // Resolve influencer ID if it's a profile ID or user ID
+        let targetInfluencerProfileId = createDto.influencerId;
+        const profileByProfileId = await this.userRepo.manager.getRepository('InfluencerProfile').findOne({
             where: { id: createDto.influencerId },
             relations: ['user']
         }) as any;
 
-        if (profile && profile.user) {
-            targetUserId = profile.user.id;
+        if (!profileByProfileId) {
+            // Try to find by user ID
+            const profileByUserId = await this.userRepo.manager.getRepository('InfluencerProfile').findOne({
+                where: { user: { id: createDto.influencerId } },
+                relations: ['user']
+            }) as any;
+
+            if (profileByUserId) {
+                targetInfluencerProfileId = profileByUserId.id;
+            } else {
+                throw new BadRequestException('Target must be a valid influencer profile or user');
+            }
         }
+
+        const finalProfile = profileByProfileId || (await this.userRepo.manager.getRepository('InfluencerProfile').findOne({
+            where: { id: targetInfluencerProfileId },
+            relations: ['user']
+        }) as any);
+
+        const targetUserId = finalProfile.user.id;
 
         const influencerUser = await this.userRepo.findOne({ where: { id: targetUserId } });
 
@@ -53,7 +70,7 @@ export class CollaborationService {
 
         const collaboration = this.collaborationRepo.create({
             requester: { id: requesterId } as any,
-            influencer: { id: targetUserId } as any,
+            influencer: { id: targetInfluencerProfileId } as any,
             title: createDto.title,
             description: createDto.description,
             proposedTerms: createDto.proposedTerms,
@@ -83,9 +100,9 @@ export class CollaborationService {
         return await this.collaborationRepo.find({
             where: [
                 { requester: { id: userId } },
-                { influencer: { id: userId } },
+                { influencer: { user: { id: userId } } },
             ],
-            relations: ['requester', 'influencer', 'requester.profile', 'influencer.profile'],
+            relations: ['requester', 'influencer', 'requester.profile', 'influencer.user', 'influencer.user.profile'],
             order: { createdAt: 'DESC' },
         });
     }
@@ -94,14 +111,14 @@ export class CollaborationService {
         try {
             const collaboration = await this.collaborationRepo.findOne({
                 where: { id },
-                relations: ['requester', 'influencer', 'requester.profile', 'influencer.profile'],
+                relations: ['requester', 'influencer', 'requester.profile', 'influencer.user', 'influencer.user.profile'],
             });
 
             if (!collaboration) {
                 throw new NotFoundException('Collaboration not found');
             }
 
-            if (collaboration.requester.id !== userId && collaboration.influencer.id !== userId) {
+            if (collaboration.requester.id !== userId && collaboration.influencer.user.id !== userId) {
                 throw new ForbiddenException('You do not have access to this collaboration');
             }
 
@@ -114,7 +131,7 @@ export class CollaborationService {
     async updateStatus(id: string, userId: string, statusDto: UpdateCollaborationStatusDto): Promise<Collaboration> {
         const collaboration = await this.getCollaborationById(id, userId);
 
-        const isInfluencer = collaboration.influencer.id === userId;
+        const isInfluencer = collaboration.influencer.user.id === userId;
         const isRequester = collaboration.requester.id === userId;
 
         // Validation based on current status and new status
@@ -151,7 +168,7 @@ export class CollaborationService {
         const updatedCollaboration = await this.collaborationRepo.save(collaboration);
 
         // Update Ranking for the influencer
-        await this.rankingService.updateRanking(collaboration.influencer.id);
+        await this.rankingService.updateRanking(collaboration.influencer.user.id);
 
         return updatedCollaboration;
     }
@@ -191,7 +208,7 @@ export class CollaborationService {
 
         // If proof was submitted, we might want to trigger a ranking update or notification
         if (updateDto.proofUrls) {
-            await this.rankingService.updateRanking(collaboration.influencer.id);
+            await this.rankingService.updateRanking(collaboration.influencer.user.id);
         }
 
         return updated;
@@ -199,11 +216,11 @@ export class CollaborationService {
 
     async deleteCollaboration(id: string, userId: string): Promise<void> {
         const collaboration = await this.getCollaborationById(id, userId);
-        const influencerId = collaboration.influencer.id;
+        const influencerUserId = collaboration.influencer.user.id;
 
         // Allow both influencer and requester to delete if it's already cancelled or rejected?
         // Usually, only the owner (requester) can delete the request.
-        if (collaboration.requester.id !== userId && collaboration.influencer.id !== userId) {
+        if (collaboration.requester.id !== userId && collaboration.influencer.user.id !== userId) {
             throw new ForbiddenException('You do not have permission to delete this collaboration');
         }
 
@@ -212,6 +229,6 @@ export class CollaborationService {
         await this.collaborationRepo.remove(collaboration);
 
         // Update Ranking (though for REQUESTED it might not change much)
-        await this.rankingService.updateRanking(influencerId);
+        await this.rankingService.updateRanking(influencerUserId);
     }
 }
