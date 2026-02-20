@@ -97,7 +97,10 @@ export class CollaborationService {
         return savedCollaboration;
     }
 
-    async getMyCollaborations(userId: string, filters?: FilterCollaborationsDto): Promise<Collaboration[]> {
+    async getMyCollaborations(userId: string, filters?: FilterCollaborationsDto) {
+        const page = filters?.page ?? 1;
+        const limit = filters?.limit ?? 20;
+
         const qb = this.collaborationRepo
             .createQueryBuilder('collaboration')
             .leftJoinAndSelect('collaboration.requester', 'requester')
@@ -118,9 +121,21 @@ export class CollaborationService {
             qb.andWhere('collaboration.title ILIKE :search', { search: `%${filters.search}%` });
         }
 
-        qb.orderBy('collaboration.createdAt', 'DESC');
+        const [items, total] = await qb
+            .orderBy('collaboration.createdAt', 'DESC')
+            .skip((page - 1) * limit)
+            .take(limit)
+            .getManyAndCount();
 
-        return qb.getMany();
+        return {
+            items,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        };
     }
 
     async getCollaborationById(id: string, userId: string): Promise<Collaboration> {

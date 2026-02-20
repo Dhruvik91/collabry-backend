@@ -1,8 +1,9 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString, IsEnum } from 'class-validator';
 import { CollaborationStatus } from '../../../database/entities/enums';
+import { PaginationQueryDto } from '../../../core/dto/pagination-query.dto';
 
-export class FilterCollaborationsDto {
+export class FilterCollaborationsDto extends PaginationQueryDto {
     @ApiPropertyOptional({ enum: CollaborationStatus, description: 'Filter by collaboration status' })
     @IsOptional()
     @IsEnum(CollaborationStatus)
