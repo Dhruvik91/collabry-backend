@@ -1,10 +1,12 @@
-import { Controller, Get, Post, Patch, Delete, Body, Req, Param } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
+import { Controller, Get, Post, Patch, Delete, Body, Req, Param, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse, ApiCreatedResponse, ApiQuery } from '@nestjs/swagger';
 import { CollaborationService } from './collaboration.service';
 import { CreateCollaborationDto } from './dto/create-collaboration.dto';
 import { UpdateCollaborationStatusDto } from './dto/update-collaboration-status.dto';
 import { UpdateCollaborationDto } from './dto/update-collaboration.dto';
+import { FilterCollaborationsDto } from './dto/filter-collaborations.dto';
 import { Collaboration } from '../../database/entities/collaboration.entity';
+import { CollaborationStatus } from '../../database/entities/enums';
 
 @ApiTags('Collaboration')
 @ApiBearerAuth()
@@ -22,8 +24,10 @@ export class CollaborationController {
     @Get()
     @ApiOperation({ summary: 'List collaborations for current user' })
     @ApiOkResponse({ description: 'Returns a list of collaborations', type: Collaboration, isArray: true })
-    async findAll(@Req() req: any) {
-        return this.collaborationService.getMyCollaborations(req.user.id);
+    @ApiQuery({ name: 'status', enum: CollaborationStatus, required: false })
+    @ApiQuery({ name: 'search', required: false, description: 'Search by title' })
+    async findAll(@Req() req: any, @Query() filters: FilterCollaborationsDto) {
+        return this.collaborationService.getMyCollaborations(req.user.id, filters);
     }
 
     @Get(':id')

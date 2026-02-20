@@ -96,7 +96,7 @@ Core business logic for brand-influencer interactions.
 | Endpoint | Method | Description | Edge Cases |
 |-----------|--------|------------|------------|
 | `/` | POST | Request new collaboration. | Self-request, Target not influencer, Start date > End date |
-| `/` | GET | List collaborations where user is requester or influencer. | N/A |
+| `/` | GET | List collaborations where user is requester or influencer. Supports `?status=` and `?search=` query params. | N/A |
 | `/:id` | GET | Get collaboration details. | Forbidden if not involved |
 | `/:id/status` | PATCH | Transition collaboration lifecycle. | Invalid state transitions, Role restrictions |
 | `/:id` | PATCH | Update collaboration details. | Only requester can edit, Forbidden if Completed/Cancelled |

@@ -8,6 +8,7 @@ import { RankingService } from '../ranking/ranking.service';
 import { CreateCollaborationDto } from './dto/create-collaboration.dto';
 import { UpdateCollaborationStatusDto } from './dto/update-collaboration-status.dto';
 import { UpdateCollaborationDto } from './dto/update-collaboration.dto';
+import { FilterCollaborationsDto } from './dto/filter-collaborations.dto';
 import { CollaborationStatus, UserRole } from '../../database/entities/enums';
 import { isEntityNotFoundError } from '../../database/errors/entity-not-found.type-guard';
 import { cif } from '../../database/errors/tryQuery';
@@ -96,15 +97,30 @@ export class CollaborationService {
         return savedCollaboration;
     }
 
-    async getMyCollaborations(userId: string): Promise<Collaboration[]> {
-        return await this.collaborationRepo.find({
-            where: [
-                { requester: { id: userId } },
-                { influencer: { user: { id: userId } } },
-            ],
-            relations: ['requester', 'influencer', 'requester.profile', 'influencer.user', 'influencer.user.profile'],
-            order: { createdAt: 'DESC' },
-        });
+    async getMyCollaborations(userId: string, filters?: FilterCollaborationsDto): Promise<Collaboration[]> {
+        const qb = this.collaborationRepo
+            .createQueryBuilder('collaboration')
+            .leftJoinAndSelect('collaboration.requester', 'requester')
+            .leftJoinAndSelect('requester.profile', 'requesterProfile')
+            .leftJoinAndSelect('collaboration.influencer', 'influencer')
+            .leftJoinAndSelect('influencer.user', 'influencerUser')
+            .leftJoinAndSelect('influencerUser.profile', 'influencerUserProfile')
+            .where(
+                '(requester.id = :userId OR influencerUser.id = :userId)',
+                { userId },
+            );
+
+        if (filters?.status) {
+            qb.andWhere('collaboration.status = :status', { status: filters.status });
+        }
+
+        if (filters?.search) {
+            qb.andWhere('collaboration.title ILIKE :search', { search: `%${filters.search}%` });
+        }
+
+        qb.orderBy('collaboration.createdAt', 'DESC');
+
+        return qb.getMany();
     }
 
     async getCollaborationById(id: string, userId: string): Promise<Collaboration> {
