@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsNumber, Min, Max } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsOptional, IsString, IsNumber, Min, Max, IsBoolean } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
 
 export class SearchInfluencersDto {
     @ApiPropertyOptional({ example: 'Lifestyle' })
@@ -24,6 +24,33 @@ export class SearchInfluencersDto {
     @IsNumber()
     @Min(0)
     minFollowers?: number;
+
+    @ApiPropertyOptional({ example: 'Rising Creator', description: 'Filter by ranking tier' })
+    @IsOptional()
+    @IsString()
+    rankingTier?: string;
+
+    @ApiPropertyOptional({ example: 3.5, description: 'Minimum average rating' })
+    @IsOptional()
+    @Type(() => Number)
+    @IsNumber()
+    @Min(0)
+    @Max(5)
+    minRating?: number;
+
+    @ApiPropertyOptional({ example: 5, description: 'Maximum average rating' })
+    @IsOptional()
+    @Type(() => Number)
+    @IsNumber()
+    @Min(0)
+    @Max(5)
+    maxRating?: number;
+
+    @ApiPropertyOptional({ example: true, description: 'Filter verified influencers only' })
+    @IsOptional()
+    @Transform(({ value }) => value === 'true' || value === true)
+    @IsBoolean()
+    verified?: boolean;
 
     @ApiPropertyOptional({ example: 1 })
     @IsOptional()
