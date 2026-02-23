@@ -2,8 +2,9 @@ import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nest
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InfluencerProfile } from '../../database/entities/influencer-profile.entity';
+import { Collaboration } from '../../database/entities/collaboration.entity';
 import { User } from '../../database/entities/user.entity';
-import { UserRole, UserStatus } from '../../database/entities/enums';
+import { UserRole, UserStatus, CollaborationStatus } from '../../database/entities/enums';
 import { SaveInfluencerProfileDto } from './dto/save-influencer-profile.dto';
 import { SearchInfluencersDto } from './dto/search-influencers.dto';
 import { RankingService } from '../ranking/ranking.service';
@@ -19,10 +20,24 @@ export class InfluencerService {
         private readonly influencerRepo: Repository<InfluencerProfile>,
         @InjectRepository(User)
         private readonly userRepo: Repository<User>,
+        @InjectRepository(Collaboration)
+        private readonly collaborationRepo: Repository<Collaboration>,
         private readonly rankingService: RankingService,
     ) { }
 
-    async getInfluencerProfile(userId: string): Promise<InfluencerProfile> {
+    /**
+     * Count completed collaborations for an influencer profile
+     */
+    private async getCompletedCollaborationsCount(influencerProfileId: string): Promise<number> {
+        return this.collaborationRepo.count({
+            where: {
+                influencer: { id: influencerProfileId },
+                status: CollaborationStatus.COMPLETED,
+            },
+        });
+    }
+
+    async getInfluencerProfile(userId: string): Promise<InfluencerProfile & { completedCollaborations: number }> {
         try {
             const profile = await this.influencerRepo.findOne({
                 where: { user: { id: userId } },
@@ -33,13 +48,15 @@ export class InfluencerService {
                 throw new NotFoundException('Influencer profile not found');
             }
 
+            const completedCollaborations = await this.getCompletedCollaborationsCount(profile.id);
+
             // Always sync ranking to ensure tier is up-to-date
             try {
                 const updatedProfile = await this.rankingService.updateRanking(userId);
-                return updatedProfile;
+                return { ...updatedProfile, completedCollaborations };
             } catch (error) {
                 this.logger.warn(`Failed to sync ranking for user ${userId}: ${error.message}`);
-                return profile; // Return profile even if ranking sync fails
+                return { ...profile, completedCollaborations };
             }
         } catch (error) {
             cif(isEntityNotFoundError, new NotFoundException('Influencer profile not found'))(error);
@@ -129,10 +146,13 @@ export class InfluencerService {
         const syncedItems = await Promise.all(
             items.map(async (item) => {
                 try {
-                    return await this.rankingService.updateRanking(item.user.id);
+                    const updatedProfile = await this.rankingService.updateRanking(item.user.id);
+                    const completedCollaborations = await this.getCompletedCollaborationsCount(item.id);
+                    return { ...updatedProfile, completedCollaborations };
                 } catch (error) {
                     this.logger.warn(`Failed to sync ranking for user ${item.user.id}: ${error.message}`);
-                    return item; // Return original if sync fails
+                    const completedCollaborations = await this.getCompletedCollaborationsCount(item.id).catch(() => 0);
+                    return { ...item, completedCollaborations };
                 }
             })
         );
@@ -148,7 +168,7 @@ export class InfluencerService {
         };
     }
 
-    async getInfluencerById(id: string): Promise<InfluencerProfile> {
+    async getInfluencerById(id: string): Promise<InfluencerProfile & { completedCollaborations: number }> {
         try {
             const profile = await this.influencerRepo.findOne({
                 where: { id },
@@ -159,13 +179,15 @@ export class InfluencerService {
                 throw new NotFoundException('Influencer not found');
             }
 
+            const completedCollaborations = await this.getCompletedCollaborationsCount(profile.id);
+
             // Sync ranking to ensure tier is up-to-date
             try {
                 const updatedProfile = await this.rankingService.updateRanking(profile.user.id);
-                return updatedProfile;
+                return { ...updatedProfile, completedCollaborations };
             } catch (error) {
                 this.logger.warn(`Failed to sync ranking for influencer ${id}: ${error.message}`);
-                return profile; // Return profile even if ranking sync fails
+                return { ...profile, completedCollaborations };
             }
         } catch (error) {
             cif(isEntityNotFoundError, new NotFoundException('Influencer not found'))(error);
