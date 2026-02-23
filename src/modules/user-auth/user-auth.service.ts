@@ -133,6 +133,7 @@ export class UserAuthService {
     // Find users with non-expired reset tokens
     const users = await this.usersRepo
       .createQueryBuilder('user')
+      .addSelect('user.passwordResetToken')
       .where('user.passwordResetToken IS NOT NULL')
       .andWhere('user.passwordResetExpires > :now', { now: new Date() })
       .getMany();
