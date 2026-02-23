@@ -186,7 +186,7 @@ export class ReviewService {
     async deleteReview(userId: string, id: string): Promise<void> {
         const review = await this.reviewRepo.findOne({
             where: { id },
-            relations: ['reviewer', 'influencer'],
+            relations: ['reviewer', 'influencer', 'influencer.user'],
         });
 
         if (!review) {
