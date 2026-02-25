@@ -155,7 +155,7 @@ Privileged platform operations.
 | Endpoint | Method | Description | Edge Cases |
 |-----------|--------|------------|------------|
 | `/stats` | GET | Global metrics dashboard. | Forbidden to non-admin |
-| `/reports` | GET/PATCH | View and resolve user reports. | N/A |
+| `/reports` | GET/PATCH | View and resolve user reports. List supports `?search=` and `status=` query params. | N/A |
 | `/verifications` | GET/PATCH | Process influencer verification requests. | N/A |
 | `/subscription/plan` | POST/DELETE | Manage subscription tiers. | N/A |
 
