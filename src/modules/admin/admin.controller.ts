@@ -1,5 +1,5 @@
-import { Controller, Get, Patch, Post, Delete, Body, Param, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse, ApiBody } from '@nestjs/swagger';
+import { Controller, Get, Patch, Post, Delete, Body, Param, UseGuards, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
 import { ReportService } from '../report/report.service';
 import { VerificationService } from '../verification/verification.service';
@@ -8,7 +8,7 @@ import { UpdateReportStatusDto } from './dto/update-report-status.dto';
 import { UpdateVerificationStatusDto } from './dto/update-verification-status.dto';
 import { SaveSubscriptionPlanDto } from '../subscription/dto/save-subscription-plan.dto';
 import { AdminStatsDto } from './dto/admin-stats.dto';
-import { UserRole } from '../../database/entities/enums';
+import { UserRole, ReportStatus } from '../../database/entities/enums';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/Guards/roles.guard';
 
@@ -36,8 +36,13 @@ export class AdminController {
     // --- Reports ---
     @Get('reports')
     @ApiOperation({ summary: 'List all system reports' })
-    async findAllReports() {
-        return this.reportService.getAllReports();
+    @ApiQuery({ name: 'search', required: false, type: String })
+    @ApiQuery({ name: 'status', required: false, enum: ReportStatus })
+    async findAllReports(
+        @Query('search') search?: string,
+        @Query('status') status?: ReportStatus
+    ) {
+        return this.reportService.getAllReports(search, status);
     }
 
     @Patch('reports/:id/status')

@@ -41,11 +41,26 @@ export class ReportService {
     return await this.reportRepo.save(report);
   }
 
-  async getAllReports(): Promise<Report[]> {
-    return await this.reportRepo.find({
-      relations: ['reporter', 'targetUser', 'reporter.profile', 'targetUser.profile'],
-      order: { createdAt: 'DESC' },
-    });
+  async getAllReports(search?: string, status?: ReportStatus): Promise<Report[]> {
+    const query = this.reportRepo.createQueryBuilder('report')
+      .leftJoinAndSelect('report.reporter', 'reporter')
+      .leftJoinAndSelect('report.targetUser', 'targetUser')
+      .leftJoinAndSelect('reporter.profile', 'reporterProfile')
+      .leftJoinAndSelect('targetUser.profile', 'targetProfile')
+      .orderBy('report.createdAt', 'DESC');
+
+    if (status) {
+      query.andWhere('report.status = :status', { status });
+    }
+
+    if (search) {
+      query.andWhere(
+        '(report.reason ILike :search OR reporter.email ILike :search)',
+        { search: `%${search}%` }
+      );
+    }
+
+    return await query.getMany();
   }
 
   async getReportById(id: string): Promise<Report> {

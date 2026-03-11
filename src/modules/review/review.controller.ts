@@ -2,6 +2,7 @@ import { Controller, Post, Get, Body, Req, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
 import { ReviewService } from './review.service';
 import { CreateReviewDto } from './dto/create-review.dto';
+import { UpdateReviewDto } from './dto/update-review.dto';
 import { AllowUnauthorized } from '../auth/unauthorized/allow-unauthorixed';
 
 @ApiTags('Review')
@@ -29,7 +30,7 @@ export class ReviewController {
     @Post(':id')
     @ApiOperation({ summary: 'Update a review' })
     @ApiOkResponse({ description: 'Review updated successfully' })
-    async update(@Req() req: any, @Param('id') id: string, @Body() updateDto: CreateReviewDto) {
+    async update(@Req() req: any, @Param('id') id: string, @Body() updateDto: UpdateReviewDto) {
         return this.reviewService.updateReview(req.user.id, id, updateDto);
     }
 
