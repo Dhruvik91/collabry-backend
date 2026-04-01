@@ -21,6 +21,7 @@ import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { VerificationModule } from './modules/verification/verification.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { RankingModule } from './modules/ranking/ranking.module';
+import { AuctionModule } from './modules/auction/auction.module';
 
 
 @Module({
@@ -45,6 +46,7 @@ import { RankingModule } from './modules/ranking/ranking.module';
     VerificationModule,
     AdminModule,
     RankingModule,
+    AuctionModule,
 
     // Utility modules
 

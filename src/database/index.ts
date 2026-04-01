@@ -1,5 +1,7 @@
 import { AdminAction } from './entities/admin-action.entity';
+import { Auction } from './entities/auction.entity';
 import { AuthSession } from './entities/auth-session.entity';
+import { Bid } from './entities/bid.entity';
 import { Collaboration } from './entities/collaboration.entity';
 import { Conversation } from './entities/conversation.entity';
 import { InfluencerProfile } from './entities/influencer-profile.entity';
@@ -16,7 +18,9 @@ import { VerificationRequest } from './entities/verification-request.entity';
 
 export const AllEntities = [
   AdminAction,
+  Auction,
   AuthSession,
+  Bid,
   Collaboration,
   Conversation,
   InfluencerProfile,
