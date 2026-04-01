@@ -146,7 +146,7 @@ export class ReviewService {
     async getInfluencerReviews(influencerProfileId: string): Promise<Review[]> {
         return await this.reviewRepo.find({
             where: { influencer: { id: influencerProfileId } },
-            relations: ['reviewer', 'reviewer.profile'],
+            relations: ['reviewer', 'reviewer.profile', 'collaboration'],
             order: { createdAt: 'DESC' },
         });
     }
