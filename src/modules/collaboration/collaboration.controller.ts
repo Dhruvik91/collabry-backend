@@ -5,6 +5,7 @@ import { CreateCollaborationDto } from './dto/create-collaboration.dto';
 import { UpdateCollaborationStatusDto } from './dto/update-collaboration-status.dto';
 import { UpdateCollaborationDto } from './dto/update-collaboration.dto';
 import { FilterCollaborationsDto } from './dto/filter-collaborations.dto';
+import { FilterMyInfluencersDto } from './dto/filter-my-influencers.dto';
 import { Collaboration } from '../../database/entities/collaboration.entity';
 import { CollaborationStatus } from '../../database/entities/enums';
 
@@ -19,6 +20,13 @@ export class CollaborationController {
     @ApiCreatedResponse({ description: 'Collaboration request created', type: Collaboration })
     async create(@Req() req: any, @Body() createDto: CreateCollaborationDto) {
         return this.collaborationService.createCollaboration(req.user.id, createDto);
+    }
+
+    @Get('my-influencers')
+    @ApiOperation({ summary: 'Get influencers I have collaborated with' })
+    @ApiOkResponse({ description: 'Returns a list of influencers with collaboration stats' })
+    async getMyInfluencers(@Req() req: any, @Query() filters: FilterMyInfluencersDto) {
+        return this.collaborationService.getMyInfluencers(req.user.id, filters);
     }
 
     @Get()

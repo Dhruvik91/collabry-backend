@@ -262,4 +262,82 @@ export class CollaborationService {
         // Update Ranking (though for REQUESTED it might not change much)
         await this.rankingService.updateRanking(influencerUserId);
     }
+
+    async getMyInfluencers(userId: string, filters?: any) {
+        const page = filters?.page ?? 1;
+        const limit = filters?.limit ?? 10;
+        const search = filters?.search;
+        const niche = filters?.niche;
+
+        // Get all collaborations for this user with filters
+        const qb = this.collaborationRepo
+            .createQueryBuilder('collaboration')
+            .leftJoinAndSelect('collaboration.influencer', 'influencer')
+            .leftJoinAndSelect('influencer.user', 'influencerUser')
+            .leftJoinAndSelect('influencerUser.profile', 'influencerUserProfile')
+            .where('collaboration.requester.id = :userId', { userId });
+
+        // Apply search filter
+        if (search) {
+            qb.andWhere(
+                '(influencer.fullName ILIKE :search OR influencer.niche ILIKE :search)',
+                { search: `%${search}%` }
+            );
+        }
+
+        // Apply niche filter
+        if (niche) {
+            qb.andWhere('influencer.niche ILIKE :niche', { niche: `%${niche}%` });
+        }
+
+        const collaborations = await qb
+            .orderBy('collaboration.updatedAt', 'DESC')
+            .getMany();
+
+        // Group by influencer and calculate stats
+        const influencerMap = new Map();
+
+        for (const collab of collaborations) {
+            const influencerId = collab.influencer.id;
+
+            if (!influencerMap.has(influencerId)) {
+                influencerMap.set(influencerId, {
+                    influencer: collab.influencer,
+                    totalCollaborations: 0,
+                    completedCollaborations: 0,
+                    lastCollaborationDate: collab.updatedAt,
+                });
+            }
+
+            const stats = influencerMap.get(influencerId);
+            stats.totalCollaborations++;
+            if (collab.status === CollaborationStatus.COMPLETED) {
+                stats.completedCollaborations++;
+            }
+
+            // Keep the most recent collaboration date
+            if (new Date(collab.updatedAt) > new Date(stats.lastCollaborationDate)) {
+                stats.lastCollaborationDate = collab.updatedAt;
+            }
+        }
+
+        // Convert map to array
+        const allInfluencers = Array.from(influencerMap.values());
+        const total = allInfluencers.length;
+
+        // Apply pagination
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + limit;
+        const items = allInfluencers.slice(startIndex, endIndex);
+
+        return {
+            items,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        };
+    }
 }
