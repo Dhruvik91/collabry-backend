@@ -189,10 +189,16 @@ export class AuctionService {
             title: bid.auction.title,
             description: bid.auction.description,
             status: CollaborationStatus.ACCEPTED,
+            proposedTerms: {
+                bidAmount: bid.amount,
+                proposal: bid.proposal,
+            },
             agreedTerms: {
                 bidAmount: bid.amount,
                 proposal: bid.proposal,
             },
+            startDate: new Date(),
+            endDate: bid.auction.deadline,
         });
 
         await this.collaborationRepository.save(collaboration);

@@ -33,4 +33,11 @@ export class CreateCollaborationDto {
     @IsOptional()
     @IsDateString()
     endDate?: Date;
+    
+    @ApiPropertyOptional({
+        example: { budget: '$500', details: 'Paid promotion' },
+    })
+    @IsOptional()
+    @IsObject()
+    agreedTerms?: any;
 }
