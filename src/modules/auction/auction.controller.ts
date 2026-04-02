@@ -9,6 +9,8 @@ import { JwtAuthGuard } from '../auth/Guards/jwt-guard';
 import { RolesGuard } from '../auth/Guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole, AuctionStatus } from '../../database/entities/enums';
+import { AuctionQueryDto } from './dto/auction-query.dto';
+import { PaginationQueryDto } from '../../core/dto/pagination-query.dto';
 
 @ApiTags('Auctions')
 @ApiBearerAuth()
@@ -28,12 +30,9 @@ export class AuctionController {
     @Get()
     @ApiOperation({ summary: 'List all open auctions' })
     findAll(
-        @Query('status') status?: AuctionStatus, 
-        @Query('category') category?: string,
-        @Query('page') page: number = 1,
-        @Query('limit') limit: number = 10
+        @Query() query: AuctionQueryDto
     ) {
-        return this.auctionService.findAll({ status, category, page, limit });
+        return this.auctionService.findAll(query);
     }
 
     @Get('my')
@@ -41,10 +40,9 @@ export class AuctionController {
     @ApiOperation({ summary: 'List all auctions created by the current user' })
     findMyAuctions(
         @Req() req: any,
-        @Query('page') page: number = 1,
-        @Query('limit') limit: number = 10
+        @Query() query: PaginationQueryDto
     ) {
-        return this.auctionService.findMyAuctions(req.user.id, page, limit);
+        return this.auctionService.findMyAuctions(req.user.id, query.page, query.limit);
     }
 
     @Get('my/bids')
@@ -52,10 +50,9 @@ export class AuctionController {
     @ApiOperation({ summary: 'List all bids placed by the current influencer' })
     findMyBids(
         @Req() req: any,
-        @Query('page') page: number = 1,
-        @Query('limit') limit: number = 10
+        @Query() query: PaginationQueryDto
     ) {
-        return this.auctionService.findMyBids(req.user.id, page, limit);
+        return this.auctionService.findMyBids(req.user.id, query.page, query.limit);
     }
 
     @Get(':id')
