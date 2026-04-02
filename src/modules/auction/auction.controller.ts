@@ -27,22 +27,35 @@ export class AuctionController {
 
     @Get()
     @ApiOperation({ summary: 'List all open auctions' })
-    findAll(@Query('status') status?: AuctionStatus, @Query('category') category?: string) {
-        return this.auctionService.findAll({ status, category });
+    findAll(
+        @Query('status') status?: AuctionStatus, 
+        @Query('category') category?: string,
+        @Query('page') page: number = 1,
+        @Query('limit') limit: number = 10
+    ) {
+        return this.auctionService.findAll({ status, category, page, limit });
     }
 
     @Get('my')
     @Roles(UserRole.USER, UserRole.ADMIN)
     @ApiOperation({ summary: 'List all auctions created by the current user' })
-    findMyAuctions(@Req() req: any) {
-        return this.auctionService.findMyAuctions(req.user.id);
+    findMyAuctions(
+        @Req() req: any,
+        @Query('page') page: number = 1,
+        @Query('limit') limit: number = 10
+    ) {
+        return this.auctionService.findMyAuctions(req.user.id, page, limit);
     }
 
     @Get('my/bids')
     @Roles(UserRole.INFLUENCER)
     @ApiOperation({ summary: 'List all bids placed by the current influencer' })
-    findMyBids(@Req() req: any) {
-        return this.auctionService.findMyBids(req.user.id);
+    findMyBids(
+        @Req() req: any,
+        @Query('page') page: number = 1,
+        @Query('limit') limit: number = 10
+    ) {
+        return this.auctionService.findMyBids(req.user.id, page, limit);
     }
 
     @Get(':id')

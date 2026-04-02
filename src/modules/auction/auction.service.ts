@@ -41,22 +41,37 @@ export class AuctionService {
         return this.auctionRepository.save(auction);
     }
 
-    async findAll(filters: { status?: AuctionStatus; category?: string }): Promise<Auction[]> {
+    async findAll(filters: { status?: AuctionStatus; category?: string; page?: number; limit?: number }): Promise<any> {
+        const { page = 1, limit = 10, status, category } = filters;
         const query = this.auctionRepository.createQueryBuilder('auction')
             .leftJoinAndSelect('auction.creator', 'creator')
             .leftJoinAndSelect('creator.profile', 'profile');
 
-        if (filters.status) {
-            query.andWhere('auction.status = :status', { status: filters.status });
+        if (status) {
+            query.andWhere('auction.status = :status', { status });
         } else {
             query.andWhere('auction.status = :status', { status: AuctionStatus.OPEN });
         }
 
-        if (filters.category) {
-            query.andWhere('auction.category = :category', { category: filters.category });
+        if (category) {
+            query.andWhere('auction.category = :category', { category });
         }
 
-        return query.orderBy('auction.createdAt', 'DESC').getMany();
+        const [items, total] = await query
+            .orderBy('auction.createdAt', 'DESC')
+            .skip((page - 1) * limit)
+            .take(limit)
+            .getManyAndCount();
+
+        return {
+            items,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        };
     }
 
     async findOne(id: string): Promise<Auction> {
@@ -209,19 +224,43 @@ export class AuctionService {
         return { message: 'Bid rejected successfully', bid };
     }
 
-    async findMyBids(influencerId: string): Promise<Bid[]> {
-        return this.bidRepository.find({
+    async findMyBids(influencerId: string, page = 1, limit = 10): Promise<any> {
+        const [items, total] = await this.bidRepository.findAndCount({
             where: { influencer: { id: influencerId } },
             relations: ['auction', 'auction.creator', 'auction.creator.profile'],
             order: { createdAt: 'DESC' },
+            skip: (page - 1) * limit,
+            take: limit,
         });
+
+        return {
+            items,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        };
     }
 
-    async findMyAuctions(userId: string): Promise<Auction[]> {
-        return this.auctionRepository.find({
+    async findMyAuctions(userId: string, page = 1, limit = 10): Promise<any> {
+        const [items, total] = await this.auctionRepository.findAndCount({
             where: { creator: { id: userId } },
             relations: ['creator', 'creator.profile', 'bids', 'bids.influencer', 'bids.influencer.profile'],
             order: { createdAt: 'DESC' },
+            skip: (page - 1) * limit,
+            take: limit,
         });
+
+        return {
+            items,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        };
     }
 }
