@@ -184,4 +184,36 @@ export class AuctionService {
         
         return { message: 'Bid accepted and collaboration created', bid, collaborationId: collaboration.id };
     }
+
+    async rejectBid(bidId: string, brandId: string): Promise<any> {
+        const bid = await this.bidRepository.findOne({
+            where: { id: bidId },
+            relations: ['auction', 'auction.creator'],
+        });
+
+        if (!bid) {
+            throw new NotFoundException(`Bid with ID ${bidId} not found`);
+        }
+
+        if (bid.auction.creator.id !== brandId) {
+            throw new ForbiddenException('You can only reject bids for your own auctions');
+        }
+
+        if (bid.status !== BidStatus.PENDING) {
+            throw new BadRequestException('Only pending bids can be rejected');
+        }
+
+        bid.status = BidStatus.REJECTED;
+        await this.bidRepository.save(bid);
+
+        return { message: 'Bid rejected successfully', bid };
+    }
+
+    async findMyBids(influencerId: string): Promise<Bid[]> {
+        return this.bidRepository.find({
+            where: { influencer: { id: influencerId } },
+            relations: ['auction', 'auction.creator', 'auction.creator.profile'],
+            order: { createdAt: 'DESC' },
+        });
+    }
 }

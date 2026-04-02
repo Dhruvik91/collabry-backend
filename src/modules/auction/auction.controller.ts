@@ -31,6 +31,13 @@ export class AuctionController {
         return this.auctionService.findAll({ status, category });
     }
 
+    @Get('my/bids')
+    @Roles(UserRole.INFLUENCER)
+    @ApiOperation({ summary: 'List all bids placed by the current influencer' })
+    findMyBids(@Req() req: any) {
+        return this.auctionService.findMyBids(req.user.id);
+    }
+
     @Get(':id')
     @ApiOperation({ summary: 'Get auction details and bids' })
     findOne(@Param('id') id: string) {
@@ -64,5 +71,12 @@ export class AuctionController {
     @ApiOperation({ summary: 'Accept a bid and create collaboration (Brand only)' })
     acceptBid(@Param('id') bidId: string, @Req() req: any) {
         return this.auctionService.acceptBid(bidId, req.user.id);
+    }
+
+    @Post('bids/:id/reject')
+    @Roles(UserRole.USER)
+    @ApiOperation({ summary: 'Reject a bid (Brand only)' })
+    rejectBid(@Param('id') bidId: string, @Req() req: any) {
+        return this.auctionService.rejectBid(bidId, req.user.id);
     }
 }
