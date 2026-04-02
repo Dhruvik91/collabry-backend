@@ -31,6 +31,13 @@ export class AuctionController {
         return this.auctionService.findAll({ status, category });
     }
 
+    @Get('my')
+    @Roles(UserRole.USER, UserRole.ADMIN)
+    @ApiOperation({ summary: 'List all auctions created by the current user' })
+    findMyAuctions(@Req() req: any) {
+        return this.auctionService.findMyAuctions(req.user.id);
+    }
+
     @Get('my/bids')
     @Roles(UserRole.INFLUENCER)
     @ApiOperation({ summary: 'List all bids placed by the current influencer' })

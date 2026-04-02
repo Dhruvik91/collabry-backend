@@ -216,4 +216,12 @@ export class AuctionService {
             order: { createdAt: 'DESC' },
         });
     }
+
+    async findMyAuctions(userId: string): Promise<Auction[]> {
+        return this.auctionRepository.find({
+            where: { creator: { id: userId } },
+            relations: ['creator', 'creator.profile', 'bids', 'bids.influencer', 'bids.influencer.profile'],
+            order: { createdAt: 'DESC' },
+        });
+    }
 }
