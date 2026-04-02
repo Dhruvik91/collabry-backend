@@ -62,7 +62,7 @@ export class AuctionService {
     async findOne(id: string): Promise<Auction> {
         const auction = await this.auctionRepository.findOne({
             where: { id },
-            relations: ['creator', 'creator.profile', 'bids', 'bids.influencer', 'bids.influencer.profile'],
+            relations: ['creator', 'creator.profile', 'bids', 'bids.influencer', 'bids.influencer.profile', 'bids.influencer.influencerProfile'],
         });
 
         if (!auction) {
