@@ -1,4 +1,5 @@
 import { Controller, Post, Get, Body, Req, Param } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
 import { ReviewService } from './review.service';
 import { CreateReviewDto } from './dto/create-review.dto';
@@ -12,6 +13,7 @@ export class ReviewController {
 
     @ApiBearerAuth()
     @Post()
+    @Throttle({ default: { limit: 5, ttl: 60000 } })
     @ApiOperation({ summary: 'Create a review for an influencer' })
     @ApiCreatedResponse({ description: 'Review created successfully' })
     async create(@Req() req: any, @Body() createDto: CreateReviewDto) {

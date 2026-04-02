@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, Req } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AuctionService } from './auction.service';
 import { CreateAuctionDto } from './dto/create-auction.dto';
@@ -17,6 +18,7 @@ export class AuctionController {
     constructor(private readonly auctionService: AuctionService) {}
 
     @Post()
+    @Throttle({ default: { limit: 10, ttl: 60000 } })
     @Roles(UserRole.USER, UserRole.ADMIN)
     @ApiOperation({ summary: 'Create a new auction (Brand only)' })
     create(@Req() req: any, @Body() createAuctionDto: CreateAuctionDto) {
@@ -50,6 +52,7 @@ export class AuctionController {
     }
 
     @Post(':id/bids')
+    @Throttle({ default: { limit: 20, ttl: 60000 } })
     @Roles(UserRole.INFLUENCER)
     @ApiOperation({ summary: 'Place a bid on an auction (Influencer only)' })
     placeBid(@Param('id') auctionId: string, @Body() createBidDto: CreateBidDto, @Req() req: any) {
