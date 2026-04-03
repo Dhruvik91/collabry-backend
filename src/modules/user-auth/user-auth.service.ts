@@ -22,10 +22,15 @@ export class UserAuthService {
     private readonly mailerService: MailerService,
   ) { }
 
-  async signup(email: string, password: string, confirmPassword: string) {
+  async signup(email: string, password: string, confirmPassword: string, role: UserRole = UserRole.USER) {
     // Validate password confirmation
     if (password !== confirmPassword) {
       throw new BadRequestException('Password and confirm password do not match');
+    }
+
+    // Prevent direct signup for ADMIN role
+    if (role === UserRole.ADMIN) {
+      throw new BadRequestException('Cannot sign up with Admin role');
     }
 
     const exists = await this.usersRepo.findOne({ where: { email } });
@@ -42,7 +47,7 @@ export class UserAuthService {
     // Create user with PENDING status
     const user = this.usersRepo.create({ 
       email, 
-      role: UserRole.USER, 
+      role, 
       passwordHash,
       status: UserStatus.PENDING,
       emailVerified: false,

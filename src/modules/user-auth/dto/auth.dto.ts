@@ -1,5 +1,6 @@
-import { IsEmail, IsString, MinLength, Matches } from 'class-validator';
+import { IsEmail, IsString, MinLength, IsEnum, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { UserRole } from '../../../database/entities/enums';
 
 export class SignupDto {
     @ApiProperty({ example: 'user@example.com', description: 'Email address' })
@@ -15,6 +16,11 @@ export class SignupDto {
     @IsString()
     @MinLength(6, { message: 'Confirm password must be at least 6 characters long' })
     confirmPassword: string;
+
+    @ApiProperty({ enum: UserRole, example: UserRole.USER, description: 'User role' })
+    @IsEnum(UserRole, { message: 'Invalid role' })
+    @IsOptional()
+    role?: UserRole;
 }
 
 export class LoginDto {
