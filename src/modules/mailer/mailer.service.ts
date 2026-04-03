@@ -250,5 +250,48 @@ export class MailerService {
       return false;
     }
   }
+
+  async sendVerificationEmail(email: string, otp: string): Promise<boolean> {
+    const content = `
+      <!-- Icon -->
+      <div style="text-align: center; margin-bottom: 24px;">
+        <div style="display: inline-block; width: 56px; height: 56px; background: linear-gradient(135deg, #ede9fe, #f5f3ff); border-radius: 16px; line-height: 56px; text-align: center;">
+          <span style="font-size: 28px;">🛡️</span>
+        </div>
+      </div>
+
+      <h2 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 800; color: #1e1335; text-align: center; letter-spacing: -0.3px;">Verify Your Email</h2>
+      <p style="margin: 0 0 28px 0; font-size: 15px; color: #6b5f7b; text-align: center; line-height: 1.6;">
+        Welcome to Kollabary! Please use the verification code below to complete your registration.
+      </p>
+
+      <!-- OTP Box -->
+      <div style="text-align: center; margin: 0 0 28px 0;">
+        <div style="display: inline-block; background: #faf8ff; border: 2px dashed #7c3aed; border-radius: 16px; padding: 20px 40px;">
+          <span style="font-size: 32px; font-weight: 800; color: #7c3aed; letter-spacing: 8px;">${otp}</span>
+        </div>
+      </div>
+
+      <!-- Info box -->
+      <div style="background: #faf8ff; border: 1px solid #ede9fe; border-radius: 12px; padding: 16px 20px; margin-bottom: 24px;">
+        <p style="margin: 0 0 4px 0; font-size: 13px; font-weight: 600; color: #7c3aed;">⏱ Expires in 10 minutes</p>
+        <p style="margin: 0; font-size: 13px; color: #8b7fa0; line-height: 1.5;">
+          For security, this code will expire in 10 minutes. If you didn't request this, you can safely ignore this email.
+        </p>
+      </div>`;
+
+    try {
+      await this.mailer.sendMail({
+        to: email,
+        subject: 'Verify Your Kollabary Account',
+        html: this.buildEmailLayout(content),
+      });
+      this.logger.log(`Verification email sent to ${email}`);
+      return true;
+    } catch (error) {
+      this.logger.error(`Failed to send verification email to ${email}`, error);
+      return false;
+    }
+  }
 }
 

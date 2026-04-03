@@ -14,6 +14,7 @@ import {
 
 import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto';
 import { SignupDto, CreateInfluencerDto } from './dto/auth.dto';
+import { VerifyEmailDto, ResendOtpDto } from './dto/verify-email.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/Guards/roles.guard';
@@ -29,9 +30,18 @@ export class UserAuthController {
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('signup')
   @ApiOperation({ summary: 'Sign up a new user (regular users only)' })
-  @ApiCreatedResponse({ description: 'User registered and JWT returned in cookie' })
-  async signup(@Body() body: SignupDto, @Res({ passthrough: true }) res: Response) {
-    const result = await this.auth.signup(body.email, body.password, body.confirmPassword);
+  @ApiCreatedResponse({ description: 'User registered and verification code sent' })
+  async signup(@Body() body: SignupDto) {
+    return this.auth.signup(body.email, body.password, body.confirmPassword);
+  }
+
+  @AllowUnauthorized()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('verify-email')
+  @ApiOperation({ summary: 'Verify email with OTP and get access token' })
+  @ApiOkResponse({ description: 'Email verified and JWT returned in cookie' })
+  async verifyEmail(@Body() body: VerifyEmailDto, @Res({ passthrough: true }) res: Response) {
+    const result = await this.auth.verifyEmail(body);
     res.cookie('access_token', result.access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -40,6 +50,15 @@ export class UserAuthController {
       maxAge: 1000 * 60 * 60 * 24 * 7,
     });
     return result;
+  }
+
+  @AllowUnauthorized()
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @Post('resend-verify-email')
+  @ApiOperation({ summary: 'Resend verification OTP email' })
+  @ApiOkResponse({ description: 'New verification code sent' })
+  async resendVerifyEmail(@Body() body: ResendOtpDto) {
+    return this.auth.resendVerifyEmail(body.email);
   }
 
   @AllowUnauthorized()
