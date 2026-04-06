@@ -83,6 +83,25 @@ export class InfluencerService {
             Object.assign(profile, saveDto);
         }
 
+        // Calculate denormalized metrics if platforms are updated
+        if (saveDto.platforms) {
+            let totalFollowers = 0;
+            let totalEngagement = 0;
+            let platformCount = 0;
+
+            for (const key in saveDto.platforms) {
+                const platform = saveDto.platforms[key];
+                if (platform.followers) totalFollowers += platform.followers;
+                if (platform.engagementRate) {
+                    totalEngagement += platform.engagementRate;
+                    platformCount++;
+                }
+            }
+
+            profile.totalFollowers = totalFollowers;
+            profile.avgEngagementRate = platformCount > 0 ? totalEngagement / platformCount : 0;
+        }
+
         await this.influencerRepo.save(profile);
 
         // Update ranking after profile changes
@@ -96,7 +115,12 @@ export class InfluencerService {
     }
 
     async searchInfluencers(searchDto: SearchInfluencersDto) {
-        const { niche, platform, minFollowers, page, limit, search, rankingTier, minRating, maxRating, verified } = searchDto;
+        const { 
+            categories, platform, minFollowers, maxFollowers, 
+            minEngagementRate, locationCountry, locationCity, gender, 
+            languages, priceMin, priceMax, audienceGender,
+            page, limit, search, rankingTier, minRating, maxRating, verified 
+        } = searchDto;
         const query = this.influencerRepo.createQueryBuilder('influencer')
             .innerJoinAndSelect('influencer.user', 'user')
             .leftJoinAndSelect('user.profile', 'profile')
@@ -104,18 +128,59 @@ export class InfluencerService {
             .andWhere('user.status = :status', { status: UserStatus.ACTIVE });
 
         if (search) {
-            query.andWhere(
-                '(profile.fullName ILIKE :search OR profile.username ILIKE :search OR profile.bio ILIKE :search OR influencer.fullName ILIKE :search)',
-                { search: `%${search}%` }
-            );
+            query.andWhere('(influencer.fullName ILIKE :search OR profile.bio ILIKE :search)', {
+                search: `%${search}%`,
+            });
         }
 
-        if (niche) {
-            query.andWhere('influencer.niche ILIKE :niche', { niche: `%${niche}%` });
+        if (categories && categories.length > 0) {
+            query.andWhere('influencer.categories && :categories', { categories });
         }
 
         if (platform) {
             query.andWhere('influencer.platforms::text ILIKE :platform', { platform: `%${platform}%` });
+        }
+
+        if (minFollowers !== undefined && minFollowers !== null) {
+            query.andWhere('influencer.totalFollowers >= :minFollowers', { minFollowers });
+        }
+
+        if (maxFollowers !== undefined && maxFollowers !== null) {
+            query.andWhere('influencer.totalFollowers <= :maxFollowers', { maxFollowers });
+        }
+
+        if (minEngagementRate !== undefined && minEngagementRate !== null) {
+            query.andWhere('influencer.avgEngagementRate >= :minEngagementRate', { minEngagementRate });
+        }
+
+        if (locationCountry) {
+            query.andWhere('influencer.locationCountry ILIKE :locationCountry', { locationCountry: `%${locationCountry}%` });
+        }
+
+        if (locationCity) {
+            query.andWhere('influencer.locationCity ILIKE :locationCity', { locationCity: `%${locationCity}%` });
+        }
+
+        if (gender) {
+            query.andWhere('influencer.gender = :gender', { gender });
+        }
+
+        if (languages && languages.length > 0) {
+            query.andWhere('influencer.languages && :languages', { languages });
+        }
+
+        if (priceMin !== undefined && priceMin !== null) {
+            query.andWhere('influencer.minPrice >= :priceMin', { priceMin });
+        }
+
+        if (priceMax !== undefined && priceMax !== null) {
+            query.andWhere('influencer.maxPrice <= :priceMax', { priceMax });
+        }
+
+        if (audienceGender) {
+            query.andWhere("influencer.audienceGenderRatio->>:audienceGenderType > '0.5'", { 
+                audienceGenderType: audienceGender.toLowerCase() 
+            });
         }
 
         if (rankingTier) {

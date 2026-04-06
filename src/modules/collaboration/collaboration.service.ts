@@ -280,14 +280,14 @@ export class CollaborationService {
         // Apply search filter
         if (search) {
             qb.andWhere(
-                '(influencer.fullName ILIKE :search OR influencer.niche ILIKE :search)',
+                '(influencer.fullName ILIKE :search)',
                 { search: `%${search}%` }
             );
         }
 
-        // Apply niche filter
+        // Apply category filter
         if (niche) {
-            qb.andWhere('influencer.niche ILIKE :niche', { niche: `%${niche}%` });
+            qb.andWhere('influencer.categories @> :categories', { categories: JSON.stringify([niche]) });
         }
 
         const collaborations = await qb

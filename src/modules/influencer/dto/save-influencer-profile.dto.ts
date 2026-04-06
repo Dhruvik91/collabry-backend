@@ -8,11 +8,6 @@ export class SaveInfluencerProfileDto {
     @IsString()
     fullName?: string;
 
-    @ApiPropertyOptional({ example: 'Lifestyle' })
-    @IsOptional()
-    @IsString()
-    niche?: string;
-
     @ApiPropertyOptional({ example: 'https://example.com/avatar.jpg' })
     @IsOptional()
     @IsString()
@@ -45,4 +40,57 @@ export class SaveInfluencerProfileDto {
     @IsOptional()
     @IsEnum(AvailabilityStatus)
     availability?: AvailabilityStatus;
+
+    @ApiPropertyOptional({ example: ['Fitness', 'Health'] })
+    @IsOptional()
+    @IsArray()
+    @IsString({ each: true })
+    categories?: string[];
+
+    @ApiPropertyOptional({ example: 'United States' })
+    @IsOptional()
+    @IsString()
+    locationCountry?: string;
+
+    @ApiPropertyOptional({ example: 'New York' })
+    @IsOptional()
+    @IsString()
+    locationCity?: string;
+
+    @ApiPropertyOptional({ example: 'Female' })
+    @IsOptional()
+    @IsString()
+    gender?: string;
+
+    @ApiPropertyOptional({ example: ['English', 'Spanish'] })
+    @IsOptional()
+    @IsArray()
+    @IsString({ each: true })
+    languages?: string[];
+
+    @ApiPropertyOptional({ example: { male: 0.3, female: 0.7 } })
+    @IsOptional()
+    @IsObject()
+    audienceGenderRatio?: any;
+
+    @ApiPropertyOptional({ example: { '18-24': 0.4, '25-34': 0.6 } })
+    @IsOptional()
+    @IsObject()
+    audienceAgeBrackets?: any;
+
+    @ApiPropertyOptional({ example: ['US', 'CA', 'UK'] })
+    @IsOptional()
+    @IsArray()
+    @IsString({ each: true })
+    audienceTopCountries?: string[];
+
+    @ApiPropertyOptional({ example: 100 })
+    @IsOptional()
+    @IsNumber()
+    minPrice?: number;
+
+    @ApiPropertyOptional({ example: 500 })
+    @IsOptional()
+    @IsNumber()
+    maxPrice?: number;
 }

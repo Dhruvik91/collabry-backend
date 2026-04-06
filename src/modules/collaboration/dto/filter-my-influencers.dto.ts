@@ -8,10 +8,10 @@ export class FilterMyInfluencersDto {
     @IsString()
     search?: string;
 
-    @ApiPropertyOptional({ description: 'Filter by niche' })
+    @ApiPropertyOptional({ description: 'Filter by category' })
     @IsOptional()
     @IsString()
-    niche?: string;
+    category?: string;
 
     @ApiPropertyOptional({ description: 'Page number', default: 1 })
     @IsOptional()
