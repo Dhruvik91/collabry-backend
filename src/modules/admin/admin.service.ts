@@ -5,7 +5,11 @@ import { User } from '../../database/entities/user.entity';
 import { Collaboration } from '../../database/entities/collaboration.entity';
 import { VerificationRequest } from '../../database/entities/verification-request.entity';
 import { Review } from '../../database/entities/review.entity';
-import { UserRole, CollaborationStatus, VerificationStatus } from '../../database/entities/enums';
+import { Auction } from '../../database/entities/auction.entity';
+import { Bid } from '../../database/entities/bid.entity';
+import { Conversation } from '../../database/entities/conversation.entity';
+import { Message } from '../../database/entities/message.entity';
+import { UserRole, CollaborationStatus, VerificationStatus, AuctionStatus } from '../../database/entities/enums';
 import {
     AdminStatsDto,
     UserStatsDto,
@@ -28,6 +32,14 @@ export class AdminService {
         private readonly verificationRepo: Repository<VerificationRequest>,
         @InjectRepository(Review)
         private readonly reviewRepo: Repository<Review>,
+        @InjectRepository(Auction)
+        private readonly auctionRepo: Repository<Auction>,
+        @InjectRepository(Bid)
+        private readonly bidRepo: Repository<Bid>,
+        @InjectRepository(Conversation)
+        private readonly conversationRepo: Repository<Conversation>,
+        @InjectRepository(Message)
+        private readonly messageRepo: Repository<Message>,
     ) { }
 
     /**
@@ -252,5 +264,75 @@ export class AdminService {
         }
 
         return growth;
+    }
+
+    /**
+     * Get all auctions in the system
+     */
+    async getAllAuctions(search?: string, status?: AuctionStatus) {
+        const query = this.auctionRepo.createQueryBuilder('auction')
+            .leftJoinAndSelect('auction.creator', 'creator')
+            .leftJoinAndSelect('creator.profile', 'profile')
+            .leftJoinAndSelect('auction.bids', 'bids')
+            .orderBy('auction.createdAt', 'DESC');
+
+        if (status) {
+            query.andWhere('auction.status = :status', { status });
+        }
+
+        if (search) {
+            query.andWhere(
+                '(auction.title ILike :search OR profile.fullName ILike :search)',
+                { search: `%${search}%` }
+            );
+        }
+
+        return await query.getMany();
+    }
+
+    /**
+     * Get all bids in the system
+     */
+    async getAllBids(search?: string) {
+        const query = this.bidRepo.createQueryBuilder('bid')
+            .leftJoinAndSelect('bid.influencer', 'influencer')
+            .leftJoinAndSelect('influencer.profile', 'profile')
+            .leftJoinAndSelect('bid.auction', 'auction')
+            .orderBy('bid.createdAt', 'DESC');
+
+        if (search) {
+            query.andWhere(
+                '(profile.fullName ILike :search OR auction.title ILike :search)',
+                { search: `%${search}%` }
+            );
+        }
+
+        return await query.getMany();
+    }
+
+    /**
+     * Get all conversations in the system
+     */
+    async getAllConversations() {
+        return await this.conversationRepo.find({
+            relations: [
+                'userOne', 
+                'userTwo', 
+                'userOne.profile', 
+                'userTwo.profile'
+            ],
+            order: { lastMessageAt: 'DESC' },
+        });
+    }
+
+    /**
+     * Get all messages for a specific conversation (Admin View)
+     */
+    async getConversationMessages(conversationId: string) {
+        return await this.messageRepo.find({
+            where: { conversation: { id: conversationId } },
+            relations: ['sender', 'sender.profile'],
+            order: { createdAt: 'ASC' },
+        });
     }
 }

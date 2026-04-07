@@ -9,10 +9,23 @@ import { User } from '../../database/entities/user.entity';
 import { Collaboration } from '../../database/entities/collaboration.entity';
 import { VerificationRequest } from '../../database/entities/verification-request.entity';
 import { Review } from '../../database/entities/review.entity';
+import { Auction } from '../../database/entities/auction.entity';
+import { Bid } from '../../database/entities/bid.entity';
+import { Conversation } from '../../database/entities/conversation.entity';
+import { Message } from '../../database/entities/message.entity';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([User, Collaboration, VerificationRequest, Review]),
+        TypeOrmModule.forFeature([
+            User, 
+            Collaboration, 
+            VerificationRequest, 
+            Review,
+            Auction,
+            Bid,
+            Conversation,
+            Message
+        ]),
         ReportModule,
         SubscriptionModule,
         VerificationModule,

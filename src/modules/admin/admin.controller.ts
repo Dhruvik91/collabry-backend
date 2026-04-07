@@ -8,7 +8,7 @@ import { UpdateReportStatusDto } from './dto/update-report-status.dto';
 import { UpdateVerificationStatusDto } from './dto/update-verification-status.dto';
 import { SaveSubscriptionPlanDto } from '../subscription/dto/save-subscription-plan.dto';
 import { AdminStatsDto } from './dto/admin-stats.dto';
-import { UserRole, ReportStatus } from '../../database/entities/enums';
+import { UserRole, ReportStatus, AuctionStatus } from '../../database/entities/enums';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/Guards/roles.guard';
 
@@ -75,5 +75,33 @@ export class AdminController {
     @ApiOperation({ summary: 'Delete a subscription plan' })
     async deletePlan(@Param('id') id: string) {
         return this.subscriptionService.deletePlan(id);
+    }
+
+    // --- Content Management ---
+    @Get('auctions')
+    @ApiOperation({ summary: 'List all auctions' })
+    async findAllAuctions(
+        @Query('search') search?: string,
+        @Query('status') status?: AuctionStatus
+    ) {
+        return this.adminService.getAllAuctions(search, status);
+    }
+
+    @Get('bids')
+    @ApiOperation({ summary: 'List all bids' })
+    async findAllBids(@Query('search') search?: string) {
+        return this.adminService.getAllBids(search);
+    }
+
+    @Get('conversations')
+    @ApiOperation({ summary: 'List all conversations' })
+    async findAllConversations() {
+        return this.adminService.getAllConversations();
+    }
+
+    @Get('conversations/:id/messages')
+    @ApiOperation({ summary: 'Get conversation messages' })
+    async findConversationMessages(@Param('id') id: string) {
+        return this.adminService.getConversationMessages(id);
     }
 }
