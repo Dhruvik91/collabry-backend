@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsEnum } from 'class-validator';
+import { IsNotEmpty, IsEnum, IsOptional, IsString } from 'class-validator';
 import { VerificationStatus } from '../../../database/entities/enums';
 
 export class UpdateVerificationStatusDto {
@@ -7,4 +7,9 @@ export class UpdateVerificationStatusDto {
     @IsNotEmpty()
     @IsEnum(VerificationStatus)
     status: VerificationStatus;
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsString()
+    adminNotes?: string;
 }

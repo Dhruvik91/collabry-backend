@@ -64,8 +64,8 @@ export class VerificationService {
         });
     }
 
-    async updateStatus(id: string, status: VerificationStatus): Promise<VerificationRequest> {
-        return await this.dataSource.transaction(async (manager) => {
+    async updateStatus(id: string, status: VerificationStatus, adminNotes?: string): Promise<VerificationRequest> {
+        const savedRequest = await this.dataSource.transaction(async (manager) => {
             const request = await manager.findOne(VerificationRequest, {
                 where: { id },
                 relations: ['influencerProfile', 'influencerProfile.user'],
@@ -74,7 +74,11 @@ export class VerificationService {
             if (!request) throw new NotFoundException('Verification request not found');
 
             request.status = status;
-            const savedRequest = await manager.save(VerificationRequest, request);
+            if (adminNotes) {
+                request.adminNotes = adminNotes;
+            }
+            
+            const saved = await manager.save(VerificationRequest, request);
 
             if (status === VerificationStatus.APPROVED) {
                 request.influencerProfile.verified = true;
@@ -84,18 +88,32 @@ export class VerificationService {
                 await manager.save(InfluencerProfile, request.influencerProfile);
             }
 
-            // Update Ranking
-            await this.rankingService.updateRanking(request.influencerProfile.user.id);
+            return saved;
+        });
+
+        // Update Ranking outside the transaction to avoid lock contention/deadlock
+        try {
+            const requestWithUser = await this.requestRepo.findOne({
+                where: { id: savedRequest.id },
+                relations: ['influencerProfile', 'influencerProfile.user'],
+            });
+            
+            if (requestWithUser?.influencerProfile?.user?.id) {
+                await this.rankingService.updateRanking(requestWithUser.influencerProfile.user.id);
+            }
 
             // Notify Influencer via Email
-            if (request.influencerProfile?.user?.email) {
+            if (requestWithUser?.influencerProfile?.user?.email) {
                 await this.mailerService.sendVerificationUpdateEmail(
-                    request.influencerProfile.user.email,
+                    requestWithUser.influencerProfile.user.email,
                     status,
                 );
             }
+        } catch (error) {
+            console.error('Error during post-verification updates:', error);
+            // Don't fail the whole request if email/ranking fails
+        }
 
-            return savedRequest;
-        });
+        return savedRequest;
     }
 }

@@ -61,7 +61,7 @@ export class AdminController {
     @Patch('verifications/:id/status')
     @ApiOperation({ summary: 'Update verification status' })
     async updateVerificationStatus(@Param('id') id: string, @Body() statusDto: UpdateVerificationStatusDto) {
-        return this.verificationService.updateStatus(id, statusDto.status);
+        return this.verificationService.updateStatus(id, statusDto.status, statusDto.adminNotes);
     }
 
     // --- Subscriptions ---
