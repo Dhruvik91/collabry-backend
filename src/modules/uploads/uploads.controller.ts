@@ -7,6 +7,7 @@ import {
     MaxFileSizeValidator,
     FileTypeValidator,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AwsService } from '../aws/aws.service';
 import { ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
@@ -17,6 +18,7 @@ export class UploadsController {
     constructor(private readonly awsService: AwsService) { }
 
     @Post()
+    @Throttle({ default: { limit: 10, ttl: 60000 } })
     @UseInterceptors(FileInterceptor('file'))
     @ApiConsumes('multipart/form-data')
     @ApiBody({

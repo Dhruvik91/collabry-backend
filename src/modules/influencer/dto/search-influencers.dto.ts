@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsNumber, Min, Max, IsBoolean } from 'class-validator';
+import { IsOptional, IsString, IsNumber, Min, Max, IsBoolean, IsArray } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 
 export class SearchInfluencersDto {
@@ -7,7 +7,6 @@ export class SearchInfluencersDto {
     @IsOptional()
     @IsString()
     niche?: string;
-
     @ApiPropertyOptional({ example: 'fitness' })
     @IsOptional()
     @IsString()
@@ -45,6 +44,66 @@ export class SearchInfluencersDto {
     @Min(0)
     @Max(5)
     maxRating?: number;
+
+    @ApiPropertyOptional({ example: ['Fitness', 'Health'], type: [String] })
+    @IsOptional()
+    @IsArray()
+    @IsString({ each: true })
+    categories?: string[];
+
+    @ApiPropertyOptional({ example: 10000 })
+    @IsOptional()
+    @Type(() => Number)
+    @IsNumber()
+    @Min(0)
+    maxFollowers?: number;
+
+    @ApiPropertyOptional({ example: 2.5 })
+    @IsOptional()
+    @Type(() => Number)
+    @IsNumber()
+    @Min(0)
+    minEngagementRate?: number;
+
+    @ApiPropertyOptional({ example: 'United States' })
+    @IsOptional()
+    @IsString()
+    locationCountry?: string;
+
+    @ApiPropertyOptional({ example: 'New York' })
+    @IsOptional()
+    @IsString()
+    locationCity?: string;
+
+    @ApiPropertyOptional({ example: 'Female' })
+    @IsOptional()
+    @IsString()
+    gender?: string;
+
+    @ApiPropertyOptional({ example: ['English'] })
+    @IsOptional()
+    @IsArray()
+    @IsString({ each: true })
+    languages?: string[];
+
+    @ApiPropertyOptional({ example: 100 })
+    @IsOptional()
+    @Type(() => Number)
+    @IsNumber()
+    @Min(0)
+    priceMin?: number;
+
+    @ApiPropertyOptional({ example: 1000 })
+    @IsOptional()
+    @Type(() => Number)
+    @IsNumber()
+    @Min(0)
+    priceMax?: number;
+
+    @ApiPropertyOptional({ example: 'Female' })
+    @IsOptional()
+    @IsString()
+    audienceGender?: string;
 
     @ApiPropertyOptional({ example: true, description: 'Filter verified influencers only' })
     @IsOptional()

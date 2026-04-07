@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Patch, Body, Req, Query, Param } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse } from '@nestjs/swagger';
 import { InfluencerService } from './influencer.service';
 import { SaveInfluencerProfileDto } from './dto/save-influencer-profile.dto';
@@ -21,6 +22,7 @@ export class InfluencerController {
 
     @ApiBearerAuth()
     @Post('profile')
+    @Throttle({ default: { limit: 10, ttl: 60000 } })
     @ApiOperation({ summary: 'Create current user influencer profile' })
     @ApiOkResponse({ description: 'Influencer profile created successfully', type: InfluencerProfile })
     async createProfile(@Req() req: any, @Body() saveDto: SaveInfluencerProfileDto) {
@@ -29,6 +31,7 @@ export class InfluencerController {
 
     @ApiBearerAuth()
     @Patch('profile')
+    @Throttle({ default: { limit: 10, ttl: 60000 } })
     @ApiOperation({ summary: 'Update current user influencer profile' })
     @ApiOkResponse({ description: 'Influencer profile updated successfully', type: InfluencerProfile })
     async updateProfile(@Req() req: any, @Body() saveDto: SaveInfluencerProfileDto) {

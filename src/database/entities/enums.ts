@@ -61,3 +61,16 @@ export enum ReportStatus {
     UNDER_REVIEW = 'UNDER_REVIEW',
     RESOLVED = 'RESOLVED',
 }
+
+export enum AuctionStatus {
+    OPEN = 'OPEN',
+    CLOSED = 'CLOSED',
+    CANCELLED = 'CANCELLED',
+    COMPLETED = 'COMPLETED',
+}
+
+export enum BidStatus {
+    PENDING = 'PENDING',
+    ACCEPTED = 'ACCEPTED',
+    REJECTED = 'REJECTED',
+}

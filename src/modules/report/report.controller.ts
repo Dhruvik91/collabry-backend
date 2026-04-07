@@ -1,4 +1,5 @@
 import { Controller, Post, Body, Req, Param } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiCreatedResponse } from '@nestjs/swagger';
 import { ReportService } from './report.service';
 import { CreateReportDto } from './dto/create-report.dto';
@@ -10,6 +11,7 @@ export class ReportController {
   constructor(private readonly reportService: ReportService) { }
 
   @Post()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiOperation({ summary: 'Submit a report against a user' })
   @ApiCreatedResponse({ description: 'Report submitted successfully' })
   async create(@Req() req: any, @Body() createDto: CreateReportDto) {

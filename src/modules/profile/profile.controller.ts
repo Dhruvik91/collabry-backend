@@ -1,4 +1,5 @@
 import { Controller, Get, Patch, Post, Body, Req, Query, Param } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse } from '@nestjs/swagger';
 import { ProfileService } from './profile.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -22,6 +23,7 @@ export class ProfileController {
 
     @ApiBearerAuth()
     @Post()
+    @Throttle({ default: { limit: 10, ttl: 60000 } })
     @ApiOperation({ summary: 'Create or update current user profile' })
     @ApiOkResponse({ description: 'Profile saved successfully', type: Profile })
     async saveProfile(@Req() req: any, @Body() saveDto: SaveProfileDto) {
@@ -30,6 +32,7 @@ export class ProfileController {
 
     @ApiBearerAuth()
     @Patch()
+    @Throttle({ default: { limit: 10, ttl: 60000 } })
     @ApiOperation({ summary: 'Update current user profile' })
     @ApiOkResponse({ description: 'Profile updated successfully', type: Profile })
     async updateProfile(@Req() req: any, @Body() updateDto: UpdateProfileDto) {

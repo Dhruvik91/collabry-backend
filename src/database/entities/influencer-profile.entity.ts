@@ -29,11 +29,6 @@ export class InfluencerProfile {
     fullName: string;
 
     @ApiProperty()
-    @Index()
-    @Column({ nullable: true })
-    niche: string;
-
-    @ApiProperty()
     @Column({ type: 'text', nullable: true })
     avatarUrl: string;
 
@@ -73,6 +68,56 @@ export class InfluencerProfile {
     @ApiProperty()
     @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
     rankingScore: number;
+
+    @ApiProperty()
+    @Column({ type: 'text', array: true, nullable: true })
+    categories: string[];
+
+    @ApiProperty()
+    @Column({ nullable: true })
+    locationCountry: string;
+
+    @ApiProperty()
+    @Column({ nullable: true })
+    locationCity: string;
+
+    @ApiProperty()
+    @Column({ nullable: true })
+    gender: string;
+
+    @ApiProperty()
+    @Column({ type: 'text', array: true, nullable: true })
+    languages: string[];
+
+    @ApiProperty({ description: 'Total followers across all platforms' })
+    @Index()
+    @Column({ type: 'int', default: 0 })
+    totalFollowers: number;
+
+    @ApiProperty({ description: 'Average engagement rate across platforms' })
+    @Index()
+    @Column({ type: 'decimal', precision: 5, scale: 2, default: 0 })
+    avgEngagementRate: number;
+
+    @ApiProperty({ description: 'Audience gender ratio, e.g., { male: 0.4, female: 0.6 }' })
+    @Column({ type: 'jsonb', nullable: true })
+    audienceGenderRatio: any;
+
+    @ApiProperty({ description: 'Audience age brackets, e.g., { "18-24": 0.3, "25-34": 0.5 }' })
+    @Column({ type: 'jsonb', nullable: true })
+    audienceAgeBrackets: any;
+
+    @ApiProperty()
+    @Column({ type: 'text', array: true, nullable: true })
+    audienceTopCountries: string[];
+
+    @ApiProperty()
+    @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+    minPrice: number;
+
+    @ApiProperty()
+    @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+    maxPrice: number;
 
     @ApiProperty()
     @Index()

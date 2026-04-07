@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Body, Req, Param } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
 import { MessagingService } from './messaging.service';
 import { StartConversationDto } from './dto/start-conversation.dto';
@@ -13,6 +14,7 @@ export class MessagingController {
     constructor(private readonly messagingService: MessagingService) { }
 
     @Post('conversation')
+    @Throttle({ default: { limit: 10, ttl: 60000 } })
     @ApiOperation({ summary: 'Create or retrieve a conversation' })
     @ApiCreatedResponse({ description: 'Conversation retrieved or created', type: Conversation })
     async getOrCreate(@Req() req: any, @Body() startDto: StartConversationDto) {
@@ -27,6 +29,7 @@ export class MessagingController {
     }
 
     @Post('conversation/:conversationId/message')
+    @Throttle({ default: { limit: 60, ttl: 60000 } })
     @ApiOperation({ summary: 'Send a message in a conversation' })
     @ApiCreatedResponse({ description: 'Message sent successfully', type: Message })
     async sendMessage(

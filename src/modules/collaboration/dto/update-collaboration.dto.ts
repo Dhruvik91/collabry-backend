@@ -38,4 +38,9 @@ export class UpdateCollaborationDto {
     @IsDateString()
     @IsOptional()
     proofSubmittedAt?: string;
+
+    @ApiPropertyOptional()
+    @IsObject()
+    @IsOptional()
+    agreedTerms?: any;
 }

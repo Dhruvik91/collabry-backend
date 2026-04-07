@@ -5,9 +5,11 @@ import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 
 import { User } from '../../database/entities/user.entity';
-import { UserRole } from '../../database/entities/enums';
+import { UserRole, UserStatus } from '../../database/entities/enums';
 import { HashingService } from '../../core/hashing/hashing';
 import { MailerService } from '../mailer/mailer.service';
+import { SignupDto } from './dto/auth.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
 
 export type JwtPayload = { id: string; email: string; role: UserRole };
 
@@ -20,24 +22,125 @@ export class UserAuthService {
     private readonly mailerService: MailerService,
   ) { }
 
-  async signup(email: string, password: string, confirmPassword: string) {
+  async signup(email: string, password: string, confirmPassword: string, role: UserRole = UserRole.USER) {
     // Validate password confirmation
     if (password !== confirmPassword) {
       throw new BadRequestException('Password and confirm password do not match');
+    }
+
+    // Prevent direct signup for ADMIN role
+    if (role === UserRole.ADMIN) {
+      throw new BadRequestException('Cannot sign up with Admin role');
     }
 
     const exists = await this.usersRepo.findOne({ where: { email } });
     if (exists) throw new ConflictException('Email already registered');
 
     const passwordHash = await this.hashing.hash(password);
-    // Force role to USER for regular signup
-    const user = this.usersRepo.create({ email, role: UserRole.USER, passwordHash });
-    const saved = await this.usersRepo.save(user);
-    const token = this.generateToken({ id: saved.id, email: saved.email, role: saved.role });
+    
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpHash = await this.hashing.hash(otp);
+    const otpExpires = new Date();
+    otpExpires.setMinutes(otpExpires.getMinutes() + 10); // 10 minutes expiry
 
-    // Exclude passwordHash from response
-    const { passwordHash: _, ...userWithoutPassword } = saved;
-    return { access_token: token, user: userWithoutPassword };
+    // Create user with PENDING status
+    const user = this.usersRepo.create({ 
+      email, 
+      role, 
+      passwordHash,
+      status: UserStatus.PENDING,
+      emailVerified: false,
+      otp: otpHash,
+      otpExpires
+    });
+    
+    await this.usersRepo.save(user);
+
+    // Send verification email
+    await this.mailerService.sendVerificationEmail(email, otp);
+
+    return { message: 'Verification code sent to your email. Please verify your account to continue.' };
+  }
+
+  async verifyEmail(dto: VerifyEmailDto) {
+    const { email, otp } = dto;
+    const user = await this.usersRepo.findOne({
+      where: { email },
+      select: ['id', 'email', 'role', 'status', 'otp', 'otpExpires']
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.status !== UserStatus.PENDING) {
+      throw new BadRequestException('Account is already verified or not in pending state');
+    }
+
+    if (!user.otp || !user.otpExpires) {
+      throw new BadRequestException('No verification code found for this account');
+    }
+
+    if (new Date() > user.otpExpires) {
+      throw new BadRequestException('Verification code has expired');
+    }
+
+    const isOtpValid = await this.hashing.compare(otp, user.otp);
+    if (!isOtpValid) {
+      throw new BadRequestException('Invalid verification code');
+    }
+
+    // Update user to ACTIVE
+    user.status = UserStatus.ACTIVE;
+    user.emailVerified = true;
+    user.otp = null;
+    user.otpExpires = null;
+    
+    const savedUser = await this.usersRepo.save(user);
+
+    // Generate token for the verified user
+    const token = this.generateToken({ id: savedUser.id, email: savedUser.email, role: savedUser.role });
+
+    // Exclude sensitive fields from response
+    const { otp: _, otpExpires: __, ...userWithoutOtp } = savedUser;
+    
+    return { 
+      message: 'Email verified successfully',
+      access_token: token, 
+      user: userWithoutOtp 
+    };
+  }
+
+  async resendVerifyEmail(email: string) {
+    const user = await this.usersRepo.findOne({
+      where: { email },
+      select: ['id', 'email', 'status']
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.status !== UserStatus.PENDING) {
+      throw new BadRequestException('Account is already verified');
+    }
+
+    // Generate new OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpHash = await this.hashing.hash(otp);
+    const otpExpires = new Date();
+    otpExpires.setMinutes(otpExpires.getMinutes() + 10);
+
+    user.otp = otpHash;
+    user.otpExpires = otpExpires;
+    
+    await this.usersRepo.save(user);
+
+    // Send new verification email
+    await this.mailerService.sendVerificationEmail(email, otp);
+
+    return { message: 'New verification code sent to your email.' };
   }
 
   async validateUser(email: string, password: string) {
@@ -48,6 +151,12 @@ export class UserAuthService {
     if (!user || !user.passwordHash) return null;
     const match = await this.hashing.compare(password, user.passwordHash);
     if (!match) return null;
+    
+    // Ensure user is verified/active
+    if (user.status !== UserStatus.ACTIVE) {
+      throw new UnauthorizedException('Please verify your email address before logging in.');
+    }
+    
     return user;
   }
 

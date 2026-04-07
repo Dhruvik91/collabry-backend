@@ -46,6 +46,14 @@ export class User {
 
     @Column({ nullable: true })
     passwordResetExpires: Date;
+    
+    @Exclude()
+    @Column({ nullable: true, select: false })
+    otp: string;
+
+    @Exclude()
+    @Column({ nullable: true, select: false })
+    otpExpires: Date;
 
     @OneToOne(() => Profile, (profile) => profile.user, { cascade: true })
     profile: Profile;
