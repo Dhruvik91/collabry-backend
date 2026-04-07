@@ -10,6 +10,7 @@ import { InfluencerProfile } from '../../database/entities/influencer-profile.en
 import { CreateAuctionDto } from './dto/create-auction.dto';
 import { UpdateAuctionDto } from './dto/update-auction.dto';
 import { CreateBidDto } from './dto/create-bid.dto';
+import { SocketGateway } from '../socket/socket.gateway';
 
 @Injectable()
 export class AuctionService {
@@ -22,6 +23,7 @@ export class AuctionService {
         private userRepository: Repository<User>,
         @InjectRepository(Collaboration)
         private collaborationRepository: Repository<Collaboration>,
+        private socketGateway: SocketGateway,
     ) {}
 
     async createAuction(createAuctionDto: CreateAuctionDto, userId: string): Promise<Auction> {
@@ -38,7 +40,12 @@ export class AuctionService {
             status: AuctionStatus.OPEN,
         });
 
-        return this.auctionRepository.save(auction);
+        const savedAuction = await this.auctionRepository.save(auction);
+        
+        // Emit auction created event to all users
+        this.socketGateway.emitToAll('auction_created', savedAuction);
+        
+        return savedAuction;
     }
 
     async findAll(filters: { status?: AuctionStatus; category?: string; page?: number; limit?: number }): Promise<any> {
@@ -95,7 +102,12 @@ export class AuctionService {
         }
 
         Object.assign(auction, updateAuctionDto);
-        return this.auctionRepository.save(auction);
+        const savedAuction = await this.auctionRepository.save(auction);
+        
+        // Emit auction updated event
+        this.socketGateway.emitToAuction(id, 'auction_updated', savedAuction);
+        
+        return savedAuction;
     }
 
     async removeAuction(id: string, userId: string): Promise<void> {
@@ -106,6 +118,9 @@ export class AuctionService {
         }
 
         await this.auctionRepository.remove(auction);
+        
+        // Emit auction deleted event
+        this.socketGateway.emitToAuction(id, 'auction_deleted', { auctionId: id });
     }
 
     async placeBid(auctionId: string, createBidDto: CreateBidDto, userId: string): Promise<Bid> {
@@ -141,7 +156,17 @@ export class AuctionService {
             status: BidStatus.PENDING,
         });
 
-        return this.bidRepository.save(bid);
+        const savedBid = await this.bidRepository.save(bid);
+        
+        // Emit new bid event to the auction room and the creator
+        this.socketGateway.emitToAuction(auctionId, 'new_bid', savedBid);
+        this.socketGateway.emitToUser(auction.creator.id, 'new_bid_notification', {
+            auctionId,
+            auctionTitle: auction.title,
+            bid: savedBid
+        });
+        
+        return savedBid;
     }
 
     async acceptBid(bidId: string, brandId: string): Promise<any> {
@@ -203,6 +228,15 @@ export class AuctionService {
 
         await this.collaborationRepository.save(collaboration);
         
+        // Emit bid accepted and auction completed events
+        this.socketGateway.emitToAuction(bid.auction.id, 'bid_accepted', { bidId, influencerId: bid.influencer.id });
+        this.socketGateway.emitToAuction(bid.auction.id, 'auction_completed', { auctionId: bid.auction.id, winnerId: bid.influencer.id });
+        this.socketGateway.emitToUser(bid.influencer.id, 'bid_accepted_notification', {
+            auctionId: bid.auction.id,
+            auctionTitle: bid.auction.title,
+            bidAmount: bid.amount
+        });
+        
         return { message: 'Bid accepted and collaboration created', bid, collaborationId: collaboration.id };
     }
 
@@ -226,6 +260,13 @@ export class AuctionService {
 
         bid.status = BidStatus.REJECTED;
         await this.bidRepository.save(bid);
+
+        // Emit bid rejected event
+        this.socketGateway.emitToUser(bid.influencer.id, 'bid_rejected', {
+            auctionId: bid.auction.id,
+            auctionTitle: bid.auction.title,
+            bidId
+        });
 
         return { message: 'Bid rejected successfully', bid };
     }
