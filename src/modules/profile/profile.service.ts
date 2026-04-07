@@ -2,6 +2,9 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Profile } from '../../database/entities/profile.entity';
+import { Auction } from '../../database/entities/auction.entity';
+import { Collaboration } from '../../database/entities/collaboration.entity';
+import { AuctionStatus, CollaborationStatus } from '../../database/entities/enums';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { SaveProfileDto } from './dto/save-profile.dto';
 import { SearchProfilesDto } from './dto/search-profiles.dto';
@@ -13,6 +16,10 @@ export class ProfileService {
     constructor(
         @InjectRepository(Profile)
         private readonly profileRepo: Repository<Profile>,
+        @InjectRepository(Auction)
+        private readonly auctionRepo: Repository<Auction>,
+        @InjectRepository(Collaboration)
+        private readonly collaborationRepo: Repository<Collaboration>,
     ) { }
 
     async getProfile(userId: string): Promise<Profile> {
@@ -100,5 +107,34 @@ export class ProfileService {
         } catch (error) {
             cif(isEntityNotFoundError, new NotFoundException('Profile not found'))(error);
         }
+    }
+
+    async getBrandProfile(profileId: string) {
+        const profile = await this.getProfileById(profileId);
+        const userId = profile.user.id;
+
+        const [totalAuctions, activeAuctions, completedCollaborations] = await Promise.all([
+            this.auctionRepo.count({ where: { creator: { id: userId } } }),
+            this.auctionRepo.find({ 
+                where: { creator: { id: userId }, status: AuctionStatus.OPEN },
+                order: { createdAt: 'DESC' },
+                take: 5
+            }),
+            this.collaborationRepo.count({ 
+                where: [
+                    { requester: { id: userId }, status: CollaborationStatus.COMPLETED },
+                ]
+            })
+        ]);
+
+        return {
+            ...profile,
+            stats: {
+                totalAuctions,
+                activeAuctionsCount: activeAuctions.length,
+                completedCollaborations,
+            },
+            activeAuctions,
+        };
     }
 }

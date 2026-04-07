@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/commo
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Report } from '../../database/entities/report.entity';
+import { Profile } from '../../database/entities/profile.entity';
 import { InfluencerProfile } from '../../database/entities/influencer-profile.entity';
 import { CreateReportDto } from './dto/create-report.dto';
 import { ReportStatus } from '../../database/entities/enums';
@@ -13,6 +14,8 @@ export class ReportService {
     private readonly reportRepo: Repository<Report>,
     @InjectRepository(InfluencerProfile)
     private readonly influencerProfileRepo: Repository<InfluencerProfile>,
+    @InjectRepository(Profile)
+    private readonly profileRepo: Repository<Profile>,
   ) { }
 
   async createReport(reporterId: string, createDto: CreateReportDto): Promise<Report> {
@@ -20,12 +23,22 @@ export class ReportService {
 
     // If it's an influencer report, try to resolve the profile ID
     if (createDto.targetType === 'influencer' || !createDto.targetUserId) {
-      const profile = await this.influencerProfileRepo.findOne({
+      const influencerProfile = await this.influencerProfileRepo.findOne({
         where: { id: createDto.targetId },
         relations: ['user']
       });
-      if (profile && profile.user) {
-        resolvedTargetUserId = profile.user.id;
+      
+      if (influencerProfile && influencerProfile.user) {
+        resolvedTargetUserId = influencerProfile.user.id;
+      } else {
+        // Try generic profile (for brands)
+        const profile = await this.profileRepo.findOne({
+          where: { id: createDto.targetId },
+          relations: ['user']
+        });
+        if (profile && profile.user) {
+          resolvedTargetUserId = profile.user.id;
+        }
       }
     }
 

@@ -42,8 +42,14 @@ export class AuctionService {
 
         const savedAuction = await this.auctionRepository.save(auction);
         
+        // Reload with relations for WebSocket
+        const fullAuction = await this.auctionRepository.findOne({
+            where: { id: savedAuction.id },
+            relations: ['creator', 'creator.profile'],
+        });
+        
         // Emit auction created event to all users
-        this.socketGateway.emitToAll('auction_created', savedAuction);
+        this.socketGateway.emitToAll('auction_created', fullAuction || savedAuction);
         
         return savedAuction;
     }
@@ -158,12 +164,20 @@ export class AuctionService {
 
         const savedBid = await this.bidRepository.save(bid);
         
+        // Reload bid with all necessary relations for the frontend (Influencer profile navigation)
+        const fullBid = await this.bidRepository.findOne({
+            where: { id: savedBid.id },
+            relations: ['influencer', 'influencer.profile', 'influencer.influencerProfile'],
+        });
+
+        const bidToEmit = fullBid || savedBid;
+
         // Emit new bid event to the auction room and the creator
-        this.socketGateway.emitToAuction(auctionId, 'new_bid', savedBid);
+        this.socketGateway.emitToAuction(auctionId, 'new_bid', bidToEmit);
         this.socketGateway.emitToUser(auction.creator.id, 'new_bid_notification', {
             auctionId,
             auctionTitle: auction.title,
-            bid: savedBid
+            bid: bidToEmit
         });
         
         return savedBid;
