@@ -60,6 +60,8 @@ export class ReportService {
       .leftJoinAndSelect('report.targetUser', 'targetUser')
       .leftJoinAndSelect('reporter.profile', 'reporterProfile')
       .leftJoinAndSelect('targetUser.profile', 'targetProfile')
+      .leftJoinAndSelect('reporter.influencerProfile', 'reporterInfluencer')
+      .leftJoinAndSelect('targetUser.influencerProfile', 'targetInfluencer')
       .orderBy('report.createdAt', 'DESC');
 
     if (status) {
@@ -79,7 +81,14 @@ export class ReportService {
   async getReportById(id: string): Promise<Report> {
     return await this.reportRepo.findOne({
       where: { id },
-      relations: ['reporter', 'targetUser', 'reporter.profile', 'targetUser.profile'],
+      relations: [
+        'reporter', 
+        'targetUser', 
+        'reporter.profile', 
+        'targetUser.profile',
+        'reporter.influencerProfile',
+        'targetUser.influencerProfile'
+      ],
     });
   }
 

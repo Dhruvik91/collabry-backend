@@ -273,6 +273,7 @@ export class AdminService {
         const query = this.auctionRepo.createQueryBuilder('auction')
             .leftJoinAndSelect('auction.creator', 'creator')
             .leftJoinAndSelect('creator.profile', 'profile')
+            .leftJoinAndSelect('creator.influencerProfile', 'influencerProfile')
             .leftJoinAndSelect('auction.bids', 'bids')
             .orderBy('auction.createdAt', 'DESC');
 
@@ -297,6 +298,7 @@ export class AdminService {
         const query = this.bidRepo.createQueryBuilder('bid')
             .leftJoinAndSelect('bid.influencer', 'influencer')
             .leftJoinAndSelect('influencer.profile', 'profile')
+            .leftJoinAndSelect('influencer.influencerProfile', 'influencerProfile')
             .leftJoinAndSelect('bid.auction', 'auction')
             .orderBy('bid.createdAt', 'DESC');
 
@@ -319,7 +321,9 @@ export class AdminService {
                 'userOne', 
                 'userTwo', 
                 'userOne.profile', 
-                'userTwo.profile'
+                'userTwo.profile',
+                'userOne.influencerProfile',
+                'userTwo.influencerProfile'
             ],
             order: { lastMessageAt: 'DESC' },
         });
@@ -331,7 +335,7 @@ export class AdminService {
     async getConversationMessages(conversationId: string) {
         return await this.messageRepo.find({
             where: { conversation: { id: conversationId } },
-            relations: ['sender', 'sender.profile'],
+            relations: ['sender', 'sender.profile', 'sender.influencerProfile'],
             order: { createdAt: 'ASC' },
         });
     }
