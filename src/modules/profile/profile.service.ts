@@ -91,10 +91,40 @@ export class ProfileService {
             query.andWhere('user.role = :role', { role });
         }
 
-        const [items, total] = await query
+        // Add subqueries for counts
+        query.addSelect((subQuery) => {
+            return subQuery
+                .select('COUNT(auction.id)', 'count')
+                .from(Auction, 'auction')
+                .where('auction.creatorId = user.id');
+        }, 'totalAuctions');
+
+        query.addSelect((subQuery) => {
+            return subQuery
+                .select('COUNT(collaboration.id)', 'count')
+                .from(Collaboration, 'collaboration')
+                .where('collaboration.requesterId = user.id')
+                .andWhere('collaboration.status = :status', { status: CollaborationStatus.COMPLETED });
+        }, 'completedCollaborations');
+
+        const { entities, raw } = await query
             .skip((page - 1) * limit)
             .take(limit)
-            .getManyAndCount();
+            .getRawAndEntities();
+
+        const total = await query.getCount();
+
+        const items = entities.map((profile, index) => {
+            const rawItem = raw[index];
+            return {
+                ...profile,
+                stats: {
+                    totalAuctions: parseInt(rawItem.totalAuctions || '0'),
+                    completedCollaborations: parseInt(rawItem.completedCollaborations || '0'),
+                    activeAuctionsCount: 0, // We don't calculate this in list view for performance
+                },
+            };
+        });
 
         return {
             items,
