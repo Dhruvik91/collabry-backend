@@ -22,6 +22,7 @@ import { VerificationModule } from './modules/verification/verification.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { RankingModule } from './modules/ranking/ranking.module';
 import { AuctionModule } from './modules/auction/auction.module';
+import { SocketModule } from './modules/socket/socket.module';
 
 
 @Module({
@@ -47,6 +48,7 @@ import { AuctionModule } from './modules/auction/auction.module';
     AdminModule,
     RankingModule,
     AuctionModule,
+    SocketModule,
 
     // Utility modules
 

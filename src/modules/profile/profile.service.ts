@@ -1,7 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Profile } from '../../database/entities/profile.entity';
+import { Auction } from '../../database/entities/auction.entity';
+import { Collaboration } from '../../database/entities/collaboration.entity';
+import { AuctionStatus, CollaborationStatus } from '../../database/entities/enums';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { SaveProfileDto } from './dto/save-profile.dto';
 import { SearchProfilesDto } from './dto/search-profiles.dto';
@@ -13,6 +16,10 @@ export class ProfileService {
     constructor(
         @InjectRepository(Profile)
         private readonly profileRepo: Repository<Profile>,
+        @InjectRepository(Auction)
+        private readonly auctionRepo: Repository<Auction>,
+        @InjectRepository(Collaboration)
+        private readonly collaborationRepo: Repository<Collaboration>,
     ) { }
 
     async getProfile(userId: string): Promise<Profile> {
@@ -32,6 +39,17 @@ export class ProfileService {
     }
 
     async saveProfile(userId: string, saveDto: SaveProfileDto): Promise<Profile> {
+        if (saveDto.username) {
+            const existingProfile = await this.profileRepo.findOne({
+                where: { username: saveDto.username },
+                relations: ['user'],
+            });
+
+            if (existingProfile && existingProfile.user.id !== userId) {
+                throw new ConflictException('Username already taken');
+            }
+        }
+
         let profile = await this.profileRepo.findOne({
             where: { user: { id: userId } },
         });
@@ -53,7 +71,7 @@ export class ProfileService {
     }
 
     async searchProfiles(searchDto: SearchProfilesDto) {
-        const { name, username, location, page, limit } = searchDto;
+        const { name, username, location, role, page, limit } = searchDto;
         const query = this.profileRepo.createQueryBuilder('profile')
             .leftJoinAndSelect('profile.user', 'user');
 
@@ -69,10 +87,44 @@ export class ProfileService {
             query.andWhere('profile.location ILIKE :location', { location: `%${location}%` });
         }
 
-        const [items, total] = await query
+        if (role) {
+            query.andWhere('user.role = :role', { role });
+        }
+
+        // Add subqueries for counts
+        query.addSelect((subQuery) => {
+            return subQuery
+                .select('COUNT(auction.id)', 'count')
+                .from(Auction, 'auction')
+                .where('auction.creatorId = user.id');
+        }, 'totalAuctions');
+
+        query.addSelect((subQuery) => {
+            return subQuery
+                .select('COUNT(collaboration.id)', 'count')
+                .from(Collaboration, 'collaboration')
+                .where('collaboration.requesterId = user.id')
+                .andWhere('collaboration.status = :status', { status: CollaborationStatus.COMPLETED });
+        }, 'completedCollaborations');
+
+        const { entities, raw } = await query
             .skip((page - 1) * limit)
             .take(limit)
-            .getManyAndCount();
+            .getRawAndEntities();
+
+        const total = await query.getCount();
+
+        const items = entities.map((profile, index) => {
+            const rawItem = raw[index];
+            return {
+                ...profile,
+                stats: {
+                    totalAuctions: parseInt(rawItem.totalAuctions || '0'),
+                    completedCollaborations: parseInt(rawItem.completedCollaborations || '0'),
+                    activeAuctionsCount: 0, // We don't calculate this in list view for performance
+                },
+            };
+        });
 
         return {
             items,
@@ -100,5 +152,34 @@ export class ProfileService {
         } catch (error) {
             cif(isEntityNotFoundError, new NotFoundException('Profile not found'))(error);
         }
+    }
+
+    async getBrandProfile(profileId: string) {
+        const profile = await this.getProfileById(profileId);
+        const userId = profile.user.id;
+
+        const [totalAuctions, activeAuctions, completedCollaborations] = await Promise.all([
+            this.auctionRepo.count({ where: { creator: { id: userId } } }),
+            this.auctionRepo.find({ 
+                where: { creator: { id: userId }, status: AuctionStatus.OPEN },
+                order: { createdAt: 'DESC' },
+                take: 5
+            }),
+            this.collaborationRepo.count({ 
+                where: [
+                    { requester: { id: userId }, status: CollaborationStatus.COMPLETED },
+                ]
+            })
+        ]);
+
+        return {
+            ...profile,
+            stats: {
+                totalAuctions,
+                activeAuctionsCount: activeAuctions.length,
+                completedCollaborations,
+            },
+            activeAuctions,
+        };
     }
 }

@@ -48,6 +48,13 @@ export class ProfileController {
     }
 
     @AllowUnauthorized()
+    @Get('brand/:id')
+    @ApiOperation({ summary: 'Get professional brand profile with stats' })
+    async getBrandProfile(@Param('id') id: string) {
+        return this.profileService.getBrandProfile(id);
+    }
+
+    @AllowUnauthorized()
     @Get(':id')
     @ApiOperation({ summary: 'Get a specific profile by ID' })
     @ApiOkResponse({ description: 'Returns the profile', type: Profile })

@@ -20,6 +20,9 @@ export class VerificationRequest {
     @Column({ type: 'jsonb', nullable: true })
     documents: any;
 
+    @Column({ type: 'text', nullable: true })
+    adminNotes: string;
+
     @CreateDateColumn()
     createdAt: Date;
 

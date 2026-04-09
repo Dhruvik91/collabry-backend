@@ -6,6 +6,7 @@ import { Message } from '../../database/entities/message.entity';
 import { StartConversationDto } from './dto/start-conversation.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { isUniqueConstraintError } from '../../database/errors/unique-constraint.type-guard';
+import { SocketGateway } from '../socket/socket.gateway';
 
 @Injectable()
 export class MessagingService {
@@ -14,6 +15,7 @@ export class MessagingService {
         private readonly conversationRepo: Repository<Conversation>,
         @InjectRepository(Message)
         private readonly messageRepo: Repository<Message>,
+        private readonly socketGateway: SocketGateway,
     ) { }
 
     async getOrCreateConversation(userId: string, startDto: StartConversationDto): Promise<Conversation> {
@@ -31,12 +33,14 @@ export class MessagingService {
         });
 
         if (!conversation) {
+            let isNew = false;
             try {
                 conversation = this.conversationRepo.create({
                     userOne: { id: userOneId } as any,
                     userTwo: { id: userTwoId } as any,
                 });
                 conversation = await this.conversationRepo.save(conversation);
+                isNew = true;
             } catch (error) {
                 if (isUniqueConstraintError(error)) {
                     // Conversation was likely created by a concurrent request, fetch it
@@ -52,13 +56,18 @@ export class MessagingService {
                 }
             }
 
-            // If we just created it and saved was successful, or if we caught unique constraint and fetched it
-            if (conversation && !conversation.userOne?.profile) {
-                // Reload to get relations if they weren't fetched yet
+            // Reload to get relations if they weren't fetched yet
+            if (conversation) {
                 conversation = await this.conversationRepo.findOne({
                     where: { id: conversation.id },
                     relations: ['userOne', 'userTwo', 'userOne.profile', 'userTwo.profile', 'userOne.influencerProfile', 'userTwo.influencerProfile'],
                 });
+
+                // Emit new conversation event to both users if it's actually new
+                if (isNew && conversation) {
+                    this.socketGateway.emitToUser(userOneId, 'new_conversation', conversation);
+                    this.socketGateway.emitToUser(userTwoId, 'new_conversation', conversation);
+                }
             }
         }
 
@@ -98,10 +107,23 @@ export class MessagingService {
 
         const savedMessage = await this.messageRepo.save(message);
 
+        // Reload message with relations for the WebSocket event
+        const fullMessage = await this.messageRepo.findOne({
+            where: { id: savedMessage.id },
+            relations: ['sender', 'sender.profile', 'sender.influencerProfile'],
+        });
+
         // Update lastMessageAt in conversation
         conversation.lastMessageAt = new Date();
         await this.conversationRepo.save(conversation);
 
+        // Emit new message event to the room (for the active chat window)
+        this.socketGateway.emitToConversation(conversationId, 'new_message', fullMessage || savedMessage);
+        
+        // Also emit to both users' private rooms (for sidebar/list updates)
+        this.socketGateway.emitToUser(conversation.userOne.id, 'new_message', fullMessage || savedMessage);
+        this.socketGateway.emitToUser(conversation.userTwo.id, 'new_message', fullMessage || savedMessage);
+        
         return savedMessage;
     }
 
@@ -129,7 +151,7 @@ export class MessagingService {
     async updateMessage(messageId: string, userId: string, updateDto: SendMessageDto): Promise<Message> {
         const message = await this.messageRepo.findOne({
             where: { id: messageId },
-            relations: ['sender'],
+            relations: ['sender', 'conversation'],
         });
 
         if (!message) {
@@ -142,7 +164,18 @@ export class MessagingService {
 
         message.message = updateDto.message;
         message.updatedAt = new Date();
-        return await this.messageRepo.save(message);
+        const savedMessage = await this.messageRepo.save(message);
+        
+        // Reload for WebSocket
+        const fullMessage = await this.messageRepo.findOne({
+            where: { id: savedMessage.id },
+            relations: ['sender', 'sender.profile', 'sender.influencerProfile'],
+        });
+
+        // Emit updated message event
+        this.socketGateway.emitToConversation(message.conversation?.id || '', 'message_updated', fullMessage || savedMessage);
+        
+        return savedMessage;
     }
 
     async deleteMessage(messageId: string, userId: string): Promise<void> {
@@ -159,7 +192,13 @@ export class MessagingService {
             throw new ForbiddenException('You can only delete your own messages');
         }
 
+        const conversationId = message.conversation?.id;
         await this.messageRepo.remove(message);
+        
+        // Emit deleted message event
+        if (conversationId) {
+            this.socketGateway.emitToConversation(conversationId, 'message_deleted', { messageId, conversationId });
+        }
     }
 
     async deleteConversation(conversationId: string, userId: string): Promise<void> {
@@ -179,5 +218,8 @@ export class MessagingService {
         // Delete all messages in the conversation first (TypeORM might handle this if cascade is set, but let's be explicit if not sure)
         await this.messageRepo.delete({ conversation: { id: conversationId } });
         await this.conversationRepo.remove(conversation);
+
+        // Emit conversation deleted event
+        this.socketGateway.emitToConversation(conversationId, 'conversation_deleted', { conversationId });
     }
 }
