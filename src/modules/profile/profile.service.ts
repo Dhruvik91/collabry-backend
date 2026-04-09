@@ -71,7 +71,7 @@ export class ProfileService {
     }
 
     async searchProfiles(searchDto: SearchProfilesDto) {
-        const { name, username, location, page, limit } = searchDto;
+        const { name, username, location, role, page, limit } = searchDto;
         const query = this.profileRepo.createQueryBuilder('profile')
             .leftJoinAndSelect('profile.user', 'user');
 
@@ -85,6 +85,10 @@ export class ProfileService {
 
         if (location) {
             query.andWhere('profile.location ILIKE :location', { location: `%${location}%` });
+        }
+
+        if (role) {
+            query.andWhere('user.role = :role', { role });
         }
 
         const [items, total] = await query

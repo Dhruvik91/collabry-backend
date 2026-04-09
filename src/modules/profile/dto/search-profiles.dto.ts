@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString, IsNumber, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
+import { UserRole } from '../../../database/entities/enums';
 
 export class SearchProfilesDto {
     @ApiPropertyOptional({ example: 'John' })
@@ -17,6 +18,11 @@ export class SearchProfilesDto {
     @IsOptional()
     @IsString()
     location?: string;
+
+    @ApiPropertyOptional({ enum: UserRole })
+    @IsOptional()
+    @IsString()
+    role?: UserRole;
 
     @ApiPropertyOptional({ example: 1 })
     @IsOptional()
