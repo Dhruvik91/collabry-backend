@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Profile } from '../../database/entities/profile.entity';
@@ -39,6 +39,17 @@ export class ProfileService {
     }
 
     async saveProfile(userId: string, saveDto: SaveProfileDto): Promise<Profile> {
+        if (saveDto.username) {
+            const existingProfile = await this.profileRepo.findOne({
+                where: { username: saveDto.username },
+                relations: ['user'],
+            });
+
+            if (existingProfile && existingProfile.user.id !== userId) {
+                throw new ConflictException('Username already taken');
+            }
+        }
+
         let profile = await this.profileRepo.findOne({
             where: { user: { id: userId } },
         });
