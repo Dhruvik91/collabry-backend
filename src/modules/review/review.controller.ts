@@ -1,17 +1,23 @@
-import { Controller, Post, Get, Body, Req, Param } from '@nestjs/common';
+import { Controller, Post, Get, Body, Req, Param, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
 import { ReviewService } from './review.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { AllowUnauthorized } from '../auth/unauthorized/allow-unauthorixed';
+import { JwtAuthGuard } from '../auth/Guards/jwt-guard';
+import { RolesGuard } from '../auth/Guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '../../database/entities/enums';
 
 @ApiTags('Review')
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('v1/review')
 export class ReviewController {
     constructor(private readonly reviewService: ReviewService) { }
 
     @ApiBearerAuth()
+    @Roles(UserRole.USER, UserRole.ADMIN)
     @Post()
     @Throttle({ default: { limit: 5, ttl: 60000 } })
     @ApiOperation({ summary: 'Create a review for an influencer' })
@@ -29,6 +35,7 @@ export class ReviewController {
     }
 
     @ApiBearerAuth()
+    @Roles(UserRole.USER, UserRole.ADMIN)
     @Post(':id')
     @ApiOperation({ summary: 'Update a review' })
     @ApiOkResponse({ description: 'Review updated successfully' })
@@ -37,6 +44,7 @@ export class ReviewController {
     }
 
     @ApiBearerAuth()
+    @Roles(UserRole.USER, UserRole.ADMIN)
     @Post(':id/delete')
     @ApiOperation({ summary: 'Delete a review' })
     @ApiOkResponse({ description: 'Review deleted successfully' })

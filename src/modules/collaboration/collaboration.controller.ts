@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Req, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Req, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse, ApiCreatedResponse, ApiQuery } from '@nestjs/swagger';
 import { CollaborationService } from './collaboration.service';
 import { CreateCollaborationDto } from './dto/create-collaboration.dto';
@@ -7,15 +7,21 @@ import { UpdateCollaborationDto } from './dto/update-collaboration.dto';
 import { FilterCollaborationsDto } from './dto/filter-collaborations.dto';
 import { FilterMyInfluencersDto } from './dto/filter-my-influencers.dto';
 import { Collaboration } from '../../database/entities/collaboration.entity';
-import { CollaborationStatus } from '../../database/entities/enums';
+import { CollaborationStatus, UserRole } from '../../database/entities/enums';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { JwtAuthGuard } from '../auth/Guards/jwt-guard';
+import { RolesGuard } from '../auth/Guards/roles.guard';
 
 @ApiTags('Collaboration')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.USER, UserRole.INFLUENCER, UserRole.ADMIN)
 @Controller('v1/collaboration')
 export class CollaborationController {
     constructor(private readonly collaborationService: CollaborationService) { }
 
     @Post()
+    @Roles(UserRole.USER, UserRole.ADMIN)
     @ApiOperation({ summary: 'Request a new collaboration' })
     @ApiCreatedResponse({ description: 'Collaboration request created', type: Collaboration })
     async create(@Req() req: any, @Body() createDto: CreateCollaborationDto) {

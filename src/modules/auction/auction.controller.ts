@@ -40,9 +40,9 @@ export class AuctionController {
     @ApiOperation({ summary: 'List all auctions created by the current user' })
     findMyAuctions(
         @Req() req: any,
-        @Query() query: PaginationQueryDto
+        @Query() query: AuctionQueryDto
     ) {
-        return this.auctionService.findMyAuctions(req.user.id, query.page, query.limit);
+        return this.auctionService.findMyAuctions(req.user.id, query.page, query.limit, query.search);
     }
 
     @Get('my/bids')
@@ -50,9 +50,9 @@ export class AuctionController {
     @ApiOperation({ summary: 'List all bids placed by the current influencer' })
     findMyBids(
         @Req() req: any,
-        @Query() query: PaginationQueryDto
+        @Query() query: AuctionQueryDto
     ) {
-        return this.auctionService.findMyBids(req.user.id, query.page, query.limit);
+        return this.auctionService.findMyBids(req.user.id, query.page, query.limit, query.search);
     }
 
     @Get(':id')

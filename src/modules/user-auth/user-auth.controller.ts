@@ -82,11 +82,12 @@ export class UserAuthController {
     return result;
   }
 
-  @UseGuards(AuthGuard('jwt-user'))
-  @Get('me')
-  @ApiOperation({ summary: 'Get current authenticated user profile' })
-  @ApiOkResponse({ description: 'Returns user information for current JWT' })
-  async me(@Req() req: Request) {
+    @UseGuards(AuthGuard('jwt-user'), RolesGuard)
+    @Roles(UserRole.USER, UserRole.INFLUENCER, UserRole.ADMIN)
+    @Get('me')
+    @ApiOperation({ summary: 'Get current authenticated user profile' })
+    @ApiOkResponse({ description: 'Returns user information for current JWT' })
+    async me(@Req() req: Request) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const payload = (req as any).user as { id: string };
     return this.auth.me(payload.id);
@@ -101,7 +102,8 @@ export class UserAuthController {
     return this.auth.createInfluencer(body.email, body.password, body.confirmPassword);
   }
 
-  @UseGuards(AuthGuard('jwt-user'))
+  @UseGuards(AuthGuard('jwt-user'), RolesGuard)
+  @Roles(UserRole.USER, UserRole.INFLUENCER, UserRole.ADMIN)
   @Post('logout')
   @ApiOperation({ summary: 'Logout current user and clear auth cookie' })
   @ApiOkResponse({ description: 'Successfully logged out' })
@@ -164,7 +166,8 @@ export class UserAuthController {
     return this.auth.resetPassword(body.token, body.newPassword);
   }
 
-  @UseGuards(AuthGuard('jwt-user'))
+  @UseGuards(AuthGuard('jwt-user'), RolesGuard)
+  @Roles(UserRole.USER, UserRole.INFLUENCER, UserRole.ADMIN)
   @Patch('change-password')
   @ApiOperation({ summary: 'Update password for authenticated user' })
   @ApiOkResponse({ description: 'Password successfully updated' })

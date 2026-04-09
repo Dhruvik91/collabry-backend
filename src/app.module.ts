@@ -23,6 +23,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { RankingModule } from './modules/ranking/ranking.module';
 import { AuctionModule } from './modules/auction/auction.module';
 import { SocketModule } from './modules/socket/socket.module';
+import { RolesGuard } from './modules/auth/Guards/roles.guard';
 
 
 @Module({

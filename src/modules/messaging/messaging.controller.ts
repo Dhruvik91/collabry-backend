@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Req, Param } from '@nestjs/common';
+import { Controller, Get, Post, Body, Req, Param, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse, ApiCreatedResponse } from '@nestjs/swagger';
 import { MessagingService } from './messaging.service';
@@ -6,9 +6,16 @@ import { StartConversationDto } from './dto/start-conversation.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { Conversation } from '../../database/entities/conversation.entity';
 import { Message } from '../../database/entities/message.entity';
+import { UserRole } from '../../database/entities/enums';
+import { Roles } from '../auth/decorators/roles.decorator';
+
+import { JwtAuthGuard } from '../auth/Guards/jwt-guard';
+import { RolesGuard } from '../auth/Guards/roles.guard';
 
 @ApiTags('Messaging')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.INFLUENCER, UserRole.USER, UserRole.ADMIN)
 @Controller('v1/messaging')
 export class MessagingController {
     constructor(private readonly messagingService: MessagingService) { }

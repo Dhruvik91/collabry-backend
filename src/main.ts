@@ -1,5 +1,6 @@
 import { NestFactory, Reflector } from '@nestjs/core';
 import * as cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { FailureResponseTransformer } from './core/exception-filters/failure-exception';
 import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
@@ -32,6 +33,7 @@ async function bootstrap() {
     allowedHeaders: 'Content-Type, Authorization',
   });
 
+  app.use(helmet());
   app.use(cookieParser());
   app.useGlobalFilters(new FailureResponseTransformer());
   app.useGlobalInterceptors(
@@ -42,6 +44,9 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      forbidUnknownValues: true,
     }),
   );
 
