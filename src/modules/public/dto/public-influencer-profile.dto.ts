@@ -60,4 +60,28 @@ export class PublicInfluencerProfileDto {
 
     @ApiProperty()
     completedCollabCount: number;
+
+    @ApiProperty()
+    address: string;
+
+    @ApiProperty()
+    gender: string;
+
+    @ApiProperty()
+    languages: string[];
+
+    @ApiProperty()
+    audienceGenderRatio: any;
+
+    @ApiProperty()
+    audienceAgeBrackets: any;
+
+    @ApiProperty()
+    audienceTopCountries: string[];
+
+    @ApiProperty()
+    minPrice: number;
+
+    @ApiProperty()
+    maxPrice: number;
 }

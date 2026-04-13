@@ -89,7 +89,15 @@ export class PublicService {
             completedCollaborations,
             avgRating: calculatedAvgRating,
             totalReviews: calculatedTotalReviews,
-            completedCollabCount: completedCollabCount
+            completedCollabCount: completedCollabCount,
+            address: influencer.address,
+            gender: influencer.gender,
+            languages: influencer.languages,
+            audienceGenderRatio: influencer.audienceGenderRatio,
+            audienceAgeBrackets: influencer.audienceAgeBrackets,
+            audienceTopCountries: influencer.audienceTopCountries,
+            minPrice: influencer.minPrice,
+            maxPrice: influencer.maxPrice
         };
     }
 
