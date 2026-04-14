@@ -1,5 +1,4 @@
 import { NestFactory, Reflector } from '@nestjs/core';
-import * as cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { FailureResponseTransformer } from './core/exception-filters/failure-exception';
@@ -15,26 +14,13 @@ async function bootstrap() {
   const config = app.get(ConfigService);
 
   app.enableCors({
-    origin: (origin, callback) => {
-      const allowed = config.get<string>('CORS_ORIGIN');
-      if (!allowed) {
-        callback(null, true);
-        return;
-      }
-      const list = allowed.split(',').map((o) => o.trim());
-      if (!origin || list.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'), false);
-      }
-    },
-    credentials: true,
+    origin: true,
+    credentials: false,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: 'Content-Type, Authorization',
   });
 
   app.use(helmet());
-  app.use(cookieParser());
   app.useGlobalFilters(new FailureResponseTransformer());
   app.useGlobalInterceptors(
     new ClassSerializerInterceptor(reflector),
