@@ -26,3 +26,4 @@ export class PublicController {
         return this.publicService.getBrandPublicData(id);
     }
 }
+

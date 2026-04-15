@@ -1,4 +1,18 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+class PublicBrandPartnerDto {
+    @ApiProperty()
+    id: string;
+
+    @ApiProperty()
+    fullName: string;
+
+    @ApiPropertyOptional()
+    avatarUrl?: string;
+
+    @ApiPropertyOptional()
+    username?: string;
+}
 
 export class PublicInfluencerProfileDto {
     @ApiProperty()
@@ -7,23 +21,23 @@ export class PublicInfluencerProfileDto {
     @ApiProperty()
     fullName: string;
 
-    @ApiProperty()
-    avatarUrl: string;
+    @ApiPropertyOptional()
+    avatarUrl?: string;
 
-    @ApiProperty()
-    bio: string;
+    @ApiPropertyOptional()
+    bio?: string;
 
-    @ApiProperty()
-    platforms: any;
+    @ApiPropertyOptional()
+    platforms?: Record<string, any>;
 
-    @ApiProperty()
-    categories: string[];
+    @ApiPropertyOptional()
+    categories?: string[];
 
-    @ApiProperty()
-    locationCountry: string;
+    @ApiPropertyOptional()
+    locationCountry?: string;
 
-    @ApiProperty()
-    locationCity: string;
+    @ApiPropertyOptional()
+    locationCity?: string;
 
     @ApiProperty()
     totalFollowers: number;
@@ -31,8 +45,8 @@ export class PublicInfluencerProfileDto {
     @ApiProperty()
     avgEngagementRate: number;
 
-    @ApiProperty()
-    rankingTier: string;
+    @ApiPropertyOptional()
+    rankingTier?: string;
 
     @ApiProperty()
     verified: boolean;
@@ -40,17 +54,17 @@ export class PublicInfluencerProfileDto {
     @ApiProperty()
     username: string;
 
-    @ApiProperty()
+    @ApiProperty({ type: [Object] })
     reviews: any[];
 
-    @ApiProperty()
-    ranking: any;
+    @ApiPropertyOptional()
+    ranking?: any;
+
+    @ApiProperty({ type: [PublicBrandPartnerDto] })
+    brandPartners: PublicBrandPartnerDto[];
 
     @ApiProperty()
-    activeCollaborations: any[];
-
-    @ApiProperty()
-    completedCollaborations: any[];
+    brandPartnerCount: number;
 
     @ApiProperty()
     avgRating: number;
@@ -61,27 +75,21 @@ export class PublicInfluencerProfileDto {
     @ApiProperty()
     completedCollabCount: number;
 
-    @ApiProperty()
-    address: string;
+    @ApiPropertyOptional()
+    languages?: string[];
 
-    @ApiProperty()
-    gender: string;
+    @ApiPropertyOptional()
+    audienceGenderRatio?: any;
 
-    @ApiProperty()
-    languages: string[];
+    @ApiPropertyOptional()
+    audienceAgeBrackets?: any;
 
-    @ApiProperty()
-    audienceGenderRatio: any;
+    @ApiPropertyOptional()
+    audienceTopCountries?: string[];
 
-    @ApiProperty()
-    audienceAgeBrackets: any;
+    @ApiPropertyOptional()
+    minPrice?: number;
 
-    @ApiProperty()
-    audienceTopCountries: string[];
-
-    @ApiProperty()
-    minPrice: number;
-
-    @ApiProperty()
-    maxPrice: number;
+    @ApiPropertyOptional()
+    maxPrice?: number;
 }

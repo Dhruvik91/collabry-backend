@@ -1,4 +1,29 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+class PublicBrandStatsDto {
+    @ApiProperty()
+    totalAuctions: number;
+
+    @ApiProperty()
+    activeAuctionsCount: number;
+
+    @ApiProperty()
+    completedCollaborations: number;
+}
+
+class PublicCollaboratorSummaryDto {
+    @ApiProperty()
+    id: string;
+
+    @ApiProperty()
+    fullName: string;
+
+    @ApiPropertyOptional()
+    avatarUrl?: string;
+
+    @ApiPropertyOptional()
+    username?: string;
+}
 
 export class PublicBrandProfileDto {
     @ApiProperty()
@@ -10,21 +35,24 @@ export class PublicBrandProfileDto {
     @ApiProperty()
     username: string;
 
-    @ApiProperty()
-    avatarUrl: string;
+    @ApiPropertyOptional()
+    avatarUrl?: string;
+
+    @ApiPropertyOptional()
+    bio?: string;
+
+    @ApiPropertyOptional()
+    location?: string;
+
+    @ApiPropertyOptional()
+    socialLinks?: Record<string, string>;
+
+    @ApiProperty({ type: PublicBrandStatsDto })
+    stats: PublicBrandStatsDto;
 
     @ApiProperty()
-    bio: string;
+    collaboratorCount: number;
 
-    @ApiProperty()
-    location: string;
-
-    @ApiProperty()
-    socialLinks: any;
-
-    @ApiProperty()
-    auctionsDone: any[];
-
-    @ApiProperty()
-    collaborationsDone: any[];
+    @ApiProperty({ type: [PublicCollaboratorSummaryDto] })
+    collaborators: PublicCollaboratorSummaryDto[];
 }
