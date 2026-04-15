@@ -184,10 +184,17 @@ export class CollaborationService {
                 }
                 break;
 
-            case CollaborationStatus.COMPLETED:
-                if (!isInfluencer) throw new ForbiddenException('Only the influencer can mark the collaboration as completed');
+            case CollaborationStatus.WORK_SUBMITTED:
+                if (!isInfluencer) throw new ForbiddenException('Only the influencer can submit work');
                 if (collaboration.status !== CollaborationStatus.IN_PROGRESS && collaboration.status !== CollaborationStatus.ACCEPTED) {
-                    throw new BadRequestException('Collaboration must be in progress or accepted to be completed');
+                    throw new BadRequestException('Collaboration must be in progress or accepted to submit work');
+                }
+                break;
+
+            case CollaborationStatus.COMPLETED:
+                if (!isRequester) throw new ForbiddenException('Only the brand can mark the collaboration as completed');
+                if (collaboration.status !== CollaborationStatus.WORK_SUBMITTED) {
+                    throw new BadRequestException('Work must be submitted before completing the collaboration');
                 }
                 break;
 
@@ -210,9 +217,19 @@ export class CollaborationService {
     async updateCollaboration(id: string, userId: string, updateDto: UpdateCollaborationDto): Promise<Collaboration> {
         const collaboration = await this.getCollaborationById(id, userId);
 
-        // Only the requester can update the collaboration details (title, description, etc.)
-        if (collaboration.requester.id !== userId) {
-            throw new ForbiddenException('Only the requester can update collaboration details');
+        // Only the requester (brand) can update the collaboration details (title, description, etc.) during REQUESTED/ACCEPTED
+        if (collaboration.requester.id !== userId && (collaboration.status === CollaborationStatus.REQUESTED || collaboration.status === CollaborationStatus.ACCEPTED)) {
+            throw new ForbiddenException('Only the requester can update collaboration details at this stage');
+        }
+
+        // Only the influencer can update proof fields
+        const isInfluencer = collaboration.influencer.user.id === userId;
+        const updateKeys = Object.keys(updateDto);
+        const proofFields = ['proofUrls', 'proofSubmittedAt'];
+        const isUpdatingProof = updateKeys.some(key => proofFields.includes(key));
+
+        if (isUpdatingProof && !isInfluencer) {
+            throw new ForbiddenException('Only the influencer can upload proof of work');
         }
 
         if (collaboration.status === CollaborationStatus.CANCELLED) {
