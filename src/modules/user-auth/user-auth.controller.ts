@@ -134,7 +134,7 @@ export class UserAuthController {
   @ApiOperation({ summary: 'Reset password using token from email' })
   @ApiOkResponse({ description: 'Password successfully reset' })
   async resetPassword(@Body() body: ResetPasswordDto) {
-    return this.auth.resetPassword(body.token, body.newPassword);
+    return this.auth.resetPassword(body.userId, body.token, body.newPassword);
   }
 
   @UseGuards(AuthGuard('jwt-user'), RolesGuard)

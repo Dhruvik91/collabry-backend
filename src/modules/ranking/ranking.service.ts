@@ -1,7 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { InfluencerProfile } from '../../database/entities/influencer-profile.entity';
 import { Collaboration } from '../../database/entities/collaboration.entity';
 import { Review } from '../../database/entities/review.entity';

@@ -88,41 +88,48 @@ export class MessagingService {
     async sendMessage(conversationId: string, userId: string, sendDto: SendMessageDto): Promise<Message> {
         const conversation = await this.conversationRepo.findOne({
             where: { id: conversationId },
-            relations: ['userOne', 'userTwo'],
+            relations: [
+                'userOne', 
+                'userTwo', 
+                'userOne.profile', 
+                'userTwo.profile', 
+                'userOne.influencerProfile', 
+                'userTwo.influencerProfile'
+            ],
         });
 
         if (!conversation) {
             throw new NotFoundException('Conversation not found');
         }
 
-        if (conversation.userOne.id !== userId && conversation.userTwo.id !== userId) {
+        const isUserOne = conversation.userOne.id === userId;
+        const isUserTwo = conversation.userTwo.id === userId;
+
+        if (!isUserOne && !isUserTwo) {
             throw new ForbiddenException('You are not a participant in this conversation');
         }
 
+        const sender = isUserOne ? conversation.userOne : conversation.userTwo;
+
         const message = this.messageRepo.create({
             conversation: { id: conversationId } as any,
-            sender: { id: userId } as any,
+            sender: sender,
             message: sendDto.message,
         });
 
         const savedMessage = await this.messageRepo.save(message);
-
-        // Reload message with relations for the WebSocket event
-        const fullMessage = await this.messageRepo.findOne({
-            where: { id: savedMessage.id },
-            relations: ['sender', 'sender.profile', 'sender.influencerProfile'],
-        });
 
         // Update lastMessageAt in conversation
         conversation.lastMessageAt = new Date();
         await this.conversationRepo.save(conversation);
 
         // Emit new message event to the room (for the active chat window)
-        this.socketGateway.emitToConversation(conversationId, 'new_message', fullMessage || savedMessage);
+        // savedMessage now contains the sender with profile info from the conversation relations
+        this.socketGateway.emitToConversation(conversationId, 'new_message', savedMessage);
         
         // Also emit to both users' private rooms (for sidebar/list updates)
-        this.socketGateway.emitToUser(conversation.userOne.id, 'new_message', fullMessage || savedMessage);
-        this.socketGateway.emitToUser(conversation.userTwo.id, 'new_message', fullMessage || savedMessage);
+        this.socketGateway.emitToUser(conversation.userOne.id, 'new_message', savedMessage);
+        this.socketGateway.emitToUser(conversation.userTwo.id, 'new_message', savedMessage);
         
         return savedMessage;
     }

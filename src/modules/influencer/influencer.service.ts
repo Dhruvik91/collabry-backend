@@ -50,14 +50,8 @@ export class InfluencerService {
 
             const completedCollaborations = await this.getCompletedCollaborationsCount(profile.id);
 
-            // Always sync ranking to ensure tier is up-to-date
-            try {
-                const updatedProfile = await this.rankingService.updateRanking(userId);
-                return { ...updatedProfile, completedCollaborations };
-            } catch (error) {
-                this.logger.warn(`Failed to sync ranking for user ${userId}: ${error.message}`);
-                return { ...profile, completedCollaborations };
-            }
+            // Return profile with count
+            return { ...profile, completedCollaborations };
         } catch (error) {
             cif(isEntityNotFoundError, new NotFoundException('Influencer profile not found'))(error);
             throw error;
@@ -115,11 +109,11 @@ export class InfluencerService {
     }
 
     async searchInfluencers(searchDto: SearchInfluencersDto) {
-        const { 
-            categories, platform, minFollowers, maxFollowers, 
-            minEngagementRate, locationCountry, locationCity, gender, 
+        const {
+            categories, platform, minFollowers, maxFollowers,
+            minEngagementRate, locationCountry, locationCity, gender,
             languages, priceMin, priceMax, audienceGender,
-            page, limit, search, rankingTier, minRating, maxRating, verified 
+            page, limit, search, rankingTier, minRating, maxRating, verified
         } = searchDto;
         const query = this.influencerRepo.createQueryBuilder('influencer')
             .innerJoinAndSelect('influencer.user', 'user')
@@ -178,8 +172,8 @@ export class InfluencerService {
         }
 
         if (audienceGender) {
-            query.andWhere("influencer.audienceGenderRatio->>:audienceGenderType > '0.5'", { 
-                audienceGenderType: audienceGender.toLowerCase() 
+            query.andWhere("influencer.audienceGenderRatio->>:audienceGenderType > '0.5'", {
+                audienceGenderType: audienceGender.toLowerCase()
             });
         }
 
@@ -207,18 +201,12 @@ export class InfluencerService {
             .take(limit)
             .getManyAndCount();
 
-        // Sync rankings for all returned profiles to ensure tiers are current
+        // Map items to include completed collaborations count
+        // Note: ranking sync removed on read for O(N) -> O(1) performance
         const syncedItems = await Promise.all(
             items.map(async (item) => {
-                try {
-                    const updatedProfile = await this.rankingService.updateRanking(item.user.id);
-                    const completedCollaborations = await this.getCompletedCollaborationsCount(item.id);
-                    return { ...updatedProfile, completedCollaborations };
-                } catch (error) {
-                    this.logger.warn(`Failed to sync ranking for user ${item.user.id}: ${error.message}`);
-                    const completedCollaborations = await this.getCompletedCollaborationsCount(item.id).catch(() => 0);
-                    return { ...item, completedCollaborations };
-                }
+                const completedCollaborations = await this.getCompletedCollaborationsCount(item.id);
+                return { ...item, completedCollaborations };
             })
         );
 
@@ -245,15 +233,7 @@ export class InfluencerService {
             }
 
             const completedCollaborations = await this.getCompletedCollaborationsCount(profile.id);
-
-            // Sync ranking to ensure tier is up-to-date
-            try {
-                const updatedProfile = await this.rankingService.updateRanking(profile.user.id);
-                return { ...updatedProfile, completedCollaborations };
-            } catch (error) {
-                this.logger.warn(`Failed to sync ranking for influencer ${id}: ${error.message}`);
-                return { ...profile, completedCollaborations };
-            }
+            return { ...profile, completedCollaborations };
         } catch (error) {
             cif(isEntityNotFoundError, new NotFoundException('Influencer not found'))(error);
             throw error;

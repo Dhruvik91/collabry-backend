@@ -101,9 +101,9 @@ export class MailerService {
 </html>`;
   }
 
-  async sendPasswordResetEmail(email: string, resetToken: string): Promise<boolean> {
+  async sendPasswordResetEmail(email: string, resetToken: string, userId: string): Promise<boolean> {
     const frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3001');
-    const resetLink = `${frontendUrl}/auth/reset-password?token=${resetToken}`;
+    const resetLink = `${frontendUrl}/auth/reset-password?token=${resetToken}&id=${userId}`;
 
     const content = `
       <!-- Icon -->

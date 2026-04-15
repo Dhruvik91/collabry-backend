@@ -138,7 +138,10 @@ export class AuctionService {
     }
 
     async placeBid(auctionId: string, createBidDto: CreateBidDto, userId: string): Promise<Bid> {
-        const influencer = await this.userRepository.findOneBy({ id: userId });
+        const influencer = await this.userRepository.findOne({
+            where: { id: userId },
+            relations: ['profile', 'influencerProfile']
+        });
         if (!influencer) throw new NotFoundException('Influencer not found');
 
         if (influencer.role !== UserRole.INFLUENCER) {
@@ -172,13 +175,8 @@ export class AuctionService {
 
         const savedBid = await this.bidRepository.save(bid);
         
-        // Reload bid with all necessary relations for the frontend (Influencer profile navigation)
-        const fullBid = await this.bidRepository.findOne({
-            where: { id: savedBid.id },
-            relations: ['influencer', 'influencer.profile', 'influencer.influencerProfile'],
-        });
-
-        const bidToEmit = fullBid || savedBid;
+        // savedBid now contains the influencer with profile info from the initial fetch
+        const bidToEmit = savedBid;
 
         // Emit new bid event to the auction room and the creator
         this.socketGateway.emitToAuction(auctionId, 'new_bid', bidToEmit);

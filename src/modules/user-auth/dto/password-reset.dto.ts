@@ -8,6 +8,10 @@ export class ForgotPasswordDto {
 }
 
 export class ResetPasswordDto {
+  @ApiProperty({ description: 'User ID for efficient lookup' })
+  @IsString()
+  userId: string;
+
   @ApiProperty({ description: 'Password reset token received via email' })
   @IsString()
   token: string;
