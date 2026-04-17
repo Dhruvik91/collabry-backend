@@ -15,6 +15,7 @@ export enum CollaborationStatus {
     ACCEPTED = 'ACCEPTED',
     REJECTED = 'REJECTED',
     IN_PROGRESS = 'IN_PROGRESS',
+    WORK_SUBMITTED = 'WORK_SUBMITTED',
     COMPLETED = 'COMPLETED',
     CANCELLED = 'CANCELLED',
 }

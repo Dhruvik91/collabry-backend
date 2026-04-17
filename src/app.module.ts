@@ -23,6 +23,8 @@ import { AdminModule } from './modules/admin/admin.module';
 import { RankingModule } from './modules/ranking/ranking.module';
 import { AuctionModule } from './modules/auction/auction.module';
 import { SocketModule } from './modules/socket/socket.module';
+import { PublicModule } from './modules/public/public.module';
+import { RolesGuard } from './modules/auth/Guards/roles.guard';
 
 
 @Module({
@@ -49,6 +51,7 @@ import { SocketModule } from './modules/socket/socket.module';
     RankingModule,
     AuctionModule,
     SocketModule,
+    PublicModule,
 
     // Utility modules
 

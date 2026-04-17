@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Post, Body, Req, Query, Param } from '@nestjs/common';
+import { Controller, Get, Patch, Post, Body, Req, Query, Param, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse } from '@nestjs/swagger';
 import { ProfileService } from './profile.service';
@@ -7,13 +7,19 @@ import { SaveProfileDto } from './dto/save-profile.dto';
 import { SearchProfilesDto } from './dto/search-profiles.dto';
 import { AllowUnauthorized } from '../auth/unauthorized/allow-unauthorixed';
 import { Profile } from '../../database/entities/profile.entity';
+import { JwtAuthGuard } from '../auth/Guards/jwt-guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/Guards/roles.guard';
+import { UserRole } from '../../database/entities/enums';
 
 @ApiTags('Profile')
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('v1/profile')
 export class ProfileController {
     constructor(private readonly profileService: ProfileService) { }
 
     @ApiBearerAuth()
+    @Roles(UserRole.USER, UserRole.INFLUENCER, UserRole.ADMIN)
     @Get()
     @ApiOperation({ summary: 'Get current user profile' })
     @ApiOkResponse({ description: 'Returns the user profile', type: Profile })
@@ -22,6 +28,7 @@ export class ProfileController {
     }
 
     @ApiBearerAuth()
+    @Roles(UserRole.USER, UserRole.INFLUENCER, UserRole.ADMIN)
     @Post()
     @Throttle({ default: { limit: 10, ttl: 60000 } })
     @ApiOperation({ summary: 'Create or update current user profile' })
@@ -31,6 +38,7 @@ export class ProfileController {
     }
 
     @ApiBearerAuth()
+    @Roles(UserRole.USER, UserRole.INFLUENCER, UserRole.ADMIN)
     @Patch()
     @Throttle({ default: { limit: 10, ttl: 60000 } })
     @ApiOperation({ summary: 'Update current user profile' })

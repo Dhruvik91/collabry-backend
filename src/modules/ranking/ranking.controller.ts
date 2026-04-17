@@ -27,12 +27,16 @@ import { RankingWeightsDto } from './dto/ranking-weights.dto';
 import { UserRole } from '../../database/entities/enums';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/Guards/roles.guard';
+import { JwtAuthGuard } from '../auth/Guards/jwt-guard';
+import { AllowUnauthorized } from '../auth/unauthorized/allow-unauthorixed';
 
 @ApiTags('Ranking')
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('v1/ranking')
 export class RankingController {
     constructor(private readonly rankingService: RankingService) { }
 
+    @AllowUnauthorized()
     @Get('breakdown/:influencerId')
     @ApiOperation({
         summary: 'Get ranking breakdown for an influencer',
@@ -55,7 +59,6 @@ export class RankingController {
     }
 
     @Post('recalculate/:influencerId')
-    @UseGuards(RolesGuard)
     @Roles(UserRole.ADMIN)
     @ApiBearerAuth()
     @HttpCode(HttpStatus.OK)
@@ -82,7 +85,6 @@ export class RankingController {
     }
 
     @Post('recalculate-all')
-    @UseGuards(RolesGuard)
     @Roles(UserRole.ADMIN)
     @ApiBearerAuth()
     @HttpCode(HttpStatus.ACCEPTED)
@@ -105,6 +107,7 @@ export class RankingController {
         };
     }
 
+    @AllowUnauthorized()
     @Get('tier-guide')
     @ApiOperation({
         summary: 'Get tier requirements guide',
@@ -116,7 +119,6 @@ export class RankingController {
     }
 
     @Get('weights')
-    @UseGuards(RolesGuard)
     @Roles(UserRole.ADMIN)
     @ApiBearerAuth()
     @ApiOperation({
@@ -131,7 +133,6 @@ export class RankingController {
     }
 
     @Patch('weights')
-    @UseGuards(RolesGuard)
     @Roles(UserRole.ADMIN)
     @ApiBearerAuth()
     @HttpCode(HttpStatus.OK)

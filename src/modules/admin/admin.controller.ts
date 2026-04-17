@@ -11,11 +11,12 @@ import { AdminStatsDto } from './dto/admin-stats.dto';
 import { UserRole, ReportStatus, AuctionStatus } from '../../database/entities/enums';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/Guards/roles.guard';
+import { JwtAuthGuard } from '../auth/Guards/jwt-guard';
 
 @ApiTags('Admin')
 @ApiBearerAuth()
 @Roles(UserRole.ADMIN)
-@UseGuards(RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('v1/admin')
 export class AdminController {
     constructor(

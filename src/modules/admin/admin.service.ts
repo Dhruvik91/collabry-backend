@@ -220,46 +220,53 @@ export class AdminService {
     private async getGrowthStats(): Promise<PlatformGrowthDto[]> {
         const growth: PlatformGrowthDto[] = [];
         const now = new Date();
+        const eightWeeksAgo = new Date(now.getTime() - 8 * 7 * 24 * 60 * 60 * 1000);
 
+        // Fetch counts for each entity grouped by week in a single efficient query
+        // Using raw SQL for PostgreSQL as TypeORM's groupBy with date_trunc is complex
+        const [userResults, collabResults, reviewResults] = await Promise.all([
+            this.userRepo.query(`
+                SELECT date_trunc('week', "createdAt") as week, count(*)::int as count
+                FROM users 
+                WHERE "createdAt" >= $1
+                GROUP BY week 
+                ORDER BY week ASC
+            `, [eightWeeksAgo]),
+            this.collaborationRepo.query(`
+                SELECT date_trunc('week', "createdAt") as week, count(*)::int as count
+                FROM collaborations
+                WHERE "createdAt" >= $1
+                GROUP BY week 
+                ORDER BY week ASC
+            `, [eightWeeksAgo]),
+            this.reviewRepo.query(`
+                SELECT date_trunc('week', "createdAt") as week, count(*)::int as count
+                FROM reviews
+                WHERE "createdAt" >= $1
+                GROUP BY week 
+                ORDER BY week ASC
+            `, [eightWeeksAgo]),
+        ]);
+
+        // Helper to format results into buckets
+        // Since we want 8 specific weeks, we iterate and match
         for (let i = 7; i >= 0; i--) {
             const weekStart = new Date(now.getTime() - (i + 1) * 7 * 24 * 60 * 60 * 1000);
             const weekEnd = new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000);
-
-            const [newUsers, newCollaborations, newReviews] = await Promise.all([
-                this.userRepo.count({
-                    where: {
-                        createdAt: MoreThan(weekStart),
-                    },
-                }),
-                this.collaborationRepo.count({
-                    where: {
-                        createdAt: MoreThan(weekStart),
-                    },
-                }),
-                this.reviewRepo.count({
-                    where: {
-                        createdAt: MoreThan(weekStart),
-                    },
-                }),
-            ]);
-
-            // Subtract previous week's count to get only this week's data
-            const prevWeekStart = new Date(
-                now.getTime() - (i + 2) * 7 * 24 * 60 * 60 * 1000
-            );
-            const [prevUsers, prevCollabs, prevReviews] = await Promise.all([
-                this.userRepo.count({ where: { createdAt: MoreThan(prevWeekStart) } }),
-                this.collaborationRepo.count({
-                    where: { createdAt: MoreThan(prevWeekStart) },
-                }),
-                this.reviewRepo.count({ where: { createdAt: MoreThan(prevWeekStart) } }),
-            ]);
+            
+            const findCount = (results: any[]) => {
+                const match = results.find(r => {
+                    const d = new Date(r.week);
+                    return d >= weekStart && d < weekEnd;
+                });
+                return match ? match.count : 0;
+            };
 
             growth.push({
                 week: `Week ${8 - i}`,
-                newUsers: newUsers - prevUsers,
-                newCollaborations: newCollaborations - prevCollabs,
-                newReviews: newReviews - prevReviews,
+                newUsers: findCount(userResults),
+                newCollaborations: findCount(collabResults),
+                newReviews: findCount(reviewResults),
             });
         }
 

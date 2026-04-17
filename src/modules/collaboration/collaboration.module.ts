@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Collaboration } from '../../database/entities/collaboration.entity';
+import { InfluencerProfile } from '../../database/entities/influencer-profile.entity';
 import { CollaborationController } from './collaboration.controller';
 import { CollaborationService } from './collaboration.service';
 
@@ -10,7 +11,7 @@ import { RankingModule } from '../ranking/ranking.module';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([Collaboration, User]),
+        TypeOrmModule.forFeature([Collaboration, User, InfluencerProfile]),
         MailerConfigModule,
         RankingModule
     ],

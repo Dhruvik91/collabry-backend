@@ -1,5 +1,5 @@
 import { Injectable, ConflictException, UnauthorizedException, BadRequestException, NotFoundException } from '@nestjs/common';
-import { randomBytes } from 'crypto';
+import { randomBytes, randomInt } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -38,8 +38,8 @@ export class UserAuthService {
 
     const passwordHash = await this.hashing.hash(password);
     
-    // Generate 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate secure 6-digit OTP
+    const otp = randomInt(100000, 999999).toString();
     const otpHash = await this.hashing.hash(otp);
     const otpExpires = new Date();
     otpExpires.setMinutes(otpExpires.getMinutes() + 10); // 10 minutes expiry
@@ -126,8 +126,8 @@ export class UserAuthService {
       throw new BadRequestException('Account is already verified');
     }
 
-    // Generate new OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Generate secure new OTP
+    const otp = randomInt(100000, 999999).toString();
     const otpHash = await this.hashing.hash(otp);
     const otpExpires = new Date();
     otpExpires.setMinutes(otpExpires.getMinutes() + 10);
@@ -232,42 +232,41 @@ export class UserAuthService {
     user.passwordResetExpires = expiresAt;
     await this.usersRepo.save(user);
 
-    // Send email with the plain token (not hashed)
-    await this.mailerService.sendPasswordResetEmail(email, resetToken);
+    // Send email with the plain token (not hashed) and user ID for O(1) lookup
+    await this.mailerService.sendPasswordResetEmail(email, resetToken, user.id);
 
     return { message: 'If an account with that email exists, a password reset link has been sent.' };
   }
 
-  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
-    // Find users with non-expired reset tokens
-    const users = await this.usersRepo
+  async resetPassword(userId: string, token: string, newPassword: string): Promise<{ message: string }> {
+    // 1. Efficient O(1) lookup by user ID
+    const user = await this.usersRepo
       .createQueryBuilder('user')
       .addSelect('user.passwordResetToken')
-      .where('user.passwordResetToken IS NOT NULL')
-      .andWhere('user.passwordResetExpires > :now', { now: new Date() })
-      .getMany();
+      .addSelect('user.passwordResetExpires')
+      .where('user.id = :userId', { userId })
+      .getOne();
 
-    // Find the user whose token matches
-    let matchedUser: User | null = null;
-    for (const user of users) {
-      if (user.passwordResetToken) {
-        const isMatch = await this.hashing.compare(token, user.passwordResetToken);
-        if (isMatch) {
-          matchedUser = user;
-          break;
-        }
-      }
-    }
-
-    if (!matchedUser) {
+    if (!user || !user.passwordResetToken || !user.passwordResetExpires) {
       throw new BadRequestException('Invalid or expired password reset token');
     }
 
-    // Hash the new password and clear reset token
-    matchedUser.passwordHash = await this.hashing.hash(newPassword);
-    matchedUser.passwordResetToken = null;
-    matchedUser.passwordResetExpires = null;
-    await this.usersRepo.save(matchedUser);
+    // 2. Check expiry
+    if (new Date() > user.passwordResetExpires) {
+      throw new BadRequestException('Password reset token has expired');
+    }
+
+    // 3. Verify token hash
+    const isMatch = await this.hashing.compare(token, user.passwordResetToken);
+    if (!isMatch) {
+      throw new BadRequestException('Invalid or expired password reset token');
+    }
+
+    // 4. Hash the new password and clear reset token
+    user.passwordHash = await this.hashing.hash(newPassword);
+    user.passwordResetToken = null;
+    user.passwordResetExpires = null;
+    await this.usersRepo.save(user);
 
     return { message: 'Password has been reset successfully. You can now log in with your new password.' };
   }

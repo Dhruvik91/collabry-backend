@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
+import { InfluencerProfile } from '../../database/entities/influencer-profile.entity';
 import { Collaboration } from '../../database/entities/collaboration.entity';
 import { User } from '../../database/entities/user.entity';
 import { MailerService } from '../mailer/mailer.service';
@@ -20,6 +21,8 @@ export class CollaborationService {
         private readonly collaborationRepo: Repository<Collaboration>,
         @InjectRepository(User)
         private readonly userRepo: Repository<User>,
+        @InjectRepository(InfluencerProfile)
+        private readonly influencerProfileRepo: Repository<InfluencerProfile>,
         private readonly mailerService: MailerService,
         private readonly rankingService: RankingService,
     ) { }
@@ -181,10 +184,17 @@ export class CollaborationService {
                 }
                 break;
 
-            case CollaborationStatus.COMPLETED:
-                if (!isInfluencer) throw new ForbiddenException('Only the influencer can mark the collaboration as completed');
+            case CollaborationStatus.WORK_SUBMITTED:
+                if (!isInfluencer) throw new ForbiddenException('Only the influencer can submit work');
                 if (collaboration.status !== CollaborationStatus.IN_PROGRESS && collaboration.status !== CollaborationStatus.ACCEPTED) {
-                    throw new BadRequestException('Collaboration must be in progress or accepted to be completed');
+                    throw new BadRequestException('Collaboration must be in progress or accepted to submit work');
+                }
+                break;
+
+            case CollaborationStatus.COMPLETED:
+                if (!isRequester) throw new ForbiddenException('Only the brand can mark the collaboration as completed');
+                if (collaboration.status !== CollaborationStatus.WORK_SUBMITTED) {
+                    throw new BadRequestException('Work must be submitted before completing the collaboration');
                 }
                 break;
 
@@ -207,9 +217,19 @@ export class CollaborationService {
     async updateCollaboration(id: string, userId: string, updateDto: UpdateCollaborationDto): Promise<Collaboration> {
         const collaboration = await this.getCollaborationById(id, userId);
 
-        // Only the requester can update the collaboration details (title, description, etc.)
-        if (collaboration.requester.id !== userId) {
-            throw new ForbiddenException('Only the requester can update collaboration details');
+        // Only the requester (brand) can update the collaboration details (title, description, etc.) during REQUESTED/ACCEPTED
+        if (collaboration.requester.id !== userId && (collaboration.status === CollaborationStatus.REQUESTED || collaboration.status === CollaborationStatus.ACCEPTED)) {
+            throw new ForbiddenException('Only the requester can update collaboration details at this stage');
+        }
+
+        // Only the influencer can update proof fields
+        const isInfluencer = collaboration.influencer.user.id === userId;
+        const updateKeys = Object.keys(updateDto);
+        const proofFields = ['proofUrls', 'proofSubmittedAt'];
+        const isUpdatingProof = updateKeys.some(key => proofFields.includes(key));
+
+        if (isUpdatingProof && !isInfluencer) {
+            throw new ForbiddenException('Only the influencer can upload proof of work');
         }
 
         if (collaboration.status === CollaborationStatus.CANCELLED) {
@@ -269,66 +289,60 @@ export class CollaborationService {
         const search = filters?.search;
         const niche = filters?.niche;
 
-        // Get all collaborations for this user with filters
-        const qb = this.collaborationRepo
+        // Efficient aggregation using GROUP BY in database
+        // This avoids fetching potentially thousands of collaborations into memory
+        const statsQb = this.collaborationRepo
             .createQueryBuilder('collaboration')
-            .leftJoinAndSelect('collaboration.influencer', 'influencer')
-            .leftJoinAndSelect('influencer.user', 'influencerUser')
-            .leftJoinAndSelect('influencerUser.profile', 'influencerUserProfile')
+            .select('collaboration.influencerId', 'influencerId')
+            .addSelect('COUNT(*)', 'totalCollaborations')
+            .addSelect(
+                `COUNT(*) FILTER (WHERE collaboration.status = '${CollaborationStatus.COMPLETED}')`,
+                'completedCollaborations'
+            )
+            .addSelect('MAX(collaboration.updatedAt)', 'lastCollaborationDate')
+            .innerJoin('collaboration.influencer', 'influencer')
             .where('collaboration.requester.id = :userId', { userId });
 
-        // Apply search filter
         if (search) {
-            qb.andWhere(
-                '(influencer.fullName ILIKE :search)',
-                { search: `%${search}%` }
-            );
+            statsQb.andWhere('influencer.fullName ILIKE :search', { search: `%${search}%` });
         }
 
-        // Apply category filter
         if (niche) {
-            qb.andWhere('influencer.categories @> :categories', { categories: JSON.stringify([niche]) });
+            statsQb.andWhere('influencer.categories @> :categories', { categories: JSON.stringify([niche]) });
         }
 
-        const collaborations = await qb
-            .orderBy('collaboration.updatedAt', 'DESC')
-            .getMany();
+        const statsResults = await statsQb
+            .groupBy('collaboration.influencerId')
+            .orderBy('MAX(collaboration.updatedAt)', 'DESC')
+            .getRawMany();
 
-        // Group by influencer and calculate stats
-        const influencerMap = new Map();
-
-        for (const collab of collaborations) {
-            const influencerId = collab.influencer.id;
-
-            if (!influencerMap.has(influencerId)) {
-                influencerMap.set(influencerId, {
-                    influencer: collab.influencer,
-                    totalCollaborations: 0,
-                    completedCollaborations: 0,
-                    lastCollaborationDate: collab.updatedAt,
-                });
-            }
-
-            const stats = influencerMap.get(influencerId);
-            stats.totalCollaborations++;
-            if (collab.status === CollaborationStatus.COMPLETED) {
-                stats.completedCollaborations++;
-            }
-
-            // Keep the most recent collaboration date
-            if (new Date(collab.updatedAt) > new Date(stats.lastCollaborationDate)) {
-                stats.lastCollaborationDate = collab.updatedAt;
-            }
-        }
-
-        // Convert map to array
-        const allInfluencers = Array.from(influencerMap.values());
-        const total = allInfluencers.length;
-
-        // Apply pagination
+        const total = statsResults.length;
         const startIndex = (page - 1) * limit;
-        const endIndex = startIndex + limit;
-        const items = allInfluencers.slice(startIndex, endIndex);
+        const paginatedStats = statsResults.slice(startIndex, startIndex + limit);
+
+        if (paginatedStats.length === 0) {
+            return { items: [], meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+        }
+
+        // Fetch the actual profiles for the paginated subset
+        const influencerIds = paginatedStats.map(s => s.influencerId);
+        const profiles = await this.influencerProfileRepo.find({
+            where: { id: In(influencerIds) },
+            relations: ['user', 'user.profile']
+        });
+
+        const items = paginatedStats.map(stat => {
+            const profile = profiles.find(p => p.id === stat.influencerId);
+            return {
+                influencer: profile,
+                totalCollaborations: parseInt(stat.totalCollaborations),
+                completedCollaborations: parseInt(stat.completedCollaborations),
+                lastCollaborationDate: stat.lastCollaborationDate,
+            };
+        });
+
+        // Re-sort to maintain exact date order
+        items.sort((a, b) => new Date(b.lastCollaborationDate).getTime() - new Date(a.lastCollaborationDate).getTime());
 
         return {
             items,

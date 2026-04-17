@@ -10,4 +10,8 @@ export class AuctionQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   category?: string;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
 }

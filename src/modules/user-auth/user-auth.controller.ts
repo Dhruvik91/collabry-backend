@@ -39,17 +39,9 @@ export class UserAuthController {
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('verify-email')
   @ApiOperation({ summary: 'Verify email with OTP and get access token' })
-  @ApiOkResponse({ description: 'Email verified and JWT returned in cookie' })
-  async verifyEmail(@Body() body: VerifyEmailDto, @Res({ passthrough: true }) res: Response) {
-    const result = await this.auth.verifyEmail(body);
-    res.cookie('access_token', result.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 1000 * 60 * 60 * 24 * 7,
-    });
-    return result;
+  @ApiOkResponse({ description: 'Email verified and JWT returned in response body' })
+  async verifyEmail(@Body() body: VerifyEmailDto) {
+    return this.auth.verifyEmail(body);
   }
 
   @AllowUnauthorized()
@@ -66,27 +58,20 @@ export class UserAuthController {
   @UseGuards(AuthGuard('local-user'))
   @Post('login')
   @ApiOperation({ summary: 'Login for all user types (USER, INFLUENCER, ADMIN)' })
-  @ApiOkResponse({ description: 'Successfully authenticated, JWT token set in cookie' })
-  async login(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+  @ApiOkResponse({ description: 'Successfully authenticated, JWT token returned in response body' })
+  async login(@Req() req: Request) {
     // req.user is set by Local Strategy
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const user = (req as any).user;
-    const result = await this.auth.login(user);
-    res.cookie('access_token', result.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 1000 * 60 * 60 * 24 * 7,
-    });
-    return result;
+    return this.auth.login(user);
   }
 
-  @UseGuards(AuthGuard('jwt-user'))
-  @Get('me')
-  @ApiOperation({ summary: 'Get current authenticated user profile' })
-  @ApiOkResponse({ description: 'Returns user information for current JWT' })
-  async me(@Req() req: Request) {
+    @UseGuards(AuthGuard('jwt-user'), RolesGuard)
+    @Roles(UserRole.USER, UserRole.INFLUENCER, UserRole.ADMIN)
+    @Get('me')
+    @ApiOperation({ summary: 'Get current authenticated user profile' })
+    @ApiOkResponse({ description: 'Returns user information for current JWT' })
+    async me(@Req() req: Request) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const payload = (req as any).user as { id: string };
     return this.auth.me(payload.id);
@@ -101,17 +86,12 @@ export class UserAuthController {
     return this.auth.createInfluencer(body.email, body.password, body.confirmPassword);
   }
 
-  @UseGuards(AuthGuard('jwt-user'))
+  @UseGuards(AuthGuard('jwt-user'), RolesGuard)
+  @Roles(UserRole.USER, UserRole.INFLUENCER, UserRole.ADMIN)
   @Post('logout')
-  @ApiOperation({ summary: 'Logout current user and clear auth cookie' })
+  @ApiOperation({ summary: 'Logout current user (client should clear stored JWT)' })
   @ApiOkResponse({ description: 'Successfully logged out' })
-  async logout(@Res({ passthrough: true }) res: Response) {
-    res.clearCookie('access_token', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-    });
+  async logout() {
     return { success: true };
   }
 
@@ -133,13 +113,6 @@ export class UserAuthController {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const profile = (req as any).user as { email: string; name?: string };
     const result = await this.auth.upsertGoogleUser({ email: profile.email, name: profile.name });
-    res.cookie('access_token', result.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 1000 * 60 * 60 * 24 * 7,
-    });
     // Redirect with token as query (frontend should capture and store)
     const redirectUrl = process.env.GOOGLE_FRONTEND_REDIRECT_LINK || 'http://localhost:3001/auth/callback';
     const url = `${redirectUrl}?token=${encodeURIComponent(result.access_token)}`;
@@ -161,10 +134,11 @@ export class UserAuthController {
   @ApiOperation({ summary: 'Reset password using token from email' })
   @ApiOkResponse({ description: 'Password successfully reset' })
   async resetPassword(@Body() body: ResetPasswordDto) {
-    return this.auth.resetPassword(body.token, body.newPassword);
+    return this.auth.resetPassword(body.userId, body.token, body.newPassword);
   }
 
-  @UseGuards(AuthGuard('jwt-user'))
+  @UseGuards(AuthGuard('jwt-user'), RolesGuard)
+  @Roles(UserRole.USER, UserRole.INFLUENCER, UserRole.ADMIN)
   @Patch('change-password')
   @ApiOperation({ summary: 'Update password for authenticated user' })
   @ApiOkResponse({ description: 'Password successfully updated' })
