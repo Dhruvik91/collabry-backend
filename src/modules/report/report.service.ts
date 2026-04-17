@@ -21,25 +21,18 @@ export class ReportService {
   async createReport(reporterId: string, createDto: CreateReportDto): Promise<Report> {
     let resolvedTargetUserId = createDto.targetUserId || createDto.targetId;
 
-    // If it's an influencer report, try to resolve the profile ID
-    if (createDto.targetType === 'influencer' || !createDto.targetUserId) {
-      const influencerProfile = await this.influencerProfileRepo.findOne({
-        where: { id: createDto.targetId },
-        relations: ['user']
-      });
-      
-      if (influencerProfile && influencerProfile.user) {
-        resolvedTargetUserId = influencerProfile.user.id;
-      } else {
-        // Try generic profile (for brands)
-        const profile = await this.profileRepo.findOne({
-          where: { id: createDto.targetId },
-          relations: ['user']
-        });
+    // Efficiently resolve target user ID in a single pass if possible
+    if (!resolvedTargetUserId && createDto.targetId) {
+        // Try all possible profile owners in parallel
+        const [influencer, brand] = await Promise.all([
+            this.influencerProfileRepo.findOne({ where: { id: createDto.targetId }, relations: ['user'] }),
+            this.profileRepo.findOne({ where: { id: createDto.targetId }, relations: ['user'] })
+        ]);
+
+        const profile = influencer || brand;
         if (profile && profile.user) {
-          resolvedTargetUserId = profile.user.id;
+            resolvedTargetUserId = profile.user.id;
         }
-      }
     }
 
     const report = this.reportRepo.create({
@@ -114,6 +107,7 @@ export class ReportService {
       throw new ForbiddenException('You can only delete your own reports');
     }
 
-    await this.reportRepo.remove(report);
+    // Use softRemove for historical integrity
+    await this.reportRepo.softRemove(report);
   }
 }

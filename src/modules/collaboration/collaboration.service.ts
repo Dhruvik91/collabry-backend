@@ -30,41 +30,26 @@ export class CollaborationService {
     async createCollaboration(requesterId: string, createDto: CreateCollaborationDto): Promise<Collaboration> {
         const requester = await this.userRepo.findOne({ where: { id: requesterId }, relations: ['profile'] });
 
-        // Resolve influencer ID if it's a profile ID or user ID
-        let targetInfluencerProfileId = createDto.influencerId;
-        const profileByProfileId = await this.userRepo.manager.getRepository('InfluencerProfile').findOne({
-            where: { id: createDto.influencerId },
+        // Robustly resolve influencer profile by either Profile ID or User ID in a single query
+        let influencerProfile = await this.influencerProfileRepo.findOne({
+            where: [
+                { id: createDto.influencerId },
+                { user: { id: createDto.influencerId } }
+            ],
             relations: ['user']
-        }) as any;
+        });
 
-        if (!profileByProfileId) {
-            // Try to find by user ID
-            const profileByUserId = await this.userRepo.manager.getRepository('InfluencerProfile').findOne({
-                where: { user: { id: createDto.influencerId } },
-                relations: ['user']
-            }) as any;
-
-            if (profileByUserId) {
-                targetInfluencerProfileId = profileByUserId.id;
-            } else {
-                throw new BadRequestException('Target must be a valid influencer profile or user');
-            }
+        if (!influencerProfile) {
+            throw new BadRequestException('Target must be a valid influencer profile or user');
         }
 
-        const finalProfile = profileByProfileId || (await this.userRepo.manager.getRepository('InfluencerProfile').findOne({
-            where: { id: targetInfluencerProfileId },
-            relations: ['user']
-        }) as any);
-
-        const targetUserId = finalProfile.user.id;
-
-        const influencerUser = await this.userRepo.findOne({ where: { id: targetUserId } });
+        const influencerUser = influencerProfile.user;
 
         if (!influencerUser || influencerUser.role !== UserRole.INFLUENCER) {
             throw new BadRequestException('Target user must be an influencer');
         }
 
-        if (requesterId === targetUserId) {
+        if (requesterId === influencerUser.id) {
             throw new BadRequestException('You cannot request a collaboration with yourself');
         }
 
@@ -74,7 +59,7 @@ export class CollaborationService {
 
         const collaboration = this.collaborationRepo.create({
             requester: { id: requesterId } as any,
-            influencer: { id: targetInfluencerProfileId } as any,
+            influencer: { id: influencerProfile.id } as any,
             title: createDto.title,
             description: createDto.description,
             proposedTerms: createDto.proposedTerms,
@@ -86,7 +71,7 @@ export class CollaborationService {
         const savedCollaboration = await this.collaborationRepo.save(collaboration);
 
         // Update Ranking
-        await this.rankingService.updateRanking(targetUserId);
+        await this.rankingService.updateRanking(influencerUser.id);
 
         // Notify Influencer via Email
         if (influencerUser && requester) {
@@ -206,10 +191,14 @@ export class CollaborationService {
         }
 
         collaboration.status = statusDto.status;
-        const updatedCollaboration = await this.collaborationRepo.save(collaboration);
 
-        // Update Ranking for the influencer
-        await this.rankingService.updateRanking(collaboration.influencer.user.id);
+        // Wrap state changes and side effects in a transaction
+        const updatedCollaboration = await this.collaborationRepo.manager.transaction(async (manager) => {
+            const saved = await manager.save(collaboration);
+            // Update Ranking for the influencer
+            await this.rankingService.updateRanking(collaboration.influencer.user.id);
+            return saved;
+        });
 
         return updatedCollaboration;
     }
@@ -255,12 +244,15 @@ export class CollaborationService {
             Object.assign(collaboration, updateDto);
         }
 
-        const updated = await this.collaborationRepo.save(collaboration);
-
-        // If proof was submitted, we might want to trigger a ranking update or notification
-        if (updateDto.proofUrls) {
-            await this.rankingService.updateRanking(collaboration.influencer.user.id);
-        }
+        // Wrap state changes and side effects in a transaction
+        const updated = await this.collaborationRepo.manager.transaction(async (manager) => {
+            const saved = await manager.save(collaboration);
+            // If proof was submitted, we might want to trigger a ranking update or notification
+            if (updateDto.proofUrls) {
+                await this.rankingService.updateRanking(collaboration.influencer.user.id);
+            }
+            return saved;
+        });
 
         return updated;
     }
@@ -275,9 +267,8 @@ export class CollaborationService {
             throw new ForbiddenException('You do not have permission to delete this collaboration');
         }
 
-        // Allow deletion regardless of status as requested
-        // Note: For historical integrity, we might want to soft-delete in a real production app
-        await this.collaborationRepo.remove(collaboration);
+        // Use softRemove for historical integrity
+        await this.collaborationRepo.softRemove(collaboration);
 
         // Update Ranking (though for REQUESTED it might not change much)
         await this.rankingService.updateRanking(influencerUserId);

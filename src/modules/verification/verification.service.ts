@@ -48,11 +48,8 @@ export class VerificationService {
     }
 
     async getMyRequests(userId: string): Promise<VerificationRequest[]> {
-        const influencer = await this.influencerRepo.findOne({ where: { user: { id: userId } } });
-        if (!influencer) return [];
-
         return await this.requestRepo.find({
-            where: { influencerProfile: { id: influencer.id } },
+            where: { influencerProfile: { user: { id: userId } } },
             order: { createdAt: 'DESC' },
         });
     }

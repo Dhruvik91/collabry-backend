@@ -7,6 +7,7 @@ import {
     OneToMany,
     CreateDateColumn,
     UpdateDateColumn,
+    DeleteDateColumn,
     Index,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
@@ -137,4 +138,7 @@ export class InfluencerProfile {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    @DeleteDateColumn()
+    deletedAt: Date;
 }

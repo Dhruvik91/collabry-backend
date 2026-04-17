@@ -6,6 +6,7 @@ import {
     OneToOne,
     CreateDateColumn,
     UpdateDateColumn,
+    DeleteDateColumn,
     JoinColumn,
     Index,
 } from 'typeorm';
@@ -72,6 +73,9 @@ export class Collaboration {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    @DeleteDateColumn()
+    deletedAt: Date;
 
     @ApiProperty({ description: 'Proof of completion URLs', type: [String], required: false })
     @Column({ type: 'text', array: true, nullable: true })

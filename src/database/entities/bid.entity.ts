@@ -5,6 +5,7 @@ import {
     ManyToOne,
     CreateDateColumn,
     UpdateDateColumn,
+    DeleteDateColumn,
     JoinColumn,
     Index,
 } from 'typeorm';
@@ -51,4 +52,7 @@ export class Bid {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    @DeleteDateColumn()
+    deletedAt: Date;
 }

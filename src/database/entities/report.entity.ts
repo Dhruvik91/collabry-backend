@@ -5,6 +5,7 @@ import {
     ManyToOne,
     CreateDateColumn,
     UpdateDateColumn,
+    DeleteDateColumn
 } from 'typeorm';
 import { User } from './user.entity';
 import { ReportStatus } from './enums';
@@ -41,4 +42,7 @@ export class Report {
 
     @Column({ nullable: true })
     resolvedAt: Date;
+
+    @DeleteDateColumn()
+    deletedAt: Date;
 }

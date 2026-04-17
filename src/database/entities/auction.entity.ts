@@ -6,6 +6,7 @@ import {
     OneToMany,
     CreateDateColumn,
     UpdateDateColumn,
+    DeleteDateColumn,
     JoinColumn,
     Index,
 } from 'typeorm';
@@ -70,4 +71,7 @@ export class Auction {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    @DeleteDateColumn()
+    deletedAt: Date;
 }

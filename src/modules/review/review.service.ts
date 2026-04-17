@@ -24,21 +24,12 @@ export class ReviewService {
     ) { }
 
     async createReview(reviewerId: string, createDto: CreateReviewDto): Promise<Review> {
-        // Resolve influencer Profile ID if a user ID was passed
-        let targetInfluencerProfileId = createDto.influencerId;
-
-        // If the ID provided is not a profile ID but a user ID, find the profile
-        const profileByUserId = await this.influencerProfileRepo.findOne({
-            where: { user: { id: createDto.influencerId } }
-        });
-
-        if (profileByUserId) {
-            targetInfluencerProfileId = profileByUserId.id;
-        }
-
-        // Ensure we actually have a profile ID now
+        // Robustly resolve influencer profile by either Profile ID or User ID in a single query
         const profile = await this.influencerProfileRepo.findOne({
-            where: { id: targetInfluencerProfileId },
+            where: [
+                { id: createDto.influencerId },
+                { user: { id: createDto.influencerId } }
+            ],
             relations: ['user']
         });
 
@@ -46,6 +37,7 @@ export class ReviewService {
             throw new NotFoundException('Influencer profile not found');
         }
 
+        const targetInfluencerProfileId = profile.id;
         const targetInfluencerUserId = profile.user.id;
 
         let collaboration: Collaboration;
@@ -199,7 +191,9 @@ export class ReviewService {
 
         const influencerProfileId = review.influencer.id;
         const influencerUserId = review.influencer.user.id;
-        await this.reviewRepo.remove(review);
+        
+        // Use softRemove for historical integrity
+        await this.reviewRepo.softRemove(review);
         await this.updateInfluencerAverageRating(influencerProfileId);
 
         // Update ranking
