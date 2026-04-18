@@ -8,14 +8,16 @@ import { CollaborationService } from './collaboration.service';
 import { User } from '../../database/entities/user.entity';
 import { MailerConfigModule } from '../mailer/mailer.module';
 import { RankingModule } from '../ranking/ranking.module';
-import { KCCoinsModule } from '../kc-coins/kc-coins.module';
+import { KcWalletModule } from '../kc-wallet/kc-wallet.module';
+import { KCSettingModule } from '../kc-setting/kc-setting.module';
 
 @Module({
     imports: [
         TypeOrmModule.forFeature([Collaboration, User, InfluencerProfile]),
         MailerConfigModule,
         RankingModule,
-        KCCoinsModule,
+        KcWalletModule,
+        KCSettingModule,
     ],
     controllers: [CollaborationController],
     providers: [CollaborationService],

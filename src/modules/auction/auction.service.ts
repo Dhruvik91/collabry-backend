@@ -11,8 +11,8 @@ import { CreateAuctionDto } from './dto/create-auction.dto';
 import { UpdateAuctionDto } from './dto/update-auction.dto';
 import { CreateBidDto } from './dto/create-bid.dto';
 import { SocketGateway } from '../socket/socket.gateway';
-import { WalletService } from '../kc-coins/wallet.service';
-import { KCSettingService, KCSettingKey } from '../kc-coins/kc-setting.service';
+import { WalletService } from '../kc-wallet/wallet.service';
+import { KCSettingService, KCSettingKey } from '../kc-setting/kc-setting.service';
 import { TransactionPurpose } from '../../database/entities/enums';
 
 @Injectable()

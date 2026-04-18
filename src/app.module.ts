@@ -24,6 +24,10 @@ import { RankingModule } from './modules/ranking/ranking.module';
 import { AuctionModule } from './modules/auction/auction.module';
 import { SocketModule } from './modules/socket/socket.module';
 import { PublicModule } from './modules/public/public.module';
+import { KcWalletModule } from './modules/kc-wallet/kc-wallet.module';
+import { KcTransactionModule } from './modules/kc-transaction/kc-transaction.module';
+import { KCSettingModule } from './modules/kc-setting/kc-setting.module';
+import { ReferralModule } from './modules/referral/referral.module';
 import { RolesGuard } from './modules/auth/Guards/roles.guard';
 
 
@@ -52,6 +56,10 @@ import { RolesGuard } from './modules/auth/Guards/roles.guard';
     AuctionModule,
     SocketModule,
     PublicModule,
+    KcWalletModule,
+    KcTransactionModule,
+    KCSettingModule,
+    ReferralModule,
 
     // Utility modules
 

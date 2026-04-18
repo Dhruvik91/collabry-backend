@@ -13,7 +13,8 @@ import { LocalUserStrategy } from './strategies/local-user.strategy';
 import { JwtUserStrategy } from './strategies/jwt-user.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { MailerConfigModule } from '../mailer/mailer.module';
-import { KCCoinsModule } from '../kc-coins/kc-coins.module';
+import { KcWalletModule } from '../kc-wallet/kc-wallet.module';
+import { ReferralModule } from '../referral/referral.module';
 import { RolesGuard } from '../auth/Guards/roles.guard';
 
 @Module({
@@ -21,7 +22,8 @@ import { RolesGuard } from '../auth/Guards/roles.guard';
     TypeOrmModule.forFeature([User]),
     PassportModule,
     MailerConfigModule,
-    KCCoinsModule,
+    KcWalletModule,
+    ReferralModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({

@@ -11,8 +11,8 @@ import { UpdateCollaborationStatusDto } from './dto/update-collaboration-status.
 import { UpdateCollaborationDto } from './dto/update-collaboration.dto';
 import { FilterCollaborationsDto } from './dto/filter-collaborations.dto';
 import { CollaborationStatus, UserRole, TransactionPurpose } from '../../database/entities/enums';
-import { WalletService } from '../kc-coins/wallet.service';
-import { KCSettingService, KCSettingKey } from '../kc-coins/kc-setting.service';
+import { WalletService } from '../kc-wallet/wallet.service';
+import { KCSettingService, KCSettingKey } from '../kc-setting/kc-setting.service';
 import { isEntityNotFoundError } from '../../database/errors/entity-not-found.type-guard';
 import { cif } from '../../database/errors/tryQuery';
 

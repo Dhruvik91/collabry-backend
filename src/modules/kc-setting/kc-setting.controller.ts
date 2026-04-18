@@ -5,13 +5,8 @@ import { UserRole } from '../../database/entities/enums';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/Guards/roles.guard';
 import { JwtAuthGuard } from '../auth/Guards/jwt-guard';
-import { IsNumber, Min } from 'class-validator';
+import { UpdateSettingDto } from './dto/update-setting.dto';
 
-class UpdateSettingDto {
-    @IsNumber()
-    @Min(0)
-    value: number;
-}
 
 @ApiTags('KC Coins Admin')
 @ApiBearerAuth()

@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Wallet } from '../../database/entities/wallet.entity';
 import { UserRole, TransactionType, TransactionPurpose } from '../../database/entities/enums';
-import { KCSettingService, KCSettingKey } from './kc-setting.service';
+import { KCSettingService, KCSettingKey } from '../kc-setting/kc-setting.service';
 import { KCTransaction } from '../../database/entities/kc-transaction.entity';
 
 @Injectable()

@@ -3,8 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, EntityManager } from 'typeorm';
 import { User } from '../../database/entities/user.entity';
 import { Referral } from '../../database/entities/referral.entity';
-import { WalletService } from './wallet.service';
-import { KCSettingService, KCSettingKey } from './kc-setting.service';
+import { WalletService } from '../kc-wallet/wallet.service';
+import { KCSettingService, KCSettingKey } from '../kc-setting/kc-setting.service';
 import { TransactionPurpose } from '../../database/entities/enums';
 import { randomBytes } from 'crypto';
 

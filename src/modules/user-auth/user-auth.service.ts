@@ -8,8 +8,8 @@ import { User } from '../../database/entities/user.entity';
 import { UserRole, UserStatus } from '../../database/entities/enums';
 import { HashingService } from '../../core/hashing/hashing';
 import { MailerService } from '../mailer/mailer.service';
-import { ReferralService } from '../kc-coins/referral.service';
-import { WalletService } from '../kc-coins/wallet.service';
+import { ReferralService } from '../referral/referral.service';
+import { WalletService } from '../kc-wallet/wallet.service';
 import { SignupDto } from './dto/auth.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 
