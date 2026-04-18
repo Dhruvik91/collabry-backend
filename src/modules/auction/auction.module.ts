@@ -7,11 +7,13 @@ import { Collaboration } from '../../database/entities/collaboration.entity';
 import { AuctionController } from './auction.controller';
 import { AuctionService } from './auction.service';
 import { CollaborationModule } from '../collaboration/collaboration.module';
+import { KCCoinsModule } from '../kc-coins/kc-coins.module';
 
 @Module({
     imports: [
         TypeOrmModule.forFeature([Auction, Bid, User, Collaboration]),
         CollaborationModule,
+        KCCoinsModule,
     ],
     controllers: [AuctionController],
     providers: [AuctionService],

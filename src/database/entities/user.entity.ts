@@ -3,6 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { UserRole, UserStatus } from './enums';
 import { InfluencerProfile } from './influencer-profile.entity';
 import { Profile } from './profile.entity';
+import { Wallet } from './wallet.entity';
 import { Exclude } from 'class-transformer';
 
 @Entity('users')
@@ -60,6 +61,19 @@ export class User {
 
     @OneToOne(() => InfluencerProfile, (profile) => profile.user)
     influencerProfile: InfluencerProfile;
+
+    @ApiProperty()
+    @Column({ unique: true, nullable: true })
+    @Index()
+    referralCode: string;
+
+    @ApiProperty()
+    @Column({ nullable: true })
+    @Index()
+    referredBy: string;
+
+    @OneToOne(() => Wallet, (wallet) => wallet.user, { cascade: true })
+    wallet: Wallet;
 
     @CreateDateColumn()
     createdAt: Date;

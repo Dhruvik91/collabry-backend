@@ -1,13 +1,15 @@
 import { Injectable, ConflictException, UnauthorizedException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { randomBytes, randomInt } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 
 import { User } from '../../database/entities/user.entity';
 import { UserRole, UserStatus } from '../../database/entities/enums';
 import { HashingService } from '../../core/hashing/hashing';
 import { MailerService } from '../mailer/mailer.service';
+import { ReferralService } from '../kc-coins/referral.service';
+import { WalletService } from '../kc-coins/wallet.service';
 import { SignupDto } from './dto/auth.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 
@@ -20,9 +22,12 @@ export class UserAuthService {
     private readonly hashing: HashingService,
     private readonly jwt: JwtService,
     private readonly mailerService: MailerService,
+    private readonly referralService: ReferralService,
+    private readonly walletService: WalletService,
+    private readonly dataSource: DataSource,
   ) { }
 
-  async signup(email: string, password: string, confirmPassword: string, role: UserRole = UserRole.USER) {
+  async signup(email: string, password: string, confirmPassword: string, role: UserRole = UserRole.USER, referredBy?: string) {
     // Validate password confirmation
     if (password !== confirmPassword) {
       throw new BadRequestException('Password and confirm password do not match');
@@ -44,6 +49,9 @@ export class UserAuthService {
     const otpExpires = new Date();
     otpExpires.setMinutes(otpExpires.getMinutes() + 10); // 10 minutes expiry
 
+    // Generate unique referral code for the new user
+    const referralCode = await this.referralService.generateUniqueReferralCode();
+
     // Create user with PENDING status
     const user = this.usersRepo.create({ 
       email, 
@@ -52,10 +60,23 @@ export class UserAuthService {
       status: UserStatus.PENDING,
       emailVerified: false,
       otp: otpHash,
-      otpExpires
+      otpExpires,
+      referralCode,
+      referredBy,
     });
     
-    await this.usersRepo.save(user);
+    // Use a transaction to ensure user and referral tracking are atomic
+    await this.dataSource.transaction(async (manager) => {
+      const savedUser = await manager.save(user);
+      
+      // Initialize wallet
+      await this.walletService.createWallet(savedUser.id, 0, manager);
+
+      // Link referral if provided
+      if (referredBy) {
+        await this.referralService.registerReferral(savedUser.id, referredBy, manager);
+      }
+    });
 
     // Send verification email
     await this.mailerService.sendVerificationEmail(email, otp);
@@ -105,6 +126,9 @@ export class UserAuthService {
     // Exclude sensitive fields from response
     const { otp: _, otpExpires: __, ...userWithoutOtp } = savedUser;
     
+    // Reward referral if applicable
+    await this.referralService.rewardReferral(user.id);
+
     return { 
       message: 'Email verified successfully',
       access_token: token, 
@@ -196,8 +220,14 @@ export class UserAuthService {
     if (!email) throw new UnauthorizedException('Google profile missing email');
     let user = await this.usersRepo.findOne({ where: { email } });
     if (!user) {
-      user = this.usersRepo.create({ email, role: UserRole.USER, passwordHash: null });
+      // Generate unique referral code
+      const referralCode = await this.referralService.generateUniqueReferralCode();
+      
+      user = this.usersRepo.create({ email, role: UserRole.USER, passwordHash: null, referralCode });
       user = await this.usersRepo.save(user);
+
+      // Create wallet
+      await this.walletService.createWallet(user.id, 0);
     }
     return this.login(user);
   }

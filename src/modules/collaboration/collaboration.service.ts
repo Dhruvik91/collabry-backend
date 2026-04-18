@@ -10,7 +10,9 @@ import { CreateCollaborationDto } from './dto/create-collaboration.dto';
 import { UpdateCollaborationStatusDto } from './dto/update-collaboration-status.dto';
 import { UpdateCollaborationDto } from './dto/update-collaboration.dto';
 import { FilterCollaborationsDto } from './dto/filter-collaborations.dto';
-import { CollaborationStatus, UserRole } from '../../database/entities/enums';
+import { CollaborationStatus, UserRole, TransactionPurpose } from '../../database/entities/enums';
+import { WalletService } from '../kc-coins/wallet.service';
+import { KCSettingService, KCSettingKey } from '../kc-coins/kc-setting.service';
 import { isEntityNotFoundError } from '../../database/errors/entity-not-found.type-guard';
 import { cif } from '../../database/errors/tryQuery';
 
@@ -25,6 +27,8 @@ export class CollaborationService {
         private readonly influencerProfileRepo: Repository<InfluencerProfile>,
         private readonly mailerService: MailerService,
         private readonly rankingService: RankingService,
+        private readonly walletService: WalletService,
+        private readonly settingService: KCSettingService,
     ) { }
 
     async createCollaboration(requesterId: string, createDto: CreateCollaborationDto): Promise<Collaboration> {
@@ -57,18 +61,35 @@ export class CollaborationService {
             throw new BadRequestException('Start date cannot be after end date');
         }
 
-        const collaboration = this.collaborationRepo.create({
-            requester: { id: requesterId } as any,
-            influencer: { id: influencerProfile.id } as any,
-            title: createDto.title,
-            description: createDto.description,
-            proposedTerms: createDto.proposedTerms,
-            startDate: createDto.startDate,
-            endDate: createDto.endDate,
-            status: CollaborationStatus.REQUESTED,
-        });
+        const savedCollaboration = await this.collaborationRepo.manager.transaction(async (manager) => {
+            const collaboration = this.collaborationRepo.create({
+                requester: { id: requesterId } as any,
+                influencer: { id: influencerProfile.id } as any,
+                title: createDto.title,
+                description: createDto.description,
+                proposedTerms: createDto.proposedTerms,
+                startDate: createDto.startDate,
+                endDate: createDto.endDate,
+                status: CollaborationStatus.REQUESTED,
+            });
 
-        const savedCollaboration = await this.collaborationRepo.save(collaboration);
+            const saved = await manager.save(collaboration);
+
+            // Deduct KC coins ONLY if NOT from an auction
+            if (!createDto.auctionId) {
+                const price = await this.settingService.getSetting(KCSettingKey.COLLABORATION_CREATION_PRICE);
+                if (price > 0) {
+                    await this.walletService.debit(
+                        requesterId,
+                        price,
+                        TransactionPurpose.COLLABORATION_CREATION,
+                        { collaborationId: saved.id },
+                        manager
+                    );
+                }
+            }
+            return saved;
+        });
 
         // Update Ranking
         await this.rankingService.updateRanking(influencerUser.id);

@@ -11,6 +11,9 @@ import { CreateAuctionDto } from './dto/create-auction.dto';
 import { UpdateAuctionDto } from './dto/update-auction.dto';
 import { CreateBidDto } from './dto/create-bid.dto';
 import { SocketGateway } from '../socket/socket.gateway';
+import { WalletService } from '../kc-coins/wallet.service';
+import { KCSettingService, KCSettingKey } from '../kc-coins/kc-setting.service';
+import { TransactionPurpose } from '../../database/entities/enums';
 
 @Injectable()
 export class AuctionService {
@@ -24,6 +27,8 @@ export class AuctionService {
         @InjectRepository(Collaboration)
         private collaborationRepository: Repository<Collaboration>,
         private socketGateway: SocketGateway,
+        private walletService: WalletService,
+        private settingService: KCSettingService,
     ) {}
 
     async createAuction(createAuctionDto: CreateAuctionDto, userId: string): Promise<Auction> {
@@ -34,13 +39,28 @@ export class AuctionService {
             throw new ForbiddenException('Only brands can create auctions');
         }
 
-        const auction = this.auctionRepository.create({
-            ...createAuctionDto,
-            creator,
-            status: AuctionStatus.OPEN,
-        });
+        const savedAuction = await this.auctionRepository.manager.transaction(async (manager) => {
+            const auction = this.auctionRepository.create({
+                ...createAuctionDto,
+                creator,
+                status: AuctionStatus.OPEN,
+            });
 
-        const savedAuction = await this.auctionRepository.save(auction);
+            const saved = await manager.save(auction);
+            
+            // Deduct KC coins
+            const price = await this.settingService.getSetting(KCSettingKey.AUCTION_CREATION_PRICE);
+            if (price > 0) {
+                await this.walletService.debit(
+                    userId,
+                    price,
+                    TransactionPurpose.AUCTION_CREATION,
+                    { auctionId: saved.id },
+                    manager
+                );
+            }
+            return saved;
+        });
         
         // Reload with relations for WebSocket
         const fullAuction = await this.auctionRepository.findOne({
@@ -167,14 +187,29 @@ export class AuctionService {
             throw new BadRequestException('You have already placed a bid on this auction');
         }
 
-        const bid = this.bidRepository.create({
-            ...createBidDto,
-            auction,
-            influencer,
-            status: BidStatus.PENDING,
-        });
+        const savedBid = await this.bidRepository.manager.transaction(async (manager) => {
+            const bid = this.bidRepository.create({
+                ...createBidDto,
+                auction,
+                influencer,
+                status: BidStatus.PENDING,
+            });
 
-        const savedBid = await this.bidRepository.save(bid);
+            const saved = await manager.save(bid);
+            
+            // Deduct KC coins
+            const price = await this.settingService.getSetting(KCSettingKey.BID_PLACEMENT_PRICE);
+            if (price > 0) {
+                await this.walletService.debit(
+                    userId,
+                    price,
+                    TransactionPurpose.BID_PLACEMENT,
+                    { auctionId, bidId: saved.id },
+                    manager
+                );
+            }
+            return saved;
+        });
         
         // savedBid now contains the influencer with profile info from the initial fetch
         const bidToEmit = savedBid;

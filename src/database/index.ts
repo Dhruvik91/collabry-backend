@@ -15,6 +15,10 @@ import { Review } from './entities/review.entity';
 import { SubscriptionPlan } from './entities/subscription-plan.entity';
 import { User } from './entities/user.entity';
 import { VerificationRequest } from './entities/verification-request.entity';
+import { Wallet } from './entities/wallet.entity';
+import { KCTransaction } from './entities/kc-transaction.entity';
+import { KCSetting } from './entities/kc-setting.entity';
+import { Referral } from './entities/referral.entity';
 
 export const AllEntities = [
   AdminAction,
@@ -34,6 +38,10 @@ export const AllEntities = [
   SubscriptionPlan,
   User,
   VerificationRequest,
+  Wallet,
+  KCTransaction,
+  KCSetting,
+  Referral,
 ];
 
 export const CustomRepository = [

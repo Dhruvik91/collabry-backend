@@ -32,7 +32,7 @@ export class UserAuthController {
   @ApiOperation({ summary: 'Sign up a new user (regular users only)' })
   @ApiCreatedResponse({ description: 'User registered and verification code sent' })
   async signup(@Body() body: SignupDto) {
-    return this.auth.signup(body.email, body.password, body.confirmPassword, body.role);
+    return this.auth.signup(body.email, body.password, body.confirmPassword, body.role, body.referralCode);
   }
 
   @AllowUnauthorized()

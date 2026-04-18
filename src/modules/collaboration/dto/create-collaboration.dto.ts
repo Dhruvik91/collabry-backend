@@ -40,4 +40,9 @@ export class CreateCollaborationDto {
     @IsOptional()
     @IsObject()
     agreedTerms?: any;
+
+    @ApiPropertyOptional({ example: 'uuid-of-auction' })
+    @IsOptional()
+    @IsUUID()
+    auctionId?: string;
 }
