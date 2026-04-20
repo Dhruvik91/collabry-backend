@@ -18,9 +18,9 @@ export class KCCronService {
         private readonly walletRepo: Repository<Wallet>,
     ) { }
 
-    @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
-    async handleDailyAllowance() {
-        this.logger.log('Starting daily KC allowance job...');
+    @Cron(CronExpression.EVERY_WEEK)
+    async handleWeeklyAllowance() {
+        this.logger.log('Starting weekly KC allowance job...');
 
         const brandAllowance = await this.settingService.getSetting(KCSettingKey.DAILY_ALLOWANCE_BRAND);
         const influencerAllowance = await this.settingService.getSetting(KCSettingKey.DAILY_ALLOWANCE_INFLUENCER);
@@ -37,7 +37,7 @@ export class KCCronService {
             }
         });
 
-        this.logger.log('Daily KC allowance job completed.');
+        this.logger.log('Weekly KC allowance job completed.');
     }
 
     private async awardBulkAllowance(manager: any, role: UserRole, amount: number) {
