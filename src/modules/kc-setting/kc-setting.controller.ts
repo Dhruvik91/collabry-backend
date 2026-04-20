@@ -10,19 +10,20 @@ import { UpdateSettingDto } from './dto/update-setting.dto';
 
 @ApiTags('KC Coins Admin')
 @ApiBearerAuth()
-@Roles(UserRole.ADMIN)
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('v1/admin/kc-settings')
 export class KCSettingController {
     constructor(private readonly settingService: KCSettingService) { }
 
     @Get()
+    @Roles(UserRole.ADMIN, UserRole.USER, UserRole.INFLUENCER)
     @ApiOperation({ summary: 'Get all KC coin settings' })
     async getAll() {
         return await this.settingService.getAllSettings();
     }
 
     @Patch(':key')
+    @Roles(UserRole.ADMIN)
     @ApiOperation({ summary: 'Update a KC coin setting' })
     async update(@Param('key') key: KCSettingKey, @Body() dto: UpdateSettingDto) {
         return await this.settingService.updateSetting(key, dto.value);
