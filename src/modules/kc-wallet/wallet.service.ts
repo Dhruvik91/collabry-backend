@@ -26,7 +26,7 @@ export class WalletService {
 
     async createWallet(userId: string, initialBalance = 0, manager?: EntityManager): Promise<Wallet> {
         const repo = manager ? manager.getRepository(Wallet) : this.walletRepo;
-        
+
         const existing = await repo.findOne({ where: { user: { id: userId } } });
         if (existing) return existing;
 
@@ -46,7 +46,7 @@ export class WalletService {
 
             if (!wallet) throw new NotFoundException('Wallet not found');
             if (Number(wallet.balance) < amount) {
-                throw new BadRequestException(`Insufficient KC coins. Required: ${amount}, Available: ${wallet.balance}`);
+                throw new BadRequestException(`Insufficient K coins. Required: ${amount}, Available: ${wallet.balance}`);
             }
 
             // Update balance
