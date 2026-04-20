@@ -22,6 +22,11 @@ export class SignupDto {
     @IsOptional()
     role?: UserRole;
 
+    @ApiProperty({ example: 'johndoe', description: 'Unique username' })
+    @IsString()
+    @IsOptional()
+    username?: string;
+
     @ApiProperty({ example: 'ABC12345', description: 'Referral code', required: false })
     @IsString()
     @IsOptional()
@@ -53,6 +58,11 @@ export class CreateInfluencerDto {
     @IsString()
     @MinLength(6, { message: 'Confirm password must be at least 6 characters long' })
     confirmPassword: string;
+
+    @ApiProperty({ example: 'johndoe', description: 'Unique username' })
+    @IsString()
+    @IsOptional()
+    username?: string;
 
     @ApiProperty({ example: 'ABC12345', description: 'Referral code', required: false })
     @IsString()

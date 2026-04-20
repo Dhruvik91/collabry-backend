@@ -32,7 +32,7 @@ export class UserAuthController {
   @ApiOperation({ summary: 'Sign up a new user (regular users only)' })
   @ApiCreatedResponse({ description: 'User registered and verification code sent' })
   async signup(@Body() body: SignupDto) {
-    return this.auth.signup(body.email, body.password, body.confirmPassword, body.role, body.referralCode);
+    return this.auth.signup(body.email, body.password, body.confirmPassword, body.role, body.referralCode, body.username);
   }
 
   @AllowUnauthorized()
@@ -83,7 +83,7 @@ export class UserAuthController {
   @ApiOperation({ summary: 'Admin creates an influencer account' })
   @ApiCreatedResponse({ description: 'Influencer account created successfully' })
   async createInfluencer(@Body() body: CreateInfluencerDto) {
-    return this.auth.createInfluencer(body.email, body.password, body.confirmPassword);
+    return this.auth.createInfluencer(body.email, body.password, body.confirmPassword, body.username);
   }
 
   @UseGuards(AuthGuard('jwt-user'), RolesGuard)

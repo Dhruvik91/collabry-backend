@@ -10,6 +10,8 @@ import { SearchInfluencersDto } from './dto/search-influencers.dto';
 import { RankingService } from '../ranking/ranking.service';
 import { isEntityNotFoundError } from '../../database/errors/entity-not-found.type-guard';
 import { cif } from '../../database/errors/tryQuery';
+import { slugify } from '../../core/utils/slugify';
+import { ConflictException } from '@nestjs/common';
 
 @Injectable()
 export class InfluencerService {
@@ -64,6 +66,14 @@ export class InfluencerService {
             throw new ForbiddenException('Only users with INFLUENCER role can have an influencer profile');
         }
 
+        // Update username if provided and different
+        if (saveDto.username && saveDto.username !== user.username) {
+            const usernameExists = await this.userRepo.findOne({ where: { username: saveDto.username } });
+            if (usernameExists) throw new ConflictException('Username already taken');
+            user.username = saveDto.username;
+            await this.userRepo.save(user);
+        }
+
         let profile = await this.influencerRepo.findOne({
             where: { user: { id: userId } },
         });
@@ -75,6 +85,26 @@ export class InfluencerService {
             });
         } else {
             Object.assign(profile, saveDto);
+        }
+
+        // Generate slug if not provided or if name/username changed and no slug exists
+        if (!profile.slug || (saveDto.fullName && !saveDto.slug)) {
+            const baseForSlug = saveDto.username || user.username || saveDto.fullName || `influencer-${userId.substring(0, 8)}`;
+            let generatedSlug = slugify(baseForSlug);
+            
+            // Basic uniqueness check for slug
+            const slugExists = await this.influencerRepo.findOne({ where: { slug: generatedSlug } });
+            if (slugExists && slugExists.id !== profile.id) {
+                generatedSlug = `${generatedSlug}-${Math.floor(Math.random() * 1000)}`;
+            }
+            profile.slug = generatedSlug;
+        } else if (saveDto.slug) {
+            // If manual slug provided, check uniqueness
+            const slugExists = await this.influencerRepo.findOne({ where: { slug: saveDto.slug } });
+            if (slugExists && slugExists.id !== profile.id) {
+                throw new ConflictException('Profile slug already taken');
+            }
+            profile.slug = saveDto.slug;
         }
 
         // Calculate denormalized metrics if platforms are updated
@@ -254,6 +284,25 @@ export class InfluencerService {
             return { ...profile, completedCollaborations };
         } catch (error) {
             cif(isEntityNotFoundError, new NotFoundException('Influencer not found'))(error);
+            throw error;
+        }
+    }
+
+    async getInfluencerBySlug(slug: string): Promise<InfluencerProfile & { completedCollaborations: number }> {
+        try {
+            const profile = await this.influencerRepo.findOne({
+                where: { slug },
+                relations: ['user', 'user.profile'],
+            });
+
+            if (!profile) {
+                throw new NotFoundException('Influencer with this slug not found');
+            }
+
+            const completedCollaborations = await this.getCompletedCollaborationsCount(profile.id);
+            return { ...profile, completedCollaborations };
+        } catch (error) {
+            cif(isEntityNotFoundError, new NotFoundException('Influencer with this slug not found'))(error);
             throw error;
         }
     }

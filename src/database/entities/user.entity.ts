@@ -12,9 +12,13 @@ export class User {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @ApiProperty()
     @Column({ unique: true })
     email: string;
+    
+    @ApiProperty()
+    @Column({ unique: true, nullable: true })
+    @Index()
+    username: string;
 
     @Exclude()
     @Column({ nullable: true, select: false })

@@ -118,7 +118,8 @@ export class PublicService {
             avgEngagementRate: influencer.avgEngagementRate,
             rankingTier: influencer.rankingTier,
             verified: influencer.verified,
-            username: influencer.user?.profile?.username || 'user',
+            username: influencer.user?.username || influencer.user?.profile?.username || 'user',
+            slug: influencer.slug,
             reviews,
             ranking,
             brandPartners,
@@ -134,6 +135,14 @@ export class PublicService {
             minPrice: influencer.minPrice,
             maxPrice: influencer.maxPrice
         } as any;
+    }
+
+    async getInfluencerPublicDataBySlug(slug: string): Promise<PublicInfluencerProfileDto> {
+        const influencer = await this.influencerService.getInfluencerBySlug(slug);
+        if (!influencer) {
+            throw new NotFoundException('Influencer not found');
+        }
+        return this.getInfluencerPublicData(influencer.id);
     }
 
     async getBrandPublicData(id: string): Promise<PublicBrandProfileDto> {

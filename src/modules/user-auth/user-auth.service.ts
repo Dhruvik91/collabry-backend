@@ -27,7 +27,7 @@ export class UserAuthService {
     private readonly dataSource: DataSource,
   ) { }
 
-  async signup(email: string, password: string, confirmPassword: string, role: UserRole = UserRole.USER, referredBy?: string) {
+  async signup(email: string, password: string, confirmPassword: string, role: UserRole = UserRole.USER, referredBy?: string, username?: string) {
     // Validate password confirmation
     if (password !== confirmPassword) {
       throw new BadRequestException('Password and confirm password do not match');
@@ -40,6 +40,11 @@ export class UserAuthService {
 
     const exists = await this.usersRepo.findOne({ where: { email } });
     if (exists) throw new ConflictException('Email already registered');
+
+    if (username) {
+      const usernameExists = await this.usersRepo.findOne({ where: { username } });
+      if (usernameExists) throw new ConflictException('Username already taken');
+    }
 
     const passwordHash = await this.hashing.hash(password);
     
@@ -63,6 +68,7 @@ export class UserAuthService {
       otpExpires,
       referralCode,
       referredBy,
+      username,
     });
     
     // Use a transaction to ensure user and referral tracking are atomic
@@ -196,7 +202,7 @@ export class UserAuthService {
     return { access_token: token, user: userWithoutPassword };
   }
 
-  async createInfluencer(email: string, password: string, confirmPassword: string) {
+  async createInfluencer(email: string, password: string, confirmPassword: string, username?: string) {
     // Validate password confirmation
     if (password !== confirmPassword) {
       throw new BadRequestException('Password and confirm password do not match');
@@ -205,9 +211,14 @@ export class UserAuthService {
     const exists = await this.usersRepo.findOne({ where: { email } });
     if (exists) throw new ConflictException('Email already registered');
 
+    if (username) {
+      const usernameExists = await this.usersRepo.findOne({ where: { username } });
+      if (usernameExists) throw new ConflictException('Username already taken');
+    }
+
     const passwordHash = await this.hashing.hash(password);
     // Create user with INFLUENCER role
-    const user = this.usersRepo.create({ email, role: UserRole.INFLUENCER, passwordHash });
+    const user = this.usersRepo.create({ email, role: UserRole.INFLUENCER, passwordHash, username });
     const saved = await this.usersRepo.save(user);
 
     // Exclude passwordHash from response
