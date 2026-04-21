@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { PaymentOrder } from '../../database/entities/payment-order.entity';
 import { TopUpPlan } from '../../database/entities/top-up-plan.entity';
-import { PaymentStatus, TransactionPurpose } from '../../database/entities/enums';
+import { PaymentStatus, TransactionPurpose, RazorpayWebhookEvent } from '../../database/entities/enums';
 import { RazorpayService } from './razorpay.service';
 import { WalletService } from '../kc-wallet/wallet.service';
 import { InitiateTopUpDto, VerifyPaymentDto } from './dto/payment.dto';
@@ -74,14 +74,15 @@ export class PaymentService {
     }
 
     async verifyPayment(userId: string, dto: VerifyPaymentDto) {
-        const order = await this.orderRepo.findOne({
+        // First check outside to avoid unnecessary locks
+        const initialOrder = await this.orderRepo.findOne({
             where: { razorpayOrderId: dto.razorpayOrderId },
             relations: ['user', 'plan'],
         });
 
-        if (!order) throw new NotFoundException('Order not found');
-        if (order.user.id !== userId) throw new BadRequestException('Unauthorized payment verification');
-        if (order.status === PaymentStatus.SUCCESS) return { message: 'Payment already verified' };
+        if (!initialOrder) throw new NotFoundException('Order not found');
+        if (initialOrder.user.id !== userId) throw new BadRequestException('Unauthorized payment verification');
+        if (initialOrder.status === PaymentStatus.SUCCESS) return { message: 'Payment already verified' };
 
         // Verify Signature
         const isValid = this.razorpayService.verifySignature(
@@ -91,13 +92,24 @@ export class PaymentService {
         );
 
         if (!isValid) {
-            order.status = PaymentStatus.FAILED;
-            await this.orderRepo.save(order);
+            initialOrder.status = PaymentStatus.FAILED;
+            await this.orderRepo.save(initialOrder);
             throw new BadRequestException('Invalid payment signature');
         }
 
-        // Use transaction to update order and credit wallet
+        // Use transaction with pessimistic lock for final update
         return await this.dataSource.transaction(async (manager) => {
+            const order = await manager.findOne(PaymentOrder, {
+                where: { id: initialOrder.id },
+                relations: ['user'],
+                lock: { mode: 'pessimistic_write' },
+            });
+
+            if (!order) throw new NotFoundException('Order lost during transaction');
+            if (order.status === PaymentStatus.SUCCESS) {
+                return { status: 'already_verified', message: 'Payment already processed' };
+            }
+
             order.status = PaymentStatus.SUCCESS;
             order.razorpayPaymentId = dto.razorpayPaymentId;
             order.razorpaySignature = dto.razorpaySignature;
@@ -108,7 +120,11 @@ export class PaymentService {
                 userId,
                 order.coins,
                 TransactionPurpose.KCOIN_TOPUP,
-                { paymentOrderId: order.id, razorpayPaymentId: dto.razorpayPaymentId },
+                { 
+                    paymentOrderId: order.id, 
+                    razorpayPaymentId: dto.razorpayPaymentId,
+                    method: 'api_verify'
+                },
                 manager,
             );
 
@@ -124,7 +140,7 @@ export class PaymentService {
             return {
                 status: 'success',
                 coinsCredited: order.coins,
-                newBalance: (await this.walletService.getWallet(userId)).balance, // Potentially stale if not using manager, but getWallet doesn't take manager
+                newBalance: (await this.walletService.getWallet(userId)).balance,
             };
         });
     }
@@ -147,42 +163,65 @@ export class PaymentService {
             throw new BadRequestException('Invalid webhook signature');
         }
 
-        const event = payload.event;
-        if (event === 'payment.captured' || event === 'order.paid') {
-            const razorpayOrderId = payload.payload.payment?.entity?.order_id || payload.payload.order?.entity?.id;
-            const razorpayPaymentId = payload.payload.payment?.entity?.id;
+        const event = payload.event as RazorpayWebhookEvent;
+        const razorpayOrderId = payload.payload.payment?.entity?.order_id || payload.payload.order?.entity?.id;
+        const razorpayPaymentId = payload.payload.payment?.entity?.id;
 
-            if (razorpayOrderId) {
-                const order = await this.orderRepo.findOne({
-                    where: { razorpayOrderId },
+        if (!razorpayOrderId) return;
+
+        const initialOrder = await this.orderRepo.findOne({
+            where: { razorpayOrderId },
+            relations: ['user'],
+        });
+
+        if (!initialOrder) {
+            console.warn(`Webhook received for unknown order: ${razorpayOrderId}`);
+            return;
+        }
+
+        if (event === RazorpayWebhookEvent.PAYMENT_CAPTURED || event === RazorpayWebhookEvent.ORDER_PAID) {
+            if (initialOrder.status === PaymentStatus.SUCCESS) return;
+
+            await this.dataSource.transaction(async (manager) => {
+                const order = await manager.findOne(PaymentOrder, {
+                    where: { id: initialOrder.id },
                     relations: ['user'],
+                    lock: { mode: 'pessimistic_write' },
                 });
 
                 if (order && order.status !== PaymentStatus.SUCCESS) {
-                    await this.dataSource.transaction(async (manager) => {
-                        order.status = PaymentStatus.SUCCESS;
-                        order.razorpayPaymentId = razorpayPaymentId;
-                        await manager.save(order);
+                    order.status = PaymentStatus.SUCCESS;
+                    order.razorpayPaymentId = razorpayPaymentId;
+                    await manager.save(order);
 
-                        await this.walletService.credit(
-                            order.user.id,
-                            order.coins,
-                            TransactionPurpose.KCOIN_TOPUP,
-                            { paymentOrderId: order.id, razorpayPaymentId, via: 'webhook' },
-                            manager,
-                        );
+                    await this.walletService.credit(
+                        order.user.id,
+                        order.coins,
+                        TransactionPurpose.KCOIN_TOPUP,
+                        { 
+                            paymentOrderId: order.id, 
+                            razorpayPaymentId, 
+                            via: 'webhook',
+                            event: event
+                        },
+                        manager,
+                    );
 
-                        // Send Success Email
-                        void this.mailerService.sendPaymentSuccessEmail(
-                            order.user.email,
-                            order.user.username || 'User',
-                            Number(order.amount),
-                            order.coins,
-                            order.razorpayOrderId
-                        ).catch(err => console.error('Failed to send payment success email (webhook):', err));
-                    });
+                    // Send Success Email
+                    void this.mailerService.sendPaymentSuccessEmail(
+                        order.user.email,
+                        order.user.username || 'User',
+                        Number(order.amount),
+                        order.coins,
+                        order.razorpayOrderId
+                    ).catch(err => console.error('Failed to send payment success email (webhook):', err));
                 }
-            }
+            });
+        } else if (event === RazorpayWebhookEvent.PAYMENT_FAILED) {
+            initialOrder.status = PaymentStatus.FAILED;
+            initialOrder.razorpayPaymentId = razorpayPaymentId;
+            await this.orderRepo.save(initialOrder);
+            console.log(`Payment failed for order ${razorpayOrderId}`);
         }
     }
 

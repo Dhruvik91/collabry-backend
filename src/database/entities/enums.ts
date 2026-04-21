@@ -88,6 +88,13 @@ export enum PaymentStatus {
     CANCELLED = 'CANCELLED',
 }
 
+export enum RazorpayWebhookEvent {
+    PAYMENT_CAPTURED = 'payment.captured',
+    PAYMENT_FAILED = 'payment.failed',
+    PAYMENT_AUTHORIZED = 'payment.authorized',
+    ORDER_PAID = 'order.paid',
+}
+
 export enum TransactionPurpose {
     AUCTION_CREATION = 'AUCTION_CREATION',
     COLLABORATION_CREATION = 'COLLABORATION_CREATION',
