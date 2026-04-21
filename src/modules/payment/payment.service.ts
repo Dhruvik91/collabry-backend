@@ -34,37 +34,42 @@ export class PaymentService {
         const user = await this.userRepo.findOne({ where: { id: userId } });
         if (!user) throw new NotFoundException('User not found');
 
+        // Create Local Order first to get an ID
+        const order = this.orderRepo.create({
+            user: { id: userId } as any,
+            plan: plan,
+            amount: plan.amount,
+            coins: plan.coins,
+            status: PaymentStatus.PENDING,
+            razorpayOrderId: 'PENDING', // Temporary
+        });
+
+        const savedOrder = await this.orderRepo.save(order);
+
         // Create Razorpay Order
         const razorpayOrder = await this.razorpayService.createOrder(
             plan.amount,
             'INR',
-            `topup_${userId}_${Date.now()}`,
+            savedOrder.id, // UUID is 36 chars, fits in 40
             {
                 userId: user.id,
                 email: user.email,
                 username: user.username || 'N/A',
                 planId: plan.id,
                 coins: plan.coins,
+                localOrderId: savedOrder.id,
             }
         );
 
-        // Create Local Order
-        const order = this.orderRepo.create({
-            user: { id: userId } as any,
-            plan: plan,
-            razorpayOrderId: razorpayOrder.id,
-            amount: plan.amount,
-            coins: plan.coins,
-            status: PaymentStatus.PENDING,
-        });
-
-        await this.orderRepo.save(order);
+        // Update local order with Razorpay Order ID
+        savedOrder.razorpayOrderId = razorpayOrder.id;
+        await this.orderRepo.save(savedOrder);
 
         return {
             orderId: razorpayOrder.id,
             amount: razorpayOrder.amount,
             currency: razorpayOrder.currency,
-            key: this.configService.get<string>('RAZORPAY_KEY_ID'), // Frontend will need this
+            key: this.configService.get<string>('RAZORPAY_KEY_ID'),
         };
     }
 
