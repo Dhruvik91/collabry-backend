@@ -81,6 +81,13 @@ export enum TransactionType {
     DEBIT = 'DEBIT',
 }
 
+export enum PaymentStatus {
+    PENDING = 'PENDING',
+    SUCCESS = 'SUCCESS',
+    FAILED = 'FAILED',
+    CANCELLED = 'CANCELLED',
+}
+
 export enum TransactionPurpose {
     AUCTION_CREATION = 'AUCTION_CREATION',
     COLLABORATION_CREATION = 'COLLABORATION_CREATION',
@@ -89,4 +96,5 @@ export enum TransactionPurpose {
     REFERRAL_REWARD = 'REFERRAL_REWARD',
     SIGNUP_BONUS = 'SIGNUP_BONUS',
     SYSTEM_ADJUSTMENT = 'SYSTEM_ADJUSTMENT',
+    KCOIN_TOPUP = 'KCOIN_TOPUP',
 }

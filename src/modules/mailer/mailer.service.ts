@@ -296,6 +296,60 @@ export class MailerService {
       return false;
     }
   }
+
+  async sendPaymentSuccessEmail(email: string, name: string, amount: number, coins: number, orderId: string): Promise<boolean> {
+    const content = `
+      <!-- Icon -->
+      <div style="text-align: center; margin-bottom: 20px;">
+        <div style="display: inline-block; width: 56px; height: 56px; background: #f0fdf4; border-radius: 16px; line-height: 56px; text-align: center;">
+          <span style="font-size: 28px;">💰</span>
+        </div>
+      </div>
+
+      <h2 style="margin: 0 0 10px 0; font-size: 20px; font-weight: 800; color: #1d284d; text-align: center; letter-spacing: -0.4px;">Payment Successful!</h2>
+      <p style="margin: 0 0 24px 0; font-size: 14px; color: #514b61; text-align: center; line-height: 1.6;">
+        Your top-up was successful. KC coins have been added to your wallet.
+      </p>
+
+      <!-- Details card -->
+      <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 16px; padding: 20px; margin-bottom: 24px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="padding-bottom: 12px;">
+              <p style="margin: 0; font-size: 10px; color: #16a34a; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Amount Paid</p>
+              <p style="margin: 4px 0 0 0; font-size: 18px; font-weight: 800; color: #1d284d;">₹${amount}</p>
+            </td>
+            <td style="padding-bottom: 12px; text-align: right;">
+              <p style="margin: 0; font-size: 10px; color: #16a34a; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">K Coins Added</p>
+              <p style="margin: 4px 0 0 0; font-size: 18px; font-weight: 800; color: #E91E8C;">${coins} KC</p>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2" style="padding-top: 12px; border-top: 1px dashed #bbf7d0;">
+              <p style="margin: 0; font-size: 10px; color: #16a34a; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Order ID</p>
+              <p style="margin: 4px 0 0 0; font-size: 13px; font-weight: 600; color: #514b61;">${orderId}</p>
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <p style="margin: 0; font-size: 13px; color: #6b5f7b; text-align: center; line-height: 1.5;">
+        Thank you for choosing Kollabary! You can now use your KC coins for auctions and collaborations.
+      </p>`;
+
+    try {
+      await this.mailer.sendMail({
+        to: email,
+        subject: 'Top-up Successful - Kollabary',
+        html: this.buildEmailLayout(content),
+      });
+      this.logger.log(`Payment success email sent to ${email}`);
+      return true;
+    } catch (error) {
+      this.logger.error(`Failed to send payment success email to ${email}`, error);
+      return false;
+    }
+  }
 }
 
 

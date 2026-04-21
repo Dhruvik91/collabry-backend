@@ -28,6 +28,8 @@ import { KcWalletModule } from './modules/kc-wallet/kc-wallet.module';
 import { KcTransactionModule } from './modules/kc-transaction/kc-transaction.module';
 import { KCSettingModule } from './modules/kc-setting/kc-setting.module';
 import { ReferralModule } from './modules/referral/referral.module';
+import { TopUpModule } from './modules/top-up/top-up.module';
+import { PaymentModule } from './modules/payment/payment.module';
 import { RolesGuard } from './modules/auth/Guards/roles.guard';
 
 
@@ -60,6 +62,8 @@ import { RolesGuard } from './modules/auth/Guards/roles.guard';
     KcTransactionModule,
     KCSettingModule,
     ReferralModule,
+    TopUpModule,
+    PaymentModule,
 
     // Utility modules
 

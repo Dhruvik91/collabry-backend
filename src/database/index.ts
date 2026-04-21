@@ -19,6 +19,8 @@ import { Wallet } from './entities/wallet.entity';
 import { KCTransaction } from './entities/kc-transaction.entity';
 import { KCSetting } from './entities/kc-setting.entity';
 import { Referral } from './entities/referral.entity';
+import { TopUpPlan } from './entities/top-up-plan.entity';
+import { PaymentOrder } from './entities/payment-order.entity';
 
 export const AllEntities = [
   AdminAction,
@@ -42,6 +44,8 @@ export const AllEntities = [
   KCTransaction,
   KCSetting,
   Referral,
+  TopUpPlan,
+  PaymentOrder,
 ];
 
 export const CustomRepository = [
