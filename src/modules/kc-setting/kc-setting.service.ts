@@ -28,7 +28,7 @@ export class KCSettingService implements OnModuleInit {
             { key: KCSettingKey.BID_PLACEMENT_PRICE, value: 25 },
             { key: KCSettingKey.DAILY_ALLOWANCE_BRAND, value: 1000 },
             { key: KCSettingKey.DAILY_ALLOWANCE_INFLUENCER, value: 500 },
-            { key: KCSettingKey.REFERRAL_REWARD_REFERRER, value: 2000 },
+            { key: KCSettingKey.REFERRAL_REWARD_REFERRER, value: 1000 },
             { key: KCSettingKey.REFERRAL_REWARD_REFERRED, value: 500 },
         ];
 

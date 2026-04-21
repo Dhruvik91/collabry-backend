@@ -106,4 +106,16 @@ export class ReferralService {
             referralCode: (await this.userRepo.findOne({ where: { id: userId } }))?.referralCode
         };
     }
+
+    async getReferralConfig() {
+        const [referrerReward, referredReward] = await Promise.all([
+            this.settingService.getSetting(KCSettingKey.REFERRAL_REWARD_REFERRER),
+            this.settingService.getSetting(KCSettingKey.REFERRAL_REWARD_REFERRED),
+        ]);
+
+        return {
+            referrerReward,
+            referredReward,
+        };
+    }
 }

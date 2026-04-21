@@ -16,4 +16,10 @@ export class ReferralController {
     async getMyStats(@Req() req: any) {
         return await this.referralService.getReferralStats(req.user.id);
     }
+
+    @Get('config')
+    @ApiOperation({ summary: 'Get referral configuration' })
+    async getConfig() {
+        return await this.referralService.getReferralConfig();
+    }
 }
