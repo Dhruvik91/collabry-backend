@@ -8,7 +8,13 @@ import { UpdateReportStatusDto } from './dto/update-report-status.dto';
 import { UpdateVerificationStatusDto } from './dto/update-verification-status.dto';
 import { SaveSubscriptionPlanDto } from '../subscription/dto/save-subscription-plan.dto';
 import { AdminStatsDto } from './dto/admin-stats.dto';
-import { UserRole, ReportStatus, AuctionStatus } from '../../database/entities/enums';
+import { 
+    AdminFinanceFilterDto, 
+    AdminOrderFilterDto, 
+    AdminUserFilterDto, 
+    AdminBulkStatusDto 
+} from './dto/admin-management.dto';
+import { UserRole, ReportStatus, AuctionStatus, UserStatus } from '../../database/entities/enums';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/Guards/roles.guard';
 import { JwtAuthGuard } from '../auth/Guards/jwt-guard';
@@ -30,8 +36,38 @@ export class AdminController {
     @Get('stats')
     @ApiOperation({ summary: 'Get platform statistics' })
     @ApiOkResponse({ description: 'Statistics retrieved successfully', type: AdminStatsDto })
-    async getStatistics(): Promise<AdminStatsDto> {
-        return this.adminService.getStatistics();
+    async getStatistics(@Query() filter: AdminFinanceFilterDto): Promise<AdminStatsDto> {
+        return this.adminService.getStatistics(filter);
+    }
+
+    @Get('orders')
+    @ApiOperation({ summary: 'List all platform orders with pagination/filters' })
+    async findAllOrders(@Query() filters: AdminOrderFilterDto) {
+        return this.adminService.getAllOrders(filters);
+    }
+
+    @Get('users')
+    @ApiOperation({ summary: 'List all platform users with pagination/filters' })
+    async findAllUsers(@Query() filters: AdminUserFilterDto) {
+        return this.adminService.getAllUsers(filters);
+    }
+
+    @Patch('users/bulk-status')
+    @ApiOperation({ summary: 'Bulk update user status (Ban/Unban)' })
+    async bulkUpdateUserStatus(@Body() bulkDto: AdminBulkStatusDto) {
+        return this.adminService.bulkUpdateUserStatus(bulkDto);
+    }
+
+    @Patch('users/:id/status')
+    @ApiOperation({ summary: 'Update individual user status' })
+    async updateUserStatus(@Param('id') id: string, @Body('status') status: UserStatus) {
+        return this.adminService.updateUserStatus(id, status);
+    }
+
+    @Patch('users/:id/verify')
+    @ApiOperation({ summary: 'Directly verify/unverify influencer' })
+    async verifyInfluencer(@Param('id') id: string, @Body('isVerified') isVerified: boolean) {
+        return this.adminService.verifyInfluencer(id, isVerified);
     }
 
     // --- Reports ---

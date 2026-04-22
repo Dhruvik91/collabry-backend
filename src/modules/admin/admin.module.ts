@@ -13,6 +13,7 @@ import { Auction } from '../../database/entities/auction.entity';
 import { Bid } from '../../database/entities/bid.entity';
 import { Conversation } from '../../database/entities/conversation.entity';
 import { Message } from '../../database/entities/message.entity';
+import { PaymentOrder } from '../../database/entities/payment-order.entity';
 
 @Module({
     imports: [
@@ -24,7 +25,8 @@ import { Message } from '../../database/entities/message.entity';
             Auction,
             Bid,
             Conversation,
-            Message
+            Message,
+            PaymentOrder
         ]),
         ReportModule,
         SubscriptionModule,

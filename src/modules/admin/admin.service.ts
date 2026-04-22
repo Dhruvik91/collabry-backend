@@ -9,7 +9,7 @@ import { Auction } from '../../database/entities/auction.entity';
 import { Bid } from '../../database/entities/bid.entity';
 import { Conversation } from '../../database/entities/conversation.entity';
 import { Message } from '../../database/entities/message.entity';
-import { UserRole, CollaborationStatus, VerificationStatus, AuctionStatus } from '../../database/entities/enums';
+import { UserRole, CollaborationStatus, VerificationStatus, AuctionStatus, UserStatus } from '../../database/entities/enums';
 import {
     AdminStatsDto,
     UserStatsDto,
@@ -17,7 +17,20 @@ import {
     VerificationStatsDto,
     ReviewStatsDto,
     PlatformGrowthDto,
+    FinanceStatsDto,
+    TrendPointDto,
 } from './dto/admin-stats.dto';
+import { 
+    AdminFinanceFilterDto, 
+    DateRangeType, 
+    AdminOrderFilterDto, 
+    AdminUserFilterDto, 
+    AdminBulkStatusDto,
+    AdminUpdateVerificationDto
+} from './dto/admin-management.dto';
+import { PaymentOrder } from '../../database/entities/payment-order.entity';
+import { PaymentStatus } from '../../database/entities/enums';
+import { Between, ILike } from 'typeorm';
 
 @Injectable()
 export class AdminService {
@@ -40,20 +53,23 @@ export class AdminService {
         private readonly conversationRepo: Repository<Conversation>,
         @InjectRepository(Message)
         private readonly messageRepo: Repository<Message>,
+        @InjectRepository(PaymentOrder)
+        private readonly orderRepo: Repository<PaymentOrder>,
     ) { }
 
     /**
      * Get comprehensive platform statistics
      * @returns Platform statistics
      */
-    async getStatistics(): Promise<AdminStatsDto> {
+    async getStatistics(filter?: AdminFinanceFilterDto): Promise<AdminStatsDto> {
         try {
-            const [users, collaborations, verifications, reviews, growth] = await Promise.all([
+            const [users, collaborations, verifications, reviews, growth, finance] = await Promise.all([
                 this.getUserStats(),
                 this.getCollaborationStats(),
                 this.getVerificationStats(),
                 this.getReviewStats(),
                 this.getGrowthStats(),
+                this.getFinanceStats(filter),
             ]);
 
             return {
@@ -62,11 +78,104 @@ export class AdminService {
                 verifications,
                 reviews,
                 growth,
+                finance,
             };
         } catch (error) {
             this.logger.error('Error fetching admin statistics:', error);
             throw error;
         }
+    }
+
+    /**
+     * Get financial statistics with dynamic aggregation
+     */
+    async getFinanceStats(filter?: AdminFinanceFilterDto): Promise<FinanceStatsDto> {
+        const { startDate, endDate } = this.calculateDateRange(filter);
+
+        // 1. Basic Stats
+        const [successOrders, totalOrders] = await Promise.all([
+            this.orderRepo.find({
+                where: {
+                    status: PaymentStatus.SUCCESS,
+                    createdAt: Between(startDate, endDate),
+                },
+            }),
+            this.orderRepo.count({
+                where: {
+                    createdAt: Between(startDate, endDate),
+                },
+            }),
+        ]);
+
+        const totalRevenue = successOrders.reduce((sum, o) => sum + Number(o.amount), 0);
+        const totalCoinsSold = successOrders.reduce((sum, o) => sum + o.coins, 0);
+        const successRate = totalOrders > 0 ? (successOrders.length / totalOrders) * 100 : 0;
+
+        // 2. Trends with Dynamic Aggregation level
+        const diffMs = endDate.getTime() - startDate.getTime();
+        const diffMonths = diffMs / (1000 * 60 * 60 * 24 * 30);
+        
+        let interval = 'day';
+        if (diffMonths >= 2 && diffMonths <= 12) interval = 'week';
+        else if (diffMonths > 12) interval = 'month';
+
+        const trendsRaw = await this.orderRepo.query(`
+            SELECT date_trunc('${interval}', "createdAt") as label, SUM(amount)::float as value
+            FROM payment_orders
+            WHERE status = 'SUCCESS' AND "createdAt" BETWEEN $1 AND $2
+            GROUP BY label
+            ORDER BY label ASC
+        `, [startDate, endDate]);
+
+        const revenueTrends = trendsRaw.map(t => ({
+            label: new Date(t.label).toLocaleDateString(),
+            value: t.value,
+        }));
+
+        return {
+            totalRevenue,
+            totalCoinsSold,
+            orderCount: totalOrders,
+            successRate,
+            revenueTrends,
+        };
+    }
+
+    private calculateDateRange(filter?: AdminFinanceFilterDto): { startDate: Date, endDate: Date } {
+        const now = new Date();
+        let startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // Default Today
+        let endDate = new Date();
+
+        if (!filter) return { startDate, endDate };
+
+        switch (filter.range) {
+            case DateRangeType.TODAY:
+                startDate = new Date(now.setHours(0, 0, 0, 0));
+                break;
+            case DateRangeType.THIS_WEEK:
+                startDate = new Date(now.setDate(now.getDate() - now.getDay()));
+                break;
+            case DateRangeType.THIS_MONTH:
+                startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                break;
+            case DateRangeType.LAST_MONTH:
+                startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                endDate = new Date(now.getFullYear(), now.getMonth(), 0);
+                break;
+            case DateRangeType.THIS_YEAR:
+                startDate = new Date(now.getFullYear(), 0, 1);
+                break;
+            case DateRangeType.LAST_YEAR:
+                startDate = new Date(now.getFullYear() - 1, 0, 1);
+                endDate = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59);
+                break;
+            case DateRangeType.CUSTOM:
+                if (filter.startDate) startDate = new Date(filter.startDate);
+                if (filter.endDate) endDate = new Date(filter.endDate);
+                break;
+        }
+
+        return { startDate, endDate };
     }
 
     /**
@@ -317,6 +426,115 @@ export class AdminService {
         }
 
         return await query.getMany();
+    }
+    async getAllOrders(filters: AdminOrderFilterDto) {
+        const { page = 1, limit = 20, status, userId, planId, startDate, endDate } = filters;
+        const query = this.orderRepo.createQueryBuilder('order')
+            .leftJoinAndSelect('order.user', 'user')
+            .leftJoinAndSelect('user.profile', 'profile')
+            .leftJoinAndSelect('order.plan', 'plan')
+            .orderBy('order.createdAt', 'DESC')
+            .skip((page - 1) * limit)
+            .take(limit);
+
+        if (status) query.andWhere('order.status = :status', { status });
+        if (userId) query.andWhere('user.id = :userId', { userId });
+        if (planId) query.andWhere('plan.id = :planId', { planId });
+        if (startDate && endDate) {
+            query.andWhere('order.createdAt BETWEEN :startDate AND :endDate', { 
+                startDate: new Date(startDate), 
+                endDate: new Date(endDate) 
+            });
+        }
+
+        const [items, total] = await query.getManyAndCount();
+        return {
+            items,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        };
+    }
+
+    /**
+     * Get all users with pagination and filters
+     */
+    async getAllUsers(filters: AdminUserFilterDto) {
+        const { page = 1, limit = 20, role, status, search, startDate, endDate } = filters;
+        const query = this.userRepo.createQueryBuilder('user')
+            .leftJoinAndSelect('user.profile', 'profile')
+            .leftJoinAndSelect('user.influencerProfile', 'influencer')
+            .orderBy('user.createdAt', 'DESC')
+            .skip((page - 1) * limit)
+            .take(limit);
+
+        if (role) query.andWhere('user.role = :role', { role });
+        if (status) query.andWhere('user.status = :status', { status });
+        if (search) {
+            query.andWhere(
+                '(user.email ILike :search OR user.username ILike :search OR profile.fullName ILike :search)',
+                { search: `%${search}%` }
+            );
+        }
+        if (startDate && endDate) {
+            query.andWhere('user.createdAt BETWEEN :startDate AND :endDate', { 
+                startDate: new Date(startDate), 
+                endDate: new Date(endDate) 
+            });
+        }
+
+        const [items, total] = await query.getManyAndCount();
+        return {
+            items,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        };
+    }
+
+    /**
+     * Update user status (Ban/Unban)
+     */
+    async updateUserStatus(userId: string, status: UserStatus) {
+        const user = await this.userRepo.findOne({ where: { id: userId } });
+        if (!user) throw new Error('User not found');
+        user.status = status;
+        return await this.userRepo.save(user);
+    }
+
+    /**
+     * Bulk update user status
+     */
+    async bulkUpdateUserStatus(dto: AdminBulkStatusDto) {
+        return await this.userRepo.update(dto.userIds, { status: dto.status });
+    }
+
+    /**
+     * Manually update influencer verification status
+     */
+    async verifyInfluencer(influencerId: string, isVerified: boolean) {
+        const influencer = await this.userRepo.findOne({ 
+            where: { id: influencerId },
+            relations: ['influencerProfile'] 
+        });
+        if (!influencer || !influencer.influencerProfile) {
+            throw new Error('Influencer profile not found');
+        }
+        
+        // This is a simplified "Direct Verification" as requested
+        // In a real scenario, we might also update the latest VerificationRequest if one exists
+        // But for "God Mode" we update the profile directly
+        return await this.userRepo.query(`
+            UPDATE influencer_profiles 
+            SET "isVerified" = $1 
+            WHERE id = $2
+        `, [isVerified, influencer.influencerProfile.id]);
     }
 
     /**
