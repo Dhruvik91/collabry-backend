@@ -1,4 +1,5 @@
 import { Controller, Post, Body, UseGuards, Req, Get, Query, Param } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { PaymentService } from './payment.service';
 import { InitiateTopUpDto, VerifyPaymentDto } from './dto/payment.dto';
@@ -15,6 +16,7 @@ export class PaymentController {
     constructor(private readonly paymentService: PaymentService) { }
 
     @Post('top-up/initiate')
+    @Throttle({ default: { limit: 5, ttl: 60000 } })
     @Roles(UserRole.USER, UserRole.INFLUENCER)
     @ApiOperation({ summary: 'Initiate a KC coin top-up' })
     async initiateTopUp(@Req() req: any, @Body() dto: InitiateTopUpDto) {

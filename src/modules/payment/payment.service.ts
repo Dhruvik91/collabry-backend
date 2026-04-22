@@ -341,9 +341,10 @@ export class PaymentService {
                 this.logger.log(`Payment failed for order ${razorpayOrderId}: ${initialOrder.metadata.failure_reason}`);
                 break;
             case RazorpayWebhookEvent.REFUND_PROCESSED:
+                initialOrder.status = PaymentStatus.REFUNDED;
                 initialOrder.metadata = { ...(initialOrder.metadata || {}), last_webhook_event: event, refund_payload: payload };
                 await this.orderRepo.save(initialOrder);
-                this.logger.warn(`Refund processed for order ${razorpayOrderId}. Manual intervention may be required.`);
+                this.logger.warn(`Refund processed for order ${razorpayOrderId}. Internal status updated to REFUNDED.`);
                 break;
             default:
                 this.logger.log(`Webhook received for unhandled event: ${event}`);

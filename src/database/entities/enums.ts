@@ -86,6 +86,7 @@ export enum PaymentStatus {
     SUCCESS = 'SUCCESS',
     FAILED = 'FAILED',
     CANCELLED = 'CANCELLED',
+    REFUNDED = 'REFUNDED',
 }
 
 export enum RazorpayWebhookEvent {
