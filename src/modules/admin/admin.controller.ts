@@ -7,7 +7,7 @@ import { SubscriptionService } from '../subscription/subscription.service';
 import { UpdateReportStatusDto } from './dto/update-report-status.dto';
 import { UpdateVerificationStatusDto } from './dto/update-verification-status.dto';
 import { SaveSubscriptionPlanDto } from '../subscription/dto/save-subscription-plan.dto';
-import { AdminStatsDto } from './dto/admin-stats.dto';
+import { AdminStatsDto, FinanceStatsDto } from './dto/admin-stats.dto';
 import { 
     AdminFinanceFilterDto, 
     AdminOrderFilterDto, 
@@ -38,6 +38,13 @@ export class AdminController {
     @ApiOkResponse({ description: 'Statistics retrieved successfully', type: AdminStatsDto })
     async getStatistics(@Query() filter: AdminFinanceFilterDto): Promise<AdminStatsDto> {
         return this.adminService.getStatistics(filter);
+    }
+
+    @Get('finance')
+    @ApiOperation({ summary: 'Get financial statistics' })
+    @ApiOkResponse({ description: 'Financial statistics retrieved successfully', type: FinanceStatsDto })
+    async getFinanceStatistics(@Query() filter: AdminFinanceFilterDto): Promise<FinanceStatsDto> {
+        return this.adminService.getFinanceStats(filter);
     }
 
     @Get('orders')
