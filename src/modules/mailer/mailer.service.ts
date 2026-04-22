@@ -43,12 +43,9 @@ export class MailerService {
 
           <!-- Header band -->
           <tr>
-            <td style="background: linear-gradient(90deg, #E91E8C 0%, #6B1B6F 100%); padding: 24px 24px 20px 24px; text-align: center;">
+            <td style="padding: 32px 24px 20px 24px; text-align: center;">
               <!-- Logo PNG -->
-              <div style="margin-bottom: 8px;">
-                <img src="https://kollabary.s3.ap-south-1.amazonaws.com/email-template-logo.png" alt="Kollabary" width="140" style="display: inline-block; border: 0;">
-              </div>
-              <p style="margin: 0; font-size: 10px; color: rgba(255,255,255,0.8); font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase;">Collaboration Platform</p>
+              <img src="https://kollabary.s3.ap-south-1.amazonaws.com/email-template-logo.png" alt="Kollabary" width="140" style="display: inline-block; border: 0;">
             </td>
           </tr>
 
