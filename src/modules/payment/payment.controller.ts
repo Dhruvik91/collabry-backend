@@ -38,7 +38,8 @@ export class PaymentController {
     @Post('webhook/razorpay')
     @ApiOperation({ summary: 'Razorpay Webhook handler' })
     async handleWebhook(@Body() payload: any, @Req() req: any) {
-        // signature check would happen here
-        return await this.paymentService.handleWebhook(payload, req.headers['x-razorpay-signature']);
+        const signature = req.headers['x-razorpay-signature'];
+        const rawBody = req.rawBody?.toString();
+        return await this.paymentService.handleWebhook(payload, signature, rawBody);
     }
 }

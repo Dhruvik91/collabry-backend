@@ -1,10 +1,11 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Razorpay from 'razorpay';
 import * as crypto from 'crypto';
 
 @Injectable()
 export class RazorpayService {
+    private readonly logger = new Logger(RazorpayService.name);
     private razorpay: any;
 
     constructor(private configService: ConfigService) {
@@ -24,8 +25,17 @@ export class RazorpayService {
             };
             return await this.razorpay.orders.create(options);
         } catch (error) {
-            console.error('Razorpay Order Creation Error:', error);
+            this.logger.error('Razorpay Order Creation Error:', error);
             throw new InternalServerErrorException('Failed to create Razorpay order');
+        }
+    }
+
+    async getPaymentDetails(paymentId: string) {
+        try {
+            return await this.razorpay.payments.fetch(paymentId);
+        } catch (error) {
+            this.logger.error(`Razorpay Payment Fetch Error for ${paymentId}:`, error);
+            throw new InternalServerErrorException('Failed to fetch payment details from Razorpay');
         }
     }
 
@@ -40,11 +50,16 @@ export class RazorpayService {
     }
 
     verifyWebhookSignature(payload: string, signature: string, webhookSecret: string): boolean {
-        const expectedSignature = crypto
-            .createHmac('sha256', webhookSecret)
-            .update(payload)
-            .digest('hex');
+        try {
+            const expectedSignature = crypto
+                .createHmac('sha256', webhookSecret)
+                .update(payload)
+                .digest('hex');
 
-        return expectedSignature === signature;
+            return expectedSignature === signature;
+        } catch (error) {
+            this.logger.error('Razorpay Webhook Signature Verification Error:', error);
+            return false;
+        }
     }
 }

@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { PaymentOrder } from '../../database/entities/payment-order.entity';
@@ -13,6 +13,8 @@ import { MailerService } from '../mailer/mailer.service';
 
 @Injectable()
 export class PaymentService {
+    private readonly logger = new Logger(PaymentService.name);
+
     constructor(
         @InjectRepository(PaymentOrder)
         private readonly orderRepo: Repository<PaymentOrder>,
@@ -70,6 +72,10 @@ export class PaymentService {
             amount: razorpayOrder.amount,
             currency: razorpayOrder.currency,
             key: this.configService.get<string>('RAZORPAY_KEY_ID'),
+            prefill: {
+                name: user.username || 'User',
+                email: user.email,
+            },
         };
     }
 
@@ -95,6 +101,16 @@ export class PaymentService {
             initialOrder.status = PaymentStatus.FAILED;
             await this.orderRepo.save(initialOrder);
             throw new BadRequestException('Invalid payment signature');
+        }
+
+        // Verify Amount
+        const paymentDetails = await this.razorpayService.getPaymentDetails(dto.razorpayPaymentId);
+        const paidAmount = Number(paymentDetails.amount) / 100; // Convert paise to INR
+        if (Math.abs(paidAmount - Number(initialOrder.amount)) > 0.01) {
+            this.logger.error(`Amount mismatch for order ${initialOrder.id}. Expected: ${initialOrder.amount}, Paid: ${paidAmount}`);
+            initialOrder.status = PaymentStatus.FAILED;
+            await this.orderRepo.save(initialOrder);
+            throw new BadRequestException('Payment amount mismatch');
         }
 
         // Use transaction with pessimistic lock for final update
@@ -135,7 +151,7 @@ export class PaymentService {
                 Number(order.amount),
                 order.coins,
                 order.razorpayOrderId
-            ).catch(err => console.error('Failed to send payment success email:', err));
+            ).catch(err => this.logger.error('Failed to send payment success email:', err));
 
             return {
                 status: 'success',
@@ -145,16 +161,16 @@ export class PaymentService {
         });
     }
 
-    async handleWebhook(payload: any, signature: string) {
+    async handleWebhook(payload: any, signature: string, rawBody?: string) {
         const webhookSecret = this.configService.get<string>('RAZORPAY_WEBHOOK_SECRET');
-        if (!webhookSecret) {
-            console.warn('RAZORPAY_WEBHOOK_SECRET not configured, skipping webhook verification');
+        if (!webhookSecret || !signature || !rawBody) {
+            this.logger.warn('RAZORPAY_WEBHOOK_SECRET not configured or missing signature/body, skipping webhook verification');
             return;
         }
 
-        // Verify Signature
+        // Verify Signature using rawBody
         const isValid = this.razorpayService.verifyWebhookSignature(
-            JSON.stringify(payload),
+            rawBody,
             signature,
             webhookSecret,
         );
@@ -175,7 +191,7 @@ export class PaymentService {
         });
 
         if (!initialOrder) {
-            console.warn(`Webhook received for unknown order: ${razorpayOrderId}`);
+            this.logger.warn(`Webhook received for unknown order: ${razorpayOrderId}`);
             return;
         }
 
@@ -190,8 +206,22 @@ export class PaymentService {
                 });
 
                 if (order && order.status !== PaymentStatus.SUCCESS) {
+                    // Verify Amount from Webhook Payload
+                    const paidAmountInPaise = payload.payload.payment?.entity?.amount;
+                    if (paidAmountInPaise) {
+                        const paidAmount = Number(paidAmountInPaise) / 100;
+                        if (Math.abs(paidAmount - Number(order.amount)) > 0.01) {
+                            this.logger.error(`Webhook Amount mismatch for order ${order.id}. Expected: ${order.amount}, Paid: ${paidAmount}`);
+                            order.status = PaymentStatus.FAILED;
+                            order.razorpayPaymentId = razorpayPaymentId;
+                            await manager.save(order);
+                            return;
+                        }
+                    }
+
                     order.status = PaymentStatus.SUCCESS;
                     order.razorpayPaymentId = razorpayPaymentId;
+                    order.razorpaySignature = signature; // Store webhook signature/header for record
                     await manager.save(order);
 
                     await this.walletService.credit(
@@ -214,14 +244,14 @@ export class PaymentService {
                         Number(order.amount),
                         order.coins,
                         order.razorpayOrderId
-                    ).catch(err => console.error('Failed to send payment success email (webhook):', err));
+                    ).catch(err => this.logger.error('Failed to send payment success email (webhook):', err));
                 }
             });
         } else if (event === RazorpayWebhookEvent.PAYMENT_FAILED) {
             initialOrder.status = PaymentStatus.FAILED;
             initialOrder.razorpayPaymentId = razorpayPaymentId;
             await this.orderRepo.save(initialOrder);
-            console.log(`Payment failed for order ${razorpayOrderId}`);
+            this.logger.log(`Payment failed for order ${razorpayOrderId}`);
         }
     }
 
