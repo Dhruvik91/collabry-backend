@@ -117,7 +117,6 @@ export class PaymentService {
         return await this.dataSource.transaction(async (manager) => {
             const order = await manager.findOne(PaymentOrder, {
                 where: { id: initialOrder.id },
-                relations: ['user'],
                 lock: { mode: 'pessimistic_write' },
             });
 
@@ -147,8 +146,8 @@ export class PaymentService {
 
             // Send Success Email
             void this.mailerService.sendPaymentSuccessEmail(
-                order.user.email,
-                order.user.username || 'User',
+                initialOrder.user.email,
+                initialOrder.user.username || 'User',
                 Number(order.amount),
                 order.coins,
                 order.razorpayOrderId
@@ -198,7 +197,6 @@ export class PaymentService {
                 return await this.dataSource.transaction(async (manager) => {
                     const lockedOrder = await manager.findOne(PaymentOrder, {
                         where: { id: order.id },
-                        relations: ['user'],
                         lock: { mode: 'pessimistic_write' },
                     });
 
@@ -209,7 +207,7 @@ export class PaymentService {
                         await manager.save(lockedOrder);
 
                         await this.walletService.credit(
-                            lockedOrder.user.id,
+                            order.user.id,
                             lockedOrder.coins,
                             TransactionPurpose.KCOIN_TOPUP,
                             { paymentOrderId: lockedOrder.id, via: 'manual_sync' },
@@ -280,7 +278,6 @@ export class PaymentService {
                 await this.dataSource.transaction(async (manager) => {
                     const order = await manager.findOne(PaymentOrder, {
                         where: { id: initialOrder.id },
-                        relations: ['user'],
                         lock: { mode: 'pessimistic_write' },
                     });
 
@@ -305,7 +302,7 @@ export class PaymentService {
                         await manager.save(order);
 
                         await this.walletService.credit(
-                            order.user.id,
+                            initialOrder.user.id,
                             order.coins,
                             TransactionPurpose.KCOIN_TOPUP,
                             {
@@ -319,8 +316,8 @@ export class PaymentService {
 
                         // Send Success Email
                         void this.mailerService.sendPaymentSuccessEmail(
-                            order.user.email,
-                            order.user.username || 'User',
+                            initialOrder.user.email,
+                            initialOrder.user.username || 'User',
                             Number(order.amount),
                             order.coins,
                             order.razorpayOrderId
