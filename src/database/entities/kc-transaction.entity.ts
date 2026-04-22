@@ -9,6 +9,7 @@ export class KCTransaction {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
+    @ApiProperty({ type: () => Wallet })
     @ManyToOne(() => Wallet)
     @Index()
     wallet: Wallet;

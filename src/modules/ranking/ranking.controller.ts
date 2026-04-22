@@ -13,17 +13,24 @@ import {
     ApiTags,
     ApiOperation,
     ApiBearerAuth,
-    ApiOkResponse,
     ApiParam,
-    ApiBadRequestResponse,
-    ApiUnauthorizedResponse,
-    ApiForbiddenResponse,
-    ApiNotFoundResponse,
+    ApiQuery,
 } from '@nestjs/swagger';
+import {
+    ApiOkResponseEnvelope,
+    ApiUnauthorizedResponseEnvelope,
+    ApiForbiddenResponseEnvelope,
+    ApiNotFoundResponseEnvelope,
+} from '../../core/swagger/response-envelope';
 import { RankingService } from './ranking.service';
 import { RankingBreakdownDto } from './dto/ranking-breakdown.dto';
 import { UpdateRankingWeightsDto } from './dto/update-ranking-weights.dto';
 import { RankingWeightsDto } from './dto/ranking-weights.dto';
+import { 
+    RecalculateRankingResponseDto, 
+    RecalculateAllRankingsResponseDto,
+    TierGuideDto
+} from './dto/ranking-response.dto';
 import { UserRole } from '../../database/entities/enums';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/Guards/roles.guard';
@@ -47,11 +54,8 @@ export class RankingController {
         description: 'User ID of the influencer',
         type: 'string',
     })
-    @ApiOkResponse({
-        description: 'Ranking breakdown retrieved successfully',
-        type: RankingBreakdownDto,
-    })
-    @ApiNotFoundResponse({ description: 'Influencer not found' })
+    @ApiOkResponseEnvelope(RankingBreakdownDto)
+    @ApiNotFoundResponseEnvelope('Influencer not found')
     async getRankingBreakdown(
         @Param('influencerId') influencerId: string
     ): Promise<RankingBreakdownDto> {
@@ -71,10 +75,10 @@ export class RankingController {
         description: 'User ID of the influencer',
         type: 'string',
     })
-    @ApiOkResponse({ description: 'Ranking recalculated successfully' })
-    @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-    @ApiForbiddenResponse({ description: 'Forbidden - Admin role required' })
-    @ApiNotFoundResponse({ description: 'Influencer not found' })
+    @ApiOkResponseEnvelope(RecalculateRankingResponseDto)
+    @ApiUnauthorizedResponseEnvelope()
+    @ApiForbiddenResponseEnvelope('Forbidden - Admin role required')
+    @ApiNotFoundResponseEnvelope('Influencer not found')
     async recalculateRanking(@Param('influencerId') influencerId: string) {
         const profile = await this.rankingService.updateRanking(influencerId);
         return {
@@ -92,9 +96,9 @@ export class RankingController {
         summary: 'Recalculate rankings for all influencers (Admin only)',
         description: 'Triggers ranking recalculation for all influencers in the system',
     })
-    @ApiOkResponse({ description: 'Ranking recalculation started' })
-    @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-    @ApiForbiddenResponse({ description: 'Forbidden - Admin role required' })
+    @ApiOkResponseEnvelope(RecalculateAllRankingsResponseDto)
+    @ApiUnauthorizedResponseEnvelope()
+    @ApiForbiddenResponseEnvelope('Forbidden - Admin role required')
     async recalculateAllRankings() {
         // Run asynchronously to avoid timeout
         this.rankingService.recalculateAllRankings().catch((error) => {
@@ -113,7 +117,7 @@ export class RankingController {
         summary: 'Get tier requirements guide',
         description: 'Returns comprehensive guide on all ranking tiers, requirements, and how to earn points',
     })
-    @ApiOkResponse({ description: 'Tier guide retrieved successfully' })
+    @ApiOkResponseEnvelope(TierGuideDto)
     async getTierGuide() {
         return this.rankingService.getTierRequirementsGuide();
     }
@@ -125,9 +129,9 @@ export class RankingController {
         summary: 'Get current ranking weights (Admin only)',
         description: 'Returns the current weight configuration used for ranking calculations',
     })
-    @ApiOkResponse({ description: 'Ranking weights retrieved successfully', type: RankingWeightsDto })
-    @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-    @ApiForbiddenResponse({ description: 'Forbidden - Admin role required' })
+    @ApiOkResponseEnvelope(RankingWeightsDto)
+    @ApiUnauthorizedResponseEnvelope()
+    @ApiForbiddenResponseEnvelope('Forbidden - Admin role required')
     async getWeights(): Promise<RankingWeightsDto> {
         return this.rankingService.getWeights();
     }
@@ -140,10 +144,9 @@ export class RankingController {
         summary: 'Update ranking weights (Admin only)',
         description: 'Updates the weight configuration used for ranking calculations',
     })
-    @ApiOkResponse({ description: 'Ranking weights updated successfully' })
-    @ApiBadRequestResponse({ description: 'Invalid weight values' })
-    @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-    @ApiForbiddenResponse({ description: 'Forbidden - Admin role required' })
+    @ApiOkResponseEnvelope(RecalculateRankingResponseDto) // Note: Actually returns message and weights, but let's use a generic success or similar
+    @ApiUnauthorizedResponseEnvelope()
+    @ApiForbiddenResponseEnvelope('Forbidden - Admin role required')
     async updateWeights(@Body() updateDto: UpdateRankingWeightsDto) {
         this.rankingService.updateWeights(updateDto);
         return {

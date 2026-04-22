@@ -1,6 +1,13 @@
 import { Controller, Get, Post, Patch, Body, Req, Query, Param, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import {
+    ApiOkResponseEnvelope,
+    ApiBadRequestResponseEnvelope,
+    ApiUnauthorizedResponseEnvelope,
+    ApiForbiddenResponseEnvelope,
+    ApiNotFoundResponseEnvelope,
+} from '../../core/swagger/response-envelope';
 import { InfluencerService } from './influencer.service';
 import { SaveInfluencerProfileDto } from './dto/save-influencer-profile.dto';
 import { SearchInfluencersDto } from './dto/search-influencers.dto';
@@ -21,7 +28,9 @@ export class InfluencerController {
     @Roles(UserRole.INFLUENCER, UserRole.ADMIN)
     @Get('profile')
     @ApiOperation({ summary: 'Get current user influencer profile' })
-    @ApiOkResponse({ description: 'Returns the influencer profile', type: InfluencerProfile })
+    @ApiOkResponseEnvelope(InfluencerProfile)
+    @ApiUnauthorizedResponseEnvelope()
+    @ApiNotFoundResponseEnvelope('Influencer profile not found')
     async getProfile(@Req() req: any) {
         return this.influencerService.getInfluencerProfile(req.user.id);
     }
@@ -31,7 +40,9 @@ export class InfluencerController {
     @Post('profile')
     @Throttle({ default: { limit: 10, ttl: 60000 } })
     @ApiOperation({ summary: 'Create current user influencer profile' })
-    @ApiOkResponse({ description: 'Influencer profile created successfully', type: InfluencerProfile })
+    @ApiOkResponseEnvelope(InfluencerProfile)
+    @ApiUnauthorizedResponseEnvelope()
+    @ApiForbiddenResponseEnvelope('Only influencers can have a profile')
     async createProfile(@Req() req: any, @Body() saveDto: SaveInfluencerProfileDto) {
         return this.influencerService.saveInfluencerProfile(req.user.id, saveDto);
     }
@@ -41,7 +52,9 @@ export class InfluencerController {
     @Patch('profile')
     @Throttle({ default: { limit: 10, ttl: 60000 } })
     @ApiOperation({ summary: 'Update current user influencer profile' })
-    @ApiOkResponse({ description: 'Influencer profile updated successfully', type: InfluencerProfile })
+    @ApiOkResponseEnvelope(InfluencerProfile)
+    @ApiUnauthorizedResponseEnvelope()
+    @ApiForbiddenResponseEnvelope('Only influencers can have a profile')
     async updateProfile(@Req() req: any, @Body() saveDto: SaveInfluencerProfileDto) {
         return this.influencerService.saveInfluencerProfile(req.user.id, saveDto);
     }
@@ -49,7 +62,8 @@ export class InfluencerController {
     @AllowUnauthorized()
     @Get('search')
     @ApiOperation({ summary: 'Search influencers' })
-    @ApiOkResponse({ description: 'Returns a paginated list of influencers' })
+    @ApiOkResponseEnvelope(InfluencerProfile, true)
+    @ApiBadRequestResponseEnvelope('Invalid query parameters')
     async search(@Query() searchDto: SearchInfluencersDto) {
         return this.influencerService.searchInfluencers(searchDto);
     }
@@ -57,7 +71,8 @@ export class InfluencerController {
     @AllowUnauthorized()
     @Get(':id')
     @ApiOperation({ summary: 'Get a specific influencer profile by ID' })
-    @ApiOkResponse({ description: 'Returns the influencer profile', type: InfluencerProfile })
+    @ApiOkResponseEnvelope(InfluencerProfile)
+    @ApiNotFoundResponseEnvelope('Influencer profile not found')
     async getInfluencer(@Param('id') id: string) {
         return this.influencerService.getInfluencerById(id);
     }

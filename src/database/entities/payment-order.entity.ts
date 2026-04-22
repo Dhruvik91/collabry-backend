@@ -10,6 +10,7 @@ export class PaymentOrder {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
+    @ApiProperty({ type: () => User })
     @ManyToOne(() => User)
     @Index()
     user: User;
@@ -55,6 +56,7 @@ export class PaymentOrder {
     @Column({ type: 'jsonb', nullable: true })
     metadata: any;
 
+    @ApiProperty()
     @CreateDateColumn()
     createdAt: Date;
 

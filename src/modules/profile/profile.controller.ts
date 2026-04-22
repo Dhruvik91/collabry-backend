@@ -1,6 +1,11 @@
 import { Controller, Get, Patch, Post, Body, Req, Query, Param, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import {
+    ApiOkResponseEnvelope,
+    ApiUnauthorizedResponseEnvelope,
+    ApiNotFoundResponseEnvelope,
+} from '../../core/swagger/response-envelope';
 import { ProfileService } from './profile.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { SaveProfileDto } from './dto/save-profile.dto';
@@ -22,7 +27,9 @@ export class ProfileController {
     @Roles(UserRole.USER, UserRole.INFLUENCER, UserRole.ADMIN)
     @Get()
     @ApiOperation({ summary: 'Get current user profile' })
-    @ApiOkResponse({ description: 'Returns the user profile', type: Profile })
+    @ApiOkResponseEnvelope(Profile)
+    @ApiUnauthorizedResponseEnvelope()
+    @ApiNotFoundResponseEnvelope('Profile not found')
     async getProfile(@Req() req: any) {
         return this.profileService.getProfile(req.user.id);
     }
@@ -32,7 +39,8 @@ export class ProfileController {
     @Post()
     @Throttle({ default: { limit: 10, ttl: 60000 } })
     @ApiOperation({ summary: 'Create or update current user profile' })
-    @ApiOkResponse({ description: 'Profile saved successfully', type: Profile })
+    @ApiOkResponseEnvelope(Profile)
+    @ApiUnauthorizedResponseEnvelope()
     async saveProfile(@Req() req: any, @Body() saveDto: SaveProfileDto) {
         return this.profileService.saveProfile(req.user.id, saveDto);
     }
@@ -42,7 +50,8 @@ export class ProfileController {
     @Patch()
     @Throttle({ default: { limit: 10, ttl: 60000 } })
     @ApiOperation({ summary: 'Update current user profile' })
-    @ApiOkResponse({ description: 'Profile updated successfully', type: Profile })
+    @ApiOkResponseEnvelope(Profile)
+    @ApiUnauthorizedResponseEnvelope()
     async updateProfile(@Req() req: any, @Body() updateDto: UpdateProfileDto) {
         return this.profileService.updateProfile(req.user.id, updateDto);
     }
@@ -50,7 +59,7 @@ export class ProfileController {
     @AllowUnauthorized()
     @Get('search')
     @ApiOperation({ summary: 'Search profiles' })
-    @ApiOkResponse({ description: 'Returns a paginated list of profiles' }) // Paginated response is harder to type without a generic wrapper
+    @ApiOkResponseEnvelope(Profile, true)
     async search(@Query() searchDto: SearchProfilesDto) {
         return this.profileService.searchProfiles(searchDto);
     }
@@ -58,6 +67,8 @@ export class ProfileController {
     @AllowUnauthorized()
     @Get('brand/:id')
     @ApiOperation({ summary: 'Get professional brand profile with stats' })
+    @ApiOkResponseEnvelope(Profile)
+    @ApiNotFoundResponseEnvelope('Brand profile not found')
     async getBrandProfile(@Param('id') id: string) {
         return this.profileService.getBrandProfile(id);
     }
@@ -65,7 +76,8 @@ export class ProfileController {
     @AllowUnauthorized()
     @Get(':id')
     @ApiOperation({ summary: 'Get a specific profile by ID' })
-    @ApiOkResponse({ description: 'Returns the profile', type: Profile })
+    @ApiOkResponseEnvelope(Profile)
+    @ApiNotFoundResponseEnvelope('Profile not found')
     async getProfileById(@Param('id') id: string) {
         return this.profileService.getProfileById(id);
     }

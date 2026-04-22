@@ -12,12 +12,13 @@ export class Wallet {
     @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
     balance: number;
 
-    @ApiProperty()
+    @ApiProperty({ type: () => User })
     @OneToOne(() => User, (user) => user.wallet)
     @JoinColumn()
     @Index()
     user: User;
 
+    @ApiProperty()
     @CreateDateColumn()
     createdAt: Date;
 

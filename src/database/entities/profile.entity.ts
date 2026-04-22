@@ -17,6 +17,7 @@ export class Profile {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
+    @ApiProperty({ type: () => User })
     @OneToOne(() => User, (user) => user.profile, { onDelete: 'CASCADE' })
     @JoinColumn()
     user: User;
@@ -46,6 +47,7 @@ export class Profile {
     @Column({ type: 'jsonb', nullable: true })
     socialLinks: any;
 
+    @ApiProperty()
     @CreateDateColumn()
     createdAt: Date;
 

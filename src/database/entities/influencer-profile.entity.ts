@@ -21,6 +21,7 @@ export class InfluencerProfile {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
+    @ApiProperty({ type: () => User })
     @OneToOne(() => User, (user) => user.influencerProfile, { onDelete: 'CASCADE' })
     @JoinColumn()
     user: User;
@@ -135,9 +136,11 @@ export class InfluencerProfile {
     @Column({ nullable: true })
     rankingTier: string;
 
+    @ApiProperty({ type: () => [Collaboration] })
     @OneToMany(() => Collaboration, (collaboration) => collaboration.influencer)
     collaborations: Collaboration[];
 
+    @ApiProperty()
     @CreateDateColumn()
     createdAt: Date;
 

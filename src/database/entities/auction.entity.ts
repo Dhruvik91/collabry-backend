@@ -58,11 +58,13 @@ export class Auction {
     })
     category: CollaborationType;
 
+    @ApiProperty({ type: () => User })
     @Index()
     @ManyToOne(() => User)
     @JoinColumn({ name: 'creatorId' })
     creator: User;
 
+    @ApiProperty({ type: () => [Bid] })
     @OneToMany(() => Bid, (bid) => (bid as any).auction)
     bids: Bid[];
 

@@ -60,9 +60,11 @@ export class User {
     @Column({ nullable: true, select: false })
     otpExpires: Date;
 
+    @ApiProperty({ type: () => Profile })
     @OneToOne(() => Profile, (profile) => profile.user, { cascade: true })
     profile: Profile;
 
+    @ApiProperty({ type: () => InfluencerProfile })
     @OneToOne(() => InfluencerProfile, (profile) => profile.user)
     influencerProfile: InfluencerProfile;
 
@@ -76,6 +78,7 @@ export class User {
     @Index()
     referredBy: string;
 
+    @ApiProperty({ type: () => Wallet })
     @OneToOne(() => Wallet, (wallet) => wallet.user, { cascade: true })
     wallet: Wallet;
 

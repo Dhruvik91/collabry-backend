@@ -1,10 +1,15 @@
 import { Controller, Get, UseGuards, Query, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+    ApiOkResponseEnvelope,
+    ApiUnauthorizedResponseEnvelope,
+} from '../../core/swagger/response-envelope';
 import { TransactionService } from './transaction.service';
 import { UserRole, TransactionType, TransactionPurpose } from '../../database/entities/enums';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/Guards/roles.guard';
 import { JwtAuthGuard } from '../auth/Guards/jwt-guard';
+import { KCTransaction } from '../../database/entities/kc-transaction.entity';
 
 @ApiTags('KC Coins')
 @ApiBearerAuth()
@@ -19,6 +24,8 @@ export class TransactionController {
     @ApiQuery({ name: 'limit', required: false, type: Number })
     @ApiQuery({ name: 'type', required: false, enum: TransactionType })
     @ApiQuery({ name: 'purpose', required: false, enum: TransactionPurpose })
+    @ApiOkResponseEnvelope(KCTransaction, true)
+    @ApiUnauthorizedResponseEnvelope()
     async getMyHistory(
         @Req() req: any,
         @Query('page') page?: number,
@@ -36,6 +43,8 @@ export class TransactionController {
     @ApiQuery({ name: 'limit', required: false, type: Number })
     @ApiQuery({ name: 'type', required: false, enum: TransactionType })
     @ApiQuery({ name: 'purpose', required: false, enum: TransactionPurpose })
+    @ApiOkResponseEnvelope(KCTransaction, true)
+    @ApiUnauthorizedResponseEnvelope()
     async getAllTransactions(
         @Query('page') page?: number,
         @Query('limit') limit?: number,

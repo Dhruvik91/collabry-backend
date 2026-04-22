@@ -22,11 +22,13 @@ export class Collaboration {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
+    @ApiProperty({ type: () => User })
     @Index()
     @ManyToOne(() => User)
     @JoinColumn({ name: 'requesterId' })
     requester: User;
 
+    @ApiProperty({ type: () => InfluencerProfile })
     @Index()
     @ManyToOne(() => InfluencerProfile)
     @JoinColumn({ name: 'influencerId' })
@@ -65,6 +67,7 @@ export class Collaboration {
     @Column({ type: 'date', nullable: true })
     endDate: Date;
 
+    @ApiProperty({ type: () => Review })
     @OneToOne(() => Review, (review) => review.collaboration)
     review: Review;
 
