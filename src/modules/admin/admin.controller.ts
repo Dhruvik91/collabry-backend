@@ -73,8 +73,8 @@ export class AdminController {
 
     @Patch('users/:id/verify')
     @ApiOperation({ summary: 'Directly verify/unverify influencer' })
-    async verifyInfluencer(@Param('id') id: string, @Body('isVerified') isVerified: boolean) {
-        return this.adminService.verifyInfluencer(id, isVerified);
+    async verifyInfluencer(@Param('id') id: string, @Body('verified') verified: boolean) {
+        return this.adminService.verifyInfluencer(id, verified);
     }
 
     // --- Reports ---

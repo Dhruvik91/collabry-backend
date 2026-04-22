@@ -428,7 +428,7 @@ export class AdminService {
         return await query.getMany();
     }
     async getAllOrders(filters: AdminOrderFilterDto) {
-        const { page = 1, limit = 20, status, userId, planId, startDate, endDate } = filters;
+        const { page = 1, limit = 20, status, userId, planId, startDate, endDate, search } = filters;
         const query = this.orderRepo.createQueryBuilder('order')
             .leftJoinAndSelect('order.user', 'user')
             .leftJoinAndSelect('user.profile', 'profile')
@@ -440,6 +440,14 @@ export class AdminService {
         if (status) query.andWhere('order.status = :status', { status });
         if (userId) query.andWhere('user.id = :userId', { userId });
         if (planId) query.andWhere('plan.id = :planId', { planId });
+
+        if (search) {
+            query.andWhere(
+                '(user.email ILike :search OR user.username ILike :search OR profile.fullName ILike :search)',
+                { search: `%${search}%` }
+            );
+        }
+
         if (startDate && endDate) {
             query.andWhere('order.createdAt BETWEEN :startDate AND :endDate', { 
                 startDate: new Date(startDate), 
@@ -518,7 +526,7 @@ export class AdminService {
     /**
      * Manually update influencer verification status
      */
-    async verifyInfluencer(influencerId: string, isVerified: boolean) {
+    async verifyInfluencer(influencerId: string, verified: boolean) {
         const influencer = await this.userRepo.findOne({ 
             where: { id: influencerId },
             relations: ['influencerProfile'] 
@@ -532,9 +540,9 @@ export class AdminService {
         // But for "God Mode" we update the profile directly
         return await this.userRepo.query(`
             UPDATE influencer_profiles 
-            SET "isVerified" = $1 
+            SET "verified" = $1 
             WHERE id = $2
-        `, [isVerified, influencer.influencerProfile.id]);
+        `, [verified, influencer.influencerProfile.id]);
     }
 
     /**

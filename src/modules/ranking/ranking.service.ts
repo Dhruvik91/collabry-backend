@@ -83,11 +83,11 @@ export class RankingService {
             }
 
             // Verification status (50 point bonus)
-            const isVerified = influencer.verified || false;
+            const verified = influencer.verified || false;
 
             // --- Simplified Score Calculation ---
             const collaborationScore = completedCollabs;
-            const verificationScore = isVerified ? 50 : 0;
+            const verificationScore = verified ? 50 : 0;
             const totalScore = collaborationScore + verificationScore;
 
             // --- Simplified Tier Determination ---
@@ -102,11 +102,11 @@ export class RankingService {
             };
 
             // Determine tier
-            if (completedCollabs >= 100 && isVerified) {
+            if (completedCollabs >= 100 && verified) {
                 tier = 'Kollabary Icon';
-            } else if (completedCollabs >= 60 && isVerified) {
+            } else if (completedCollabs >= 60 && verified) {
                 tier = 'Elite Creator';
-            } else if (completedCollabs >= 30 && isVerified) {
+            } else if (completedCollabs >= 30 && verified) {
                 tier = 'Pro Influencer';
             } else if (completedCollabs >= 15) {
                 tier = 'Trusted Collaborator';
@@ -122,7 +122,7 @@ export class RankingService {
                 averageRating: { value: 0, score: 0, maxScore: 0 },
                 responseSpeed: { hours: 0, score: 0, maxScore: 0 },
                 completionRate: { percentage: 0, score: 0, maxScore: 0 },
-                verificationBonus: { isVerified, score: verificationScore, maxScore: 50 },
+                verificationBonus: { verified, score: verificationScore, maxScore: 50 },
                 penalties: { 
                     count: 0, 
                     score: 0,
@@ -131,10 +131,10 @@ export class RankingService {
                 totalScore,
                 rankingTier: tier,
                 nextTier: this.getNextTier(tier),
-                tierProgress: this.calculateTierProgress(tier, totalScore, tierRequirements, completedCollabs, 0, 0, 0, isVerified, 0),
+                tierProgress: this.calculateTierProgress(tier, totalScore, tierRequirements, completedCollabs, 0, 0, 0, verified, 0),
                 requirementsMet: {
                     completedCollabs: completedCollabs >= currentTierReqs.minCollabs,
-                    verified: currentTierReqs.verified ? isVerified : true,
+                    verified: currentTierReqs.verified ? verified : true,
                 },
                 tierRequirements: currentTierReqs,
             };
@@ -153,7 +153,7 @@ export class RankingService {
             averageRating: { value: 0, score: 0, maxScore: 0 },
             responseSpeed: { hours: 0, score: 0, maxScore: 0 },
             completionRate: { percentage: 0, score: 0, maxScore: 0 },
-            verificationBonus: { isVerified: false, score: 0, maxScore: 50 },
+            verificationBonus: { verified: false, score: 0, maxScore: 50 },
             penalties: { count: 0, score: 0, breakdown: { cancellations: 0, rejections: 0, reports: 0 } },
             totalScore: 0,
             rankingTier: 'Rising Creator',
@@ -223,7 +223,7 @@ export class RankingService {
         averageRating?: number,
         completionRate?: number,
         avgResponseHours?: number,
-        isVerified?: boolean,
+        verified?: boolean,
         totalPenalties?: number
     ): number {
         const tierOrder = ['Rising Creator', 'Emerging Partner', 'Trusted Collaborator', 'Pro Influencer', 'Elite Creator', 'Kollabary Icon'];
@@ -254,7 +254,7 @@ export class RankingService {
 
         // Verification (binary - 0% or 100%)
         if (nextTierReqs.verified && !currentTierReqs.verified) {
-            progressMetrics.push(isVerified ? 100 : 0);
+            progressMetrics.push(verified ? 100 : 0);
         }
 
         // Return average progress across requirements

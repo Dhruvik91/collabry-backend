@@ -183,6 +183,10 @@ export class UserAuthService {
     if (!match) return null;
     
     // Ensure user is verified/active
+    if (user.status === UserStatus.SUSPENDED) {
+      throw new UnauthorizedException('Your account has been suspended. Please contact support.');
+    }
+    
     if (user.status !== UserStatus.ACTIVE) {
       throw new UnauthorizedException('Please verify your email address before logging in.');
     }

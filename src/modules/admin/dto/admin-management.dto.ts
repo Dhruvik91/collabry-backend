@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsEnum, IsInt, Min, Max, IsArray, IsUUID, IsDateString } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiPropertyOptional, ApiProperty } from '@nestjs/swagger';
 import { UserRole, UserStatus, PaymentStatus } from '../../../database/entities/enums';
 
@@ -15,12 +16,14 @@ export enum DateRangeType {
 export class PaginationDto {
     @ApiPropertyOptional({ default: 1 })
     @IsOptional()
+    @Type(() => Number)
     @IsInt()
     @Min(1)
     page?: number = 1;
 
     @ApiPropertyOptional({ default: 20 })
     @IsOptional()
+    @Type(() => Number)
     @IsInt()
     @Min(1)
     @Max(100)
@@ -52,6 +55,11 @@ export class AdminOrderFilterDto extends PaginationDto {
     @IsOptional()
     @IsDateString()
     endDate?: string;
+
+    @ApiPropertyOptional()
+    @IsOptional()
+    @IsString()
+    search?: string;
 }
 
 export class AdminUserFilterDto extends PaginationDto {
