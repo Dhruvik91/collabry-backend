@@ -93,6 +93,7 @@ export enum RazorpayWebhookEvent {
     PAYMENT_FAILED = 'payment.failed',
     PAYMENT_AUTHORIZED = 'payment.authorized',
     ORDER_PAID = 'order.paid',
+    REFUND_PROCESSED = 'refund.processed',
 }
 
 export enum TransactionPurpose {

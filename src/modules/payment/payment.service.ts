@@ -129,6 +129,7 @@ export class PaymentService {
             order.status = PaymentStatus.SUCCESS;
             order.razorpayPaymentId = dto.razorpayPaymentId;
             order.razorpaySignature = dto.razorpaySignature;
+            order.metadata = { ...(order.metadata || {}), verify_api_response: paymentDetails };
             await manager.save(order);
 
             // Credit Coins to Wallet
@@ -136,8 +137,8 @@ export class PaymentService {
                 userId,
                 order.coins,
                 TransactionPurpose.KCOIN_TOPUP,
-                { 
-                    paymentOrderId: order.id, 
+                {
+                    paymentOrderId: order.id,
                     razorpayPaymentId: dto.razorpayPaymentId,
                     method: 'api_verify'
                 },
@@ -159,6 +160,82 @@ export class PaymentService {
                 newBalance: (await this.walletService.getWallet(userId)).balance,
             };
         });
+    }
+
+    async cancelOrder(userId: string, orderId: string) {
+        const order = await this.orderRepo.findOne({
+            where: { id: orderId, user: { id: userId } }
+        });
+
+        if (!order) throw new NotFoundException('Order not found');
+        if (order.status !== PaymentStatus.PENDING) {
+            return { status: order.status, message: `Cannot cancel order in ${order.status} status` };
+        }
+
+        order.status = PaymentStatus.CANCELLED;
+        await this.orderRepo.save(order);
+        this.logger.log(`Order ${orderId} cancelled by user ${userId}`);
+        return { status: 'cancelled' };
+    }
+
+    async syncOrderStatus(userId: string, orderId: string) {
+        const order = await this.orderRepo.findOne({
+            where: { id: orderId, user: { id: userId } },
+            relations: ['user']
+        });
+
+        if (!order) throw new NotFoundException('Order not found');
+        if (order.status === PaymentStatus.SUCCESS) return { status: 'success', message: 'Already completed' };
+
+        try {
+            const rzpOrder = await this.razorpayService.fetchOrder(order.razorpayOrderId);
+            const rzpPayments = await this.razorpayService.fetchOrderPayments(order.razorpayOrderId);
+
+            const successfulPayment = rzpPayments?.items?.find((p: any) => p.status === 'captured');
+
+            if (successfulPayment) {
+                // If we found a successful payment, trigger verification logic
+                return await this.dataSource.transaction(async (manager) => {
+                    const lockedOrder = await manager.findOne(PaymentOrder, {
+                        where: { id: order.id },
+                        relations: ['user'],
+                        lock: { mode: 'pessimistic_write' },
+                    });
+
+                    if (lockedOrder && lockedOrder.status !== PaymentStatus.SUCCESS) {
+                        lockedOrder.status = PaymentStatus.SUCCESS;
+                        lockedOrder.razorpayPaymentId = successfulPayment.id;
+                        lockedOrder.metadata = { ...(lockedOrder.metadata || {}), sync_at: new Date(), rzp_payment: successfulPayment };
+                        await manager.save(lockedOrder);
+
+                        await this.walletService.credit(
+                            lockedOrder.user.id,
+                            lockedOrder.coins,
+                            TransactionPurpose.KCOIN_TOPUP,
+                            { paymentOrderId: lockedOrder.id, via: 'manual_sync' },
+                            manager
+                        );
+
+                        return { status: 'success', coinsCredited: lockedOrder.coins };
+                    }
+                    return { status: lockedOrder.status };
+                });
+            }
+
+            // No captured payment found, check if there's a failed one
+            const failedPayment = rzpPayments?.items?.find((p: any) => p.status === 'failed');
+            if (failedPayment && order.status !== PaymentStatus.FAILED) {
+                order.status = PaymentStatus.FAILED;
+                order.metadata = { ...(order.metadata || {}), rzp_sync_failure: failedPayment };
+                await this.orderRepo.save(order);
+                return { status: 'failed', reason: failedPayment.error_description };
+            }
+
+            return { status: order.status, rzpStatus: rzpOrder.status, message: 'No captured payment found yet' };
+        } catch (error) {
+            this.logger.error(`Failed to sync order ${orderId}:`, error);
+            throw new BadRequestException('Failed to sync with payment gateway');
+        }
     }
 
     async handleWebhook(payload: any, signature: string, rawBody?: string) {
@@ -195,63 +272,82 @@ export class PaymentService {
             return;
         }
 
-        if (event === RazorpayWebhookEvent.PAYMENT_CAPTURED || event === RazorpayWebhookEvent.ORDER_PAID) {
-            if (initialOrder.status === PaymentStatus.SUCCESS) return;
+        switch (event) {
+            case RazorpayWebhookEvent.PAYMENT_CAPTURED:
+            case RazorpayWebhookEvent.ORDER_PAID:
+                if (initialOrder.status === PaymentStatus.SUCCESS) return;
 
-            await this.dataSource.transaction(async (manager) => {
-                const order = await manager.findOne(PaymentOrder, {
-                    where: { id: initialOrder.id },
-                    relations: ['user'],
-                    lock: { mode: 'pessimistic_write' },
-                });
+                await this.dataSource.transaction(async (manager) => {
+                    const order = await manager.findOne(PaymentOrder, {
+                        where: { id: initialOrder.id },
+                        relations: ['user'],
+                        lock: { mode: 'pessimistic_write' },
+                    });
 
-                if (order && order.status !== PaymentStatus.SUCCESS) {
-                    // Verify Amount from Webhook Payload
-                    const paidAmountInPaise = payload.payload.payment?.entity?.amount;
-                    if (paidAmountInPaise) {
-                        const paidAmount = Number(paidAmountInPaise) / 100;
-                        if (Math.abs(paidAmount - Number(order.amount)) > 0.01) {
-                            this.logger.error(`Webhook Amount mismatch for order ${order.id}. Expected: ${order.amount}, Paid: ${paidAmount}`);
-                            order.status = PaymentStatus.FAILED;
-                            order.razorpayPaymentId = razorpayPaymentId;
-                            await manager.save(order);
-                            return;
+                    if (order && order.status !== PaymentStatus.SUCCESS) {
+                        // Verify Amount from Webhook Payload
+                        const paidAmountInPaise = payload.payload.payment?.entity?.amount;
+                        if (paidAmountInPaise) {
+                            const paidAmount = Number(paidAmountInPaise) / 100;
+                            if (Math.abs(paidAmount - Number(order.amount)) > 0.01) {
+                                this.logger.error(`Webhook Amount mismatch for order ${order.id}. Expected: ${order.amount}, Paid: ${paidAmount}`);
+                                order.status = PaymentStatus.FAILED;
+                                order.razorpayPaymentId = razorpayPaymentId;
+                                await manager.save(order);
+                                return;
+                            }
                         }
+
+                        order.status = PaymentStatus.SUCCESS;
+                        order.razorpayPaymentId = razorpayPaymentId;
+                        order.razorpaySignature = signature; // Store webhook signature/header for record
+                        order.metadata = { ...(order.metadata || {}), webhook_last_event: event, webhook_payload: payload };
+                        await manager.save(order);
+
+                        await this.walletService.credit(
+                            order.user.id,
+                            order.coins,
+                            TransactionPurpose.KCOIN_TOPUP,
+                            {
+                                paymentOrderId: order.id,
+                                razorpayPaymentId,
+                                via: 'webhook',
+                                event: event
+                            },
+                            manager,
+                        );
+
+                        // Send Success Email
+                        void this.mailerService.sendPaymentSuccessEmail(
+                            order.user.email,
+                            order.user.username || 'User',
+                            Number(order.amount),
+                            order.coins,
+                            order.razorpayOrderId
+                        ).catch(err => this.logger.error('Failed to send payment success email (webhook):', err));
                     }
-
-                    order.status = PaymentStatus.SUCCESS;
-                    order.razorpayPaymentId = razorpayPaymentId;
-                    order.razorpaySignature = signature; // Store webhook signature/header for record
-                    await manager.save(order);
-
-                    await this.walletService.credit(
-                        order.user.id,
-                        order.coins,
-                        TransactionPurpose.KCOIN_TOPUP,
-                        { 
-                            paymentOrderId: order.id, 
-                            razorpayPaymentId, 
-                            via: 'webhook',
-                            event: event
-                        },
-                        manager,
-                    );
-
-                    // Send Success Email
-                    void this.mailerService.sendPaymentSuccessEmail(
-                        order.user.email,
-                        order.user.username || 'User',
-                        Number(order.amount),
-                        order.coins,
-                        order.razorpayOrderId
-                    ).catch(err => this.logger.error('Failed to send payment success email (webhook):', err));
-                }
-            });
-        } else if (event === RazorpayWebhookEvent.PAYMENT_FAILED) {
-            initialOrder.status = PaymentStatus.FAILED;
-            initialOrder.razorpayPaymentId = razorpayPaymentId;
-            await this.orderRepo.save(initialOrder);
-            this.logger.log(`Payment failed for order ${razorpayOrderId}`);
+                });
+                break;
+            case RazorpayWebhookEvent.PAYMENT_FAILED:
+                initialOrder.status = PaymentStatus.FAILED;
+                initialOrder.razorpayPaymentId = razorpayPaymentId;
+                initialOrder.metadata = {
+                    ...(initialOrder.metadata || {}),
+                    failure_reason: payload.payload.payment?.entity?.error_description,
+                    failure_code: payload.payload.payment?.entity?.error_code,
+                    webhook_payload: payload
+                };
+                await this.orderRepo.save(initialOrder);
+                this.logger.log(`Payment failed for order ${razorpayOrderId}: ${initialOrder.metadata.failure_reason}`);
+                break;
+            case RazorpayWebhookEvent.REFUND_PROCESSED:
+                initialOrder.metadata = { ...(initialOrder.metadata || {}), last_webhook_event: event, refund_payload: payload };
+                await this.orderRepo.save(initialOrder);
+                this.logger.warn(`Refund processed for order ${razorpayOrderId}. Manual intervention may be required.`);
+                break;
+            default:
+                this.logger.log(`Webhook received for unhandled event: ${event}`);
+                break;
         }
     }
 

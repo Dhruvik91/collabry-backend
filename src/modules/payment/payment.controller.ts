@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Req, Get, Query } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Req, Get, Query, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { PaymentService } from './payment.service';
 import { InitiateTopUpDto, VerifyPaymentDto } from './dto/payment.dto';
@@ -33,6 +33,20 @@ export class PaymentController {
     @ApiOperation({ summary: 'Get my top-up orders' })
     async getMyOrders(@Req() req: any, @Query('page') page = 1, @Query('limit') limit = 20) {
         return await this.paymentService.getMyOrders(req.user.id, Number(page), Number(limit));
+    }
+
+    @Post('top-up/cancel/:orderId')
+    @Roles(UserRole.USER, UserRole.INFLUENCER)
+    @ApiOperation({ summary: 'Cancel a pending KC coin top-up order' })
+    async cancelOrder(@Req() req: any, @Param('orderId') orderId: string) {
+        return await this.paymentService.cancelOrder(req.user.id, orderId);
+    }
+
+    @Post('top-up/sync/:orderId')
+    @Roles(UserRole.USER, UserRole.INFLUENCER)
+    @ApiOperation({ summary: 'Sync a pending order with Razorpay' })
+    async syncOrder(@Req() req: any, @Param('orderId') orderId: string) {
+        return await this.paymentService.syncOrderStatus(req.user.id, orderId);
     }
 
     @Post('webhook/razorpay')

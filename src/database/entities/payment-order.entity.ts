@@ -51,6 +51,10 @@ export class PaymentOrder {
     @Column({ type: 'int' })
     coins: number;
 
+    @ApiProperty()
+    @Column({ type: 'jsonb', nullable: true })
+    metadata: any;
+
     @CreateDateColumn()
     createdAt: Date;
 

@@ -39,6 +39,24 @@ export class RazorpayService {
         }
     }
 
+    async fetchOrder(orderId: string) {
+        try {
+            return await this.razorpay.orders.fetch(orderId);
+        } catch (error) {
+            this.logger.error(`Razorpay Order Fetch Error for ${orderId}:`, error);
+            throw new InternalServerErrorException('Failed to fetch order from Razorpay');
+        }
+    }
+
+    async fetchOrderPayments(orderId: string) {
+        try {
+            return await this.razorpay.orders.fetchPayments(orderId);
+        } catch (error) {
+            this.logger.error(`Razorpay Order Payments Fetch Error for ${orderId}:`, error);
+            throw new InternalServerErrorException('Failed to fetch order payments from Razorpay');
+        }
+    }
+
     verifySignature(orderId: string, paymentId: string, signature: string): boolean {
         const secret = this.configService.get<string>('RAZORPAY_KEY_SECRET');
         const generatedSignature = crypto
