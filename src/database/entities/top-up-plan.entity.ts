@@ -20,6 +20,10 @@ export class TopUpPlan {
     coins: number;
 
     @ApiProperty()
+    @Column({ type: 'int', default: 0 })
+    bonusCoins: number;
+
+    @ApiProperty()
     @Column({ default: true })
     isActive: boolean;
 

@@ -71,7 +71,7 @@ export class InfluencerController {
     }
 
     @ApiBearerAuth()
-    @Roles(UserRole.INFLUENCER)
+    @Roles(UserRole.INFLUENCER, UserRole.USER)
     @Get(':id')
     @ApiOperation({ summary: 'Get a specific influencer profile by ID' })
     @ApiOkResponseEnvelope(InfluencerProfile)

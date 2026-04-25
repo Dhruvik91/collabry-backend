@@ -17,6 +17,12 @@ export class CreateTopUpPlanDto {
     coins: number;
 
     @ApiProperty()
+    @IsNumber()
+    @IsOptional()
+    @Min(0)
+    bonusCoins?: number;
+
+    @ApiProperty()
     @IsOptional()
     @IsBoolean()
     isActive?: boolean;
@@ -39,6 +45,12 @@ export class UpdateTopUpPlanDto {
     @IsNumber()
     @Min(1)
     coins?: number;
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsNumber()
+    @Min(0)
+    bonusCoins?: number;
 
     @ApiProperty({ required: false })
     @IsOptional()
