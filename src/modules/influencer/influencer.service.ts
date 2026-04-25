@@ -306,4 +306,19 @@ export class InfluencerService {
             throw error;
         }
     }
+
+    async updateUserStatus(userId: string, status: UserStatus): Promise<User> {
+        const user = await this.userRepo.findOneBy({ id: userId });
+        if (!user) throw new NotFoundException('User not found');
+
+        user.status = status;
+        return this.userRepo.save(user);
+    }
+
+    async deleteAccount(userId: string): Promise<void> {
+        const user = await this.userRepo.findOneBy({ id: userId });
+        if (!user) throw new NotFoundException('User not found');
+
+        await this.userRepo.softDelete(userId);
+    }
 }

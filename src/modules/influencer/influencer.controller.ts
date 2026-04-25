@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Req, Query, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Req, Query, Param, UseGuards, Delete } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import {
@@ -16,7 +16,8 @@ import { InfluencerProfile } from '../../database/entities/influencer-profile.en
 import { JwtAuthGuard } from '../auth/Guards/jwt-guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/Guards/roles.guard';
-import { UserRole } from '../../database/entities/enums';
+import { UserRole, UserStatus } from '../../database/entities/enums';
+import { User } from '../../database/entities/user.entity';
 
 @ApiTags('Influencer')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -68,12 +69,33 @@ export class InfluencerController {
         return this.influencerService.searchInfluencers(searchDto);
     }
 
-    @AllowUnauthorized()
+    @ApiBearerAuth()
+    @Roles(UserRole.INFLUENCER)
     @Get(':id')
     @ApiOperation({ summary: 'Get a specific influencer profile by ID' })
     @ApiOkResponseEnvelope(InfluencerProfile)
     @ApiNotFoundResponseEnvelope('Influencer profile not found')
     async getInfluencer(@Param('id') id: string) {
         return this.influencerService.getInfluencerById(id);
+    }
+
+    @ApiBearerAuth()
+    @Roles(UserRole.INFLUENCER)
+    @Patch('status')
+    @ApiOperation({ summary: 'Update current user status (Active/Inactive)' })
+    @ApiOkResponseEnvelope(User)
+    @ApiUnauthorizedResponseEnvelope()
+    async updateStatus(@Req() req: any, @Body('status') status: UserStatus) {
+        return this.influencerService.updateUserStatus(req.user.id, status);
+    }
+
+    @ApiBearerAuth()
+    @Roles(UserRole.INFLUENCER)
+    @Delete('account')
+    @ApiOperation({ summary: 'Soft delete current user account' })
+    @ApiOkResponseEnvelope(null)
+    @ApiUnauthorizedResponseEnvelope()
+    async deleteAccount(@Req() req: any) {
+        return this.influencerService.deleteAccount(req.user.id);
     }
 }
