@@ -7,6 +7,7 @@ import {
     ApiUnauthorizedResponseEnvelope,
     ApiForbiddenResponseEnvelope,
     ApiNotFoundResponseEnvelope,
+    EmptyResponseDto,
 } from '../../core/swagger/response-envelope';
 import { InfluencerService } from './influencer.service';
 import { SaveInfluencerProfileDto } from './dto/save-influencer-profile.dto';
@@ -93,7 +94,7 @@ export class InfluencerController {
     @Roles(UserRole.INFLUENCER)
     @Delete('account')
     @ApiOperation({ summary: 'Soft delete current user account' })
-    @ApiOkResponseEnvelope(null)
+    @ApiOkResponseEnvelope(EmptyResponseDto)
     @ApiUnauthorizedResponseEnvelope()
     async deleteAccount(@Req() req: any) {
         return this.influencerService.deleteAccount(req.user.id);
