@@ -133,7 +133,8 @@ export class PublicService {
             audienceAgeBrackets: influencer.audienceAgeBrackets,
             audienceTopCountries: influencer.audienceTopCountries,
             minPrice: influencer.minPrice,
-            maxPrice: influencer.maxPrice
+            maxPrice: influencer.maxPrice,
+            collaborationTypes: influencer.collaborationTypes
         } as any;
     }
 
