@@ -162,9 +162,7 @@ export class PaymentService {
     }
 
     async cancelOrder(userId: string, orderId: string) {
-        const order = await this.orderRepo.findOne({
-            where: { id: orderId, user: { id: userId } }
-        });
+        const order = await this.findOrderByIdOrRazorpayId(userId, orderId);
 
         if (!order) throw new NotFoundException('Order not found');
         if (order.status !== PaymentStatus.PENDING) {
@@ -178,10 +176,7 @@ export class PaymentService {
     }
 
     async syncOrderStatus(userId: string, orderId: string) {
-        const order = await this.orderRepo.findOne({
-            where: { id: orderId, user: { id: userId } },
-            relations: ['user']
-        });
+        const order = await this.findOrderByIdOrRazorpayId(userId, orderId, ['user']);
 
         if (!order) throw new NotFoundException('Order not found');
         if (order.status === PaymentStatus.SUCCESS) return { status: 'success', message: 'Already completed' };
@@ -367,5 +362,15 @@ export class PaymentService {
                 totalPages: Math.ceil(total / limit),
             },
         };
+    }
+
+    private async findOrderByIdOrRazorpayId(userId: string, orderId: string, relations: string[] = []) {
+        const isRazorpayId = orderId.startsWith('order_');
+        return await this.orderRepo.findOne({
+            where: isRazorpayId
+                ? { razorpayOrderId: orderId, user: { id: userId } }
+                : { id: orderId, user: { id: userId } },
+            relations: relations.length ? relations : undefined
+        });
     }
 }
