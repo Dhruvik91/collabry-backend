@@ -189,6 +189,12 @@ export class UserAuthService {
     const match = await this.hashing.compare(password, user.passwordHash);
     if (!match) return null;
 
+    // Handle inactive accounts (Deactivated) - Auto-reactivate on login
+    if (user.status === UserStatus.INACTIVE) {
+      user.status = UserStatus.ACTIVE;
+      await this.usersRepo.save(user);
+    }
+
     // Ensure user is verified/active
     if (user.status === UserStatus.SUSPENDED) {
       throw new UnauthorizedException('Your account has been suspended. Please contact support.');

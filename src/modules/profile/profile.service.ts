@@ -1,10 +1,12 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Profile } from '../../database/entities/profile.entity';
+import { User } from '../../database/entities/user.entity';
+import { InfluencerProfile } from '../../database/entities/influencer-profile.entity';
 import { Auction } from '../../database/entities/auction.entity';
 import { Collaboration } from '../../database/entities/collaboration.entity';
-import { AuctionStatus, CollaborationStatus } from '../../database/entities/enums';
+import { AuctionStatus, CollaborationStatus, UserStatus } from '../../database/entities/enums';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { SaveProfileDto } from './dto/save-profile.dto';
 import { SearchProfilesDto } from './dto/search-profiles.dto';
@@ -16,16 +18,22 @@ export class ProfileService {
     constructor(
         @InjectRepository(Profile)
         private readonly profileRepo: Repository<Profile>,
+        @InjectRepository(User)
+        private readonly userRepo: Repository<User>,
+        @InjectRepository(InfluencerProfile)
+        private readonly influencerRepo: Repository<InfluencerProfile>,
         @InjectRepository(Auction)
         private readonly auctionRepo: Repository<Auction>,
         @InjectRepository(Collaboration)
         private readonly collaborationRepo: Repository<Collaboration>,
+        private readonly dataSource: DataSource,
     ) { }
 
     async getProfile(userId: string): Promise<Profile> {
         try {
             const profile = await this.profileRepo.findOne({
                 where: { user: { id: userId } },
+                relations: ['user'],
             });
 
             if (!profile) {
@@ -73,7 +81,8 @@ export class ProfileService {
     async searchProfiles(searchDto: SearchProfilesDto) {
         const { name, username, location, role, page, limit } = searchDto;
         const query = this.profileRepo.createQueryBuilder('profile')
-            .leftJoinAndSelect('profile.user', 'user');
+            .leftJoinAndSelect('profile.user', 'user')
+            .where('user.status = :userStatus', { userStatus: UserStatus.ACTIVE });
 
         if (name) {
             query.andWhere('profile.fullName ILIKE :name', { name: `%${name}%` });
@@ -104,7 +113,7 @@ export class ProfileService {
                 .select('COUNT(collaboration.id)', 'count')
                 .from(Collaboration, 'collaboration')
                 .where('collaboration.requesterId = user.id')
-                .andWhere('collaboration.status = :status', { status: CollaborationStatus.COMPLETED });
+                .andWhere('collaboration.status = :collabStatus', { collabStatus: CollaborationStatus.COMPLETED });
         }, 'completedCollaborations');
 
         const { entities, raw } = await query
@@ -181,5 +190,47 @@ export class ProfileService {
             },
             activeAuctions,
         };
+    }
+
+    async updateStatus(userId: string, status: UserStatus) {
+        const user = await this.userRepo.findOne({ where: { id: userId } });
+        if (!user) throw new NotFoundException('User not found');
+
+        user.status = status;
+        return await this.userRepo.save(user);
+    }
+
+    async deactivateAccount(userId: string) {
+        return this.updateStatus(userId, UserStatus.INACTIVE);
+    }
+
+    async activateAccount(userId: string) {
+        return this.updateStatus(userId, UserStatus.ACTIVE);
+    }
+
+    /**
+     * Soft delete user, profile, and influencer profile
+     */
+    async deleteAccount(userId: string) {
+        return await this.dataSource.transaction(async (manager) => {
+            // Find all related entities
+            const user = await manager.findOne(User, {
+                where: { id: userId },
+                relations: ['profile', 'influencerProfile']
+            });
+
+            if (!user) throw new NotFoundException('User not found');
+
+            // Soft delete in order
+            if (user.influencerProfile) {
+                await manager.softRemove(InfluencerProfile, user.influencerProfile);
+            }
+
+            if (user.profile) {
+                await manager.softRemove(Profile, user.profile);
+            }
+
+            return await manager.softRemove(User, user);
+        });
     }
 }

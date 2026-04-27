@@ -49,6 +49,10 @@ export class Profile {
     socialLinks: any;
 
     @ApiProperty()
+    @Column({ default: false })
+    verified: boolean;
+
+    @ApiProperty()
     @CreateDateColumn()
     createdAt: Date;
 

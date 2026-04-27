@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn, DeleteDateColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
-import { InfluencerProfile } from './influencer-profile.entity';
+import { User } from './user.entity';
 import { VerificationStatus } from './enums';
 
 @Entity('verification_requests')
@@ -9,9 +9,9 @@ export class VerificationRequest {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @ApiProperty({ type: () => InfluencerProfile })
-    @ManyToOne(() => InfluencerProfile)
-    influencerProfile: InfluencerProfile;
+    @ApiProperty({ type: () => User })
+    @ManyToOne(() => User)
+    user: User;
 
     @ApiProperty({ enum: VerificationStatus })
     @Column({

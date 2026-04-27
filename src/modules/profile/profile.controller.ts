@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Post, Body, Req, Query, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Post, Delete, Body, Req, Query, Param, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import {
@@ -6,10 +6,12 @@ import {
     ApiUnauthorizedResponseEnvelope,
     ApiNotFoundResponseEnvelope,
 } from '../../core/swagger/response-envelope';
+import { SuccessResponseDto } from '../../core/dto/message-response.dto';
 import { ProfileService } from './profile.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { SaveProfileDto } from './dto/save-profile.dto';
 import { SearchProfilesDto } from './dto/search-profiles.dto';
+import { UserStatusDto } from './dto/user-status.dto';
 import { AllowUnauthorized } from '../auth/unauthorized/allow-unauthorixed';
 import { Profile } from '../../database/entities/profile.entity';
 import { JwtAuthGuard } from '../auth/Guards/jwt-guard';
@@ -62,6 +64,26 @@ export class ProfileController {
     @ApiOkResponseEnvelope(Profile, true)
     async search(@Query() searchDto: SearchProfilesDto) {
         return this.profileService.searchProfiles(searchDto);
+    }
+
+    @ApiBearerAuth()
+    @Roles(UserRole.USER, UserRole.INFLUENCER, UserRole.ADMIN)
+    @Patch('status')
+    @ApiOperation({ summary: 'Update current user status (Activate/Deactivate)' })
+    @ApiOkResponseEnvelope(SuccessResponseDto)
+    async updateStatus(@Req() req: any, @Body() statusDto: UserStatusDto) {
+        await this.profileService.updateStatus(req.user.id, statusDto.status);
+        return { success: true, message: `Account status updated to ${statusDto.status}` };
+    }
+
+    @ApiBearerAuth()
+    @Roles(UserRole.USER, UserRole.INFLUENCER, UserRole.ADMIN)
+    @Delete()
+    @ApiOperation({ summary: 'Delete current user account' })
+    @ApiOkResponseEnvelope(SuccessResponseDto)
+    async deleteAccount(@Req() req: any) {
+        await this.profileService.deleteAccount(req.user.id);
+        return { success: true, message: 'Account deleted successfully' };
     }
 
     @AllowUnauthorized()

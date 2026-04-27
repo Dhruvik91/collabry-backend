@@ -526,25 +526,36 @@ export class AdminService {
     }
 
     /**
-     * Manually update influencer verification status
+     * Manually update user verification status (Direct Verification)
      */
-    async verifyInfluencer(influencerId: string, verified: boolean) {
-        const influencer = await this.userRepo.findOne({ 
-            where: { id: influencerId },
-            relations: ['influencerProfile'] 
+    async verifyUser(userId: string, verified: boolean) {
+        const user = await this.userRepo.findOne({ 
+            where: { id: userId },
+            relations: ['profile', 'influencerProfile'] 
         });
-        if (!influencer || !influencer.influencerProfile) {
-            throw new Error('Influencer profile not found');
+        if (!user) {
+            throw new Error('User not found');
         }
         
-        // This is a simplified "Direct Verification" as requested
-        // In a real scenario, we might also update the latest VerificationRequest if one exists
-        // But for "God Mode" we update the profile directly
-        return await this.userRepo.query(`
-            UPDATE influencer_profiles 
-            SET "verified" = $1 
-            WHERE id = $2
-        `, [verified, influencer.influencerProfile.id]);
+        // Update main Profile
+        if (user.profile) {
+            await this.userRepo.query(`
+                UPDATE profiles 
+                SET "verified" = $1 
+                WHERE id = $2
+            `, [verified, user.profile.id]);
+        }
+
+        // Update InfluencerProfile if exists
+        if (user.influencerProfile) {
+            await this.userRepo.query(`
+                UPDATE influencer_profiles 
+                SET "verified" = $1 
+                WHERE id = $2
+            `, [verified, user.influencerProfile.id]);
+        }
+        
+        return { message: `User verification status updated to ${verified}` };
     }
 
     /**

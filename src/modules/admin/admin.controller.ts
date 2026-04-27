@@ -109,13 +109,13 @@ export class AdminController {
     }
 
     @Patch('users/:id/verify')
-    @ApiOperation({ summary: 'Directly verify/unverify influencer' })
+    @ApiOperation({ summary: 'Directly verify/unverify any user (God Mode)' })
     @ApiOkResponseEnvelope(SuccessResponseDto)
     @ApiUnauthorizedResponseEnvelope()
     @ApiForbiddenResponseEnvelope()
-    @ApiNotFoundResponseEnvelope('Influencer profile not found')
-    async verifyInfluencer(@Param('id') id: string, @Body('verified') verified: boolean) {
-        await this.adminService.verifyInfluencer(id, verified);
+    @ApiNotFoundResponseEnvelope('User not found')
+    async verifyUser(@Param('id') id: string, @Body('verified') verified: boolean) {
+        await this.adminService.verifyUser(id, verified);
         return { success: true };
     }
 

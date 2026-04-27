@@ -17,7 +17,7 @@ import { VerificationRequest } from '../../database/entities/verification-reques
 @ApiTags('Verification')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.INFLUENCER, UserRole.ADMIN)
+@Roles(UserRole.INFLUENCER, UserRole.ADMIN, UserRole.USER)
 @Controller('v1/verification')
 export class VerificationController {
     constructor(private readonly verificationService: VerificationService) { }
