@@ -31,6 +31,8 @@ import {
 import { PaymentOrder } from '../../database/entities/payment-order.entity';
 import { PaymentStatus } from '../../database/entities/enums';
 import { KCSettingService, KCSettingKey } from '../kc-setting/kc-setting.service';
+import { WalletService } from '../kc-wallet/wallet.service';
+import { TransactionPurpose } from '../../database/entities/enums';
 import { Between, ILike } from 'typeorm';
 
 @Injectable()
@@ -57,6 +59,7 @@ export class AdminService {
         @InjectRepository(PaymentOrder)
         private readonly orderRepo: Repository<PaymentOrder>,
         private readonly settingService: KCSettingService,
+        private readonly walletService: WalletService,
     ) { }
 
     /**
@@ -598,5 +601,17 @@ export class AdminService {
      */
     async updateSetting(key: KCSettingKey, value: number) {
         return await this.settingService.updateSetting(key, value);
+    }
+
+    /**
+     * Add coins directly to a user's wallet (Admin Only)
+     */
+    async addCoinsToUser(userId: string, amount: number) {
+        return await this.walletService.credit(
+            userId,
+            amount,
+            TransactionPurpose.SYSTEM_ADJUSTMENT,
+            { adminAction: true, timestamp: new Date().toISOString() }
+        );
     }
 }

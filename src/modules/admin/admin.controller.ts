@@ -243,4 +243,15 @@ export class AdminController {
     ) {
         return this.adminService.updateSetting(key, value);
     }
+
+    @Post('users/:id/coins')
+    @ApiOperation({ summary: 'Add coins directly to user wallet' })
+    @ApiOkResponseEnvelope(SuccessResponseDto)
+    @ApiUnauthorizedResponseEnvelope()
+    @ApiForbiddenResponseEnvelope()
+    @ApiNotFoundResponseEnvelope('User not found')
+    async addCoins(@Param('id') id: string, @Body('amount') amount: number) {
+        await this.adminService.addCoinsToUser(id, amount);
+        return { success: true };
+    }
 }
