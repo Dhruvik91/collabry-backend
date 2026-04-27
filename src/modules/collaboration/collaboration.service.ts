@@ -4,7 +4,7 @@ import { Repository, In } from 'typeorm';
 import { InfluencerProfile } from '../../database/entities/influencer-profile.entity';
 import { Collaboration } from '../../database/entities/collaboration.entity';
 import { User } from '../../database/entities/user.entity';
-import { MailerService } from '../mailer/mailer.service';
+import { AppMailerService } from '../mailer/mailer.service';
 import { RankingService } from '../ranking/ranking.service';
 import { CreateCollaborationDto } from './dto/create-collaboration.dto';
 import { UpdateCollaborationStatusDto } from './dto/update-collaboration-status.dto';
@@ -25,7 +25,7 @@ export class CollaborationService {
         private readonly userRepo: Repository<User>,
         @InjectRepository(InfluencerProfile)
         private readonly influencerProfileRepo: Repository<InfluencerProfile>,
-        private readonly mailerService: MailerService,
+        private readonly mailerService: AppMailerService,
         private readonly rankingService: RankingService,
         private readonly walletService: WalletService,
         private readonly settingService: KCSettingService,

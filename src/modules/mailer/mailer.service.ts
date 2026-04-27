@@ -1,16 +1,30 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MailerService as NestMailerService } from '@nestjs-modules/mailer';
 import { ConfigService } from '@nestjs/config';
+import { SendgridService } from '../sendgrid/sendgrid.service';
 
 
 @Injectable()
-export class MailerService {
-  private readonly logger = new Logger(MailerService.name);
+export class AppMailerService {
+  private readonly logger = new Logger(AppMailerService.name);
 
   constructor(
     private readonly mailer: NestMailerService,
     private readonly configService: ConfigService,
+    private readonly sendgridService: SendgridService,
   ) { }
+
+  /**
+   * Dispatches mail through SendGrid if configured, otherwise falls back to defaults.
+   */
+  private async dispatchMail(options: { to: string; subject: string; html: string }): Promise<void> {
+    const apiKey = this.configService.get<string>('SENDGRID_API_KEY');
+    if (apiKey) {
+      await this.sendgridService.sendMail(options);
+    } else {
+      await this.mailer.sendMail(options);
+    }
+  }
 
   /**
    * Build the shared email layout wrapper.
@@ -121,7 +135,7 @@ export class MailerService {
       </p>`;
 
     try {
-      await this.mailer.sendMail({
+      await this.dispatchMail({
         to: email,
         subject: 'Reset Your Kollabary Password',
         html: this.buildEmailLayout(content),
@@ -172,7 +186,7 @@ export class MailerService {
       </div>`;
 
     try {
-      await this.mailer.sendMail({
+      await this.dispatchMail({
         to: email,
         subject: `New Collaboration Request: ${collaborationTitle}`,
         html: this.buildEmailLayout(content),
@@ -221,7 +235,7 @@ export class MailerService {
       </div>`;
 
     try {
-      await this.mailer.sendMail({
+      await this.dispatchMail({
         to: email,
         subject: `Verification Request Update: ${statusLabel}`,
         html: this.buildEmailLayout(content),
@@ -256,7 +270,7 @@ export class MailerService {
       </div>`;
 
     try {
-      await this.mailer.sendMail({
+      await this.dispatchMail({
         to: email,
         subject: 'Verify Your Kollabary Account',
         html: this.buildEmailLayout(content),
@@ -303,7 +317,7 @@ export class MailerService {
       </p>`;
 
     try {
-      await this.mailer.sendMail({
+      await this.dispatchMail({
         to: email,
         subject: 'Top-up Successful - Kollabary',
         html: this.buildEmailLayout(content),

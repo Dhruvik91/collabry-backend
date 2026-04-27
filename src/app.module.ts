@@ -32,6 +32,7 @@ import { ReferralModule } from './modules/referral/referral.module';
 import { TopUpModule } from './modules/top-up/top-up.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { RolesGuard } from './modules/auth/Guards/roles.guard';
+import { SendgridModule } from './modules/sendgrid/sendgrid.module';
 
 
 @Module({
@@ -71,6 +72,7 @@ import { RolesGuard } from './modules/auth/Guards/roles.guard';
 
     AwsModule,
     UploadsModule,
+    SendgridModule,
   ],
   controllers: [AppController],
   providers: [
