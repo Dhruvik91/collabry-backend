@@ -11,6 +11,9 @@ import { CreateAuctionDto } from './dto/create-auction.dto';
 import { UpdateAuctionDto } from './dto/update-auction.dto';
 import { CreateBidDto } from './dto/create-bid.dto';
 import { SocketGateway } from '../socket/socket.gateway';
+import { WalletService } from '../kc-wallet/wallet.service';
+import { KCSettingService, KCSettingKey } from '../kc-setting/kc-setting.service';
+import { TransactionPurpose } from '../../database/entities/enums';
 
 @Injectable()
 export class AuctionService {
@@ -24,6 +27,8 @@ export class AuctionService {
         @InjectRepository(Collaboration)
         private collaborationRepository: Repository<Collaboration>,
         private socketGateway: SocketGateway,
+        private walletService: WalletService,
+        private settingService: KCSettingService,
     ) {}
 
     async createAuction(createAuctionDto: CreateAuctionDto, userId: string): Promise<Auction> {
@@ -34,13 +39,28 @@ export class AuctionService {
             throw new ForbiddenException('Only brands can create auctions');
         }
 
-        const auction = this.auctionRepository.create({
-            ...createAuctionDto,
-            creator,
-            status: AuctionStatus.OPEN,
-        });
+        const savedAuction = await this.auctionRepository.manager.transaction(async (manager) => {
+            const auction = this.auctionRepository.create({
+                ...createAuctionDto,
+                creator,
+                status: AuctionStatus.OPEN,
+            });
 
-        const savedAuction = await this.auctionRepository.save(auction);
+            const saved = await manager.save(auction);
+            
+            // Deduct KC coins
+            const price = await this.settingService.getSetting(KCSettingKey.AUCTION_CREATION_PRICE);
+            if (price > 0) {
+                await this.walletService.debit(
+                    userId,
+                    price,
+                    TransactionPurpose.AUCTION_CREATION,
+                    { auctionId: saved.id },
+                    manager
+                );
+            }
+            return saved;
+        });
         
         // Reload with relations for WebSocket
         const fullAuction = await this.auctionRepository.findOne({
@@ -131,7 +151,8 @@ export class AuctionService {
             throw new ForbiddenException('You can only delete your own auctions');
         }
 
-        await this.auctionRepository.remove(auction);
+        // Use softRemove for historical data preservation
+        await this.auctionRepository.softRemove(auction);
         
         // Emit auction deleted event
         this.socketGateway.emitToAuction(id, 'auction_deleted', { auctionId: id });
@@ -166,14 +187,29 @@ export class AuctionService {
             throw new BadRequestException('You have already placed a bid on this auction');
         }
 
-        const bid = this.bidRepository.create({
-            ...createBidDto,
-            auction,
-            influencer,
-            status: BidStatus.PENDING,
-        });
+        const savedBid = await this.bidRepository.manager.transaction(async (manager) => {
+            const bid = this.bidRepository.create({
+                ...createBidDto,
+                auction,
+                influencer,
+                status: BidStatus.PENDING,
+            });
 
-        const savedBid = await this.bidRepository.save(bid);
+            const saved = await manager.save(bid);
+            
+            // Deduct KC coins
+            const price = await this.settingService.getSetting(KCSettingKey.BID_PLACEMENT_PRICE);
+            if (price > 0) {
+                await this.walletService.debit(
+                    userId,
+                    price,
+                    TransactionPurpose.BID_PLACEMENT,
+                    { auctionId, bidId: saved.id },
+                    manager
+                );
+            }
+            return saved;
+        });
         
         // savedBid now contains the influencer with profile info from the initial fetch
         const bidToEmit = savedBid;
@@ -207,48 +243,58 @@ export class AuctionService {
             throw new BadRequestException('This auction is no longer open');
         }
 
-        // 1. Mark bid as accepted
-        bid.status = BidStatus.ACCEPTED;
-        await this.bidRepository.save(bid);
+        // Wrap entire bid acceptance process in a transaction
+        const result = await this.bidRepository.manager.transaction(async (manager) => {
+            // 1. Mark bid as accepted
+            bid.status = BidStatus.ACCEPTED;
+            await manager.save(bid);
 
-        // 2. Mark auction as completed
-        bid.auction.status = AuctionStatus.COMPLETED;
-        await this.auctionRepository.save(bid.auction);
+            // 2. Mark auction as completed
+            bid.auction.status = AuctionStatus.COMPLETED;
+            await manager.save(bid.auction);
 
-        // 3. Reject all other bids
-        await this.bidRepository.createQueryBuilder()
-            .update(Bid)
-            .set({ status: BidStatus.REJECTED })
-            .where('auctionId = :auctionId AND id != :bidId', { auctionId: bid.auction.id, bidId })
-            .execute();
+            // 3. Reject all other bids for this auction
+            await manager.createQueryBuilder()
+                .update(Bid)
+                .set({ status: BidStatus.REJECTED })
+                .where('auctionId = :auctionId AND id != :bidId', { auctionId: bid.auction.id, bidId })
+                .execute();
 
-        // 4. Create collaboration
-        const influencerProfileRepo = this.userRepository.manager.getRepository(InfluencerProfile);
-        const influencerProfile = await influencerProfileRepo.findOne({
-            where: { user: { id: bid.influencer.id } }
+            // 4. Create collaboration
+            const influencerProfileRepo = manager.getRepository(InfluencerProfile);
+            const influencerProfile = await influencerProfileRepo.findOne({
+                where: { user: { id: bid.influencer.id } }
+            });
+
+            if (!influencerProfile) {
+                throw new NotFoundException('Influencer profile not found');
+            }
+
+            const collabRepo = manager.getRepository(Collaboration);
+            const collaboration = collabRepo.create({
+                requester: { id: bid.auction.creator.id } as any,
+                influencer: { id: influencerProfile.id } as any,
+                title: bid.auction.title,
+                description: bid.auction.description,
+                status: CollaborationStatus.ACCEPTED,
+                proposedTerms: {
+                    bidAmount: bid.amount,
+                    proposal: bid.proposal,
+                },
+                agreedTerms: {
+                    bidAmount: bid.amount,
+                    proposal: bid.proposal,
+                },
+                startDate: new Date(),
+                endDate: bid.auction.deadline,
+            });
+
+            const savedCollab = await manager.save(collaboration);
+
+            return { collaborationId: savedCollab.id };
         });
-
-        const collaboration = this.collaborationRepository.create({
-            requester: bid.auction.creator,
-            influencer: influencerProfile,
-            title: bid.auction.title,
-            description: bid.auction.description,
-            status: CollaborationStatus.ACCEPTED,
-            proposedTerms: {
-                bidAmount: bid.amount,
-                proposal: bid.proposal,
-            },
-            agreedTerms: {
-                bidAmount: bid.amount,
-                proposal: bid.proposal,
-            },
-            startDate: new Date(),
-            endDate: bid.auction.deadline,
-        });
-
-        await this.collaborationRepository.save(collaboration);
         
-        // Emit bid accepted and auction completed events
+        // Emit bid accepted and auction completed events (Outside transaction for performance)
         this.socketGateway.emitToAuction(bid.auction.id, 'bid_accepted', { bidId, influencerId: bid.influencer.id });
         this.socketGateway.emitToAuction(bid.auction.id, 'auction_completed', { auctionId: bid.auction.id, winnerId: bid.influencer.id });
         this.socketGateway.emitToUser(bid.influencer.id, 'bid_accepted_notification', {
@@ -257,7 +303,7 @@ export class AuctionService {
             bidAmount: bid.amount
         });
         
-        return { message: 'Bid accepted and collaboration created', bid, collaborationId: collaboration.id };
+        return { message: 'Bid accepted and collaboration created', bid, collaborationId: result.collaborationId };
     }
 
     async rejectBid(bidId: string, brandId: string): Promise<any> {

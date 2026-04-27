@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -24,6 +25,12 @@ import { RankingModule } from './modules/ranking/ranking.module';
 import { AuctionModule } from './modules/auction/auction.module';
 import { SocketModule } from './modules/socket/socket.module';
 import { PublicModule } from './modules/public/public.module';
+import { KcWalletModule } from './modules/kc-wallet/kc-wallet.module';
+import { KcTransactionModule } from './modules/kc-transaction/kc-transaction.module';
+import { KCSettingModule } from './modules/kc-setting/kc-setting.module';
+import { ReferralModule } from './modules/referral/referral.module';
+import { TopUpModule } from './modules/top-up/top-up.module';
+import { PaymentModule } from './modules/payment/payment.module';
 import { RolesGuard } from './modules/auth/Guards/roles.guard';
 
 
@@ -31,6 +38,7 @@ import { RolesGuard } from './modules/auth/Guards/roles.guard';
   imports: [
     TypeOrmConnectionModule,
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([{
       ttl: 60000,
       limit: 100,
@@ -52,6 +60,12 @@ import { RolesGuard } from './modules/auth/Guards/roles.guard';
     AuctionModule,
     SocketModule,
     PublicModule,
+    KcWalletModule,
+    KcTransactionModule,
+    KCSettingModule,
+    ReferralModule,
+    TopUpModule,
+    PaymentModule,
 
     // Utility modules
 

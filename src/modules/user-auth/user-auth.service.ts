@@ -1,15 +1,18 @@
 import { Injectable, ConflictException, UnauthorizedException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { randomBytes, randomInt } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 
 import { User } from '../../database/entities/user.entity';
 import { UserRole, UserStatus } from '../../database/entities/enums';
 import { HashingService } from '../../core/hashing/hashing';
 import { MailerService } from '../mailer/mailer.service';
-import { SignupDto } from './dto/auth.dto';
+import { ReferralService } from '../referral/referral.service';
+import { WalletService } from '../kc-wallet/wallet.service';
 import { VerifyEmailDto } from './dto/verify-email.dto';
+import { KCSettingService, KCSettingKey } from '../kc-setting/kc-setting.service';
+import { TransactionPurpose } from '../../database/entities/enums';
 
 export type JwtPayload = { id: string; email: string; role: UserRole };
 
@@ -20,9 +23,13 @@ export class UserAuthService {
     private readonly hashing: HashingService,
     private readonly jwt: JwtService,
     private readonly mailerService: MailerService,
+    private readonly referralService: ReferralService,
+    private readonly walletService: WalletService,
+    private readonly settingService: KCSettingService,
+    private readonly dataSource: DataSource,
   ) { }
 
-  async signup(email: string, password: string, confirmPassword: string, role: UserRole = UserRole.USER) {
+  async signup(email: string, password: string, confirmPassword: string, role: UserRole = UserRole.USER, referredBy?: string, username?: string) {
     // Validate password confirmation
     if (password !== confirmPassword) {
       throw new BadRequestException('Password and confirm password do not match');
@@ -36,26 +43,48 @@ export class UserAuthService {
     const exists = await this.usersRepo.findOne({ where: { email } });
     if (exists) throw new ConflictException('Email already registered');
 
+    if (username) {
+      const usernameExists = await this.usersRepo.findOne({ where: { username } });
+      if (usernameExists) throw new ConflictException('Username already taken');
+    }
+
     const passwordHash = await this.hashing.hash(password);
-    
+
     // Generate secure 6-digit OTP
     const otp = randomInt(100000, 999999).toString();
     const otpHash = await this.hashing.hash(otp);
     const otpExpires = new Date();
     otpExpires.setMinutes(otpExpires.getMinutes() + 10); // 10 minutes expiry
 
+    // Generate unique referral code for the new user
+    const referralCode = await this.referralService.generateUniqueReferralCode();
+
     // Create user with PENDING status
-    const user = this.usersRepo.create({ 
-      email, 
-      role, 
+    const user = this.usersRepo.create({
+      email,
+      role,
       passwordHash,
       status: UserStatus.PENDING,
       emailVerified: false,
       otp: otpHash,
-      otpExpires
+      otpExpires,
+      referralCode,
+      referredBy,
+      username,
     });
-    
-    await this.usersRepo.save(user);
+
+    // Use a transaction to ensure user and referral tracking are atomic
+    await this.dataSource.transaction(async (manager) => {
+      const savedUser = await manager.save(user);
+
+      // Initialize wallet
+      await this.walletService.createWallet(savedUser.id, 0, manager);
+
+      // Link referral if provided
+      if (referredBy) {
+        await this.referralService.registerReferral(savedUser.id, referredBy, manager);
+      }
+    });
 
     // Send verification email
     await this.mailerService.sendVerificationEmail(email, otp);
@@ -96,19 +125,27 @@ export class UserAuthService {
     user.emailVerified = true;
     user.otp = null;
     user.otpExpires = null;
-    
+
     const savedUser = await this.usersRepo.save(user);
 
-    // Generate token for the verified user
-    const token = this.generateToken({ id: savedUser.id, email: savedUser.email, role: savedUser.role });
+    // Reward referral if applicable
+    await this.referralService.rewardReferral(user.id);
 
-    // Exclude sensitive fields from response
-    const { otp: _, otpExpires: __, ...userWithoutOtp } = savedUser;
-    
-    return { 
+    // Award New Arrival Bonus
+    const bonusAmount = await this.settingService.getSetting(KCSettingKey.NEW_ARRIVAL_BONUS_AMOUNT);
+    if (bonusAmount > 0) {
+      await this.walletService.credit(
+        user.id,
+        bonusAmount,
+        TransactionPurpose.NEW_ARRIVAL_BONUS
+      );
+    }
+
+    const loginData = await this.login(savedUser, true);
+
+    return {
       message: 'Email verified successfully',
-      access_token: token, 
-      user: userWithoutOtp 
+      ...loginData
     };
   }
 
@@ -134,7 +171,7 @@ export class UserAuthService {
 
     user.otp = otpHash;
     user.otpExpires = otpExpires;
-    
+
     await this.usersRepo.save(user);
 
     // Send new verification email
@@ -151,12 +188,22 @@ export class UserAuthService {
     if (!user || !user.passwordHash) return null;
     const match = await this.hashing.compare(password, user.passwordHash);
     if (!match) return null;
-    
+
+    // Handle inactive accounts (Deactivated) - Auto-reactivate on login
+    if (user.status === UserStatus.INACTIVE) {
+      user.status = UserStatus.ACTIVE;
+      await this.usersRepo.save(user);
+    }
+
     // Ensure user is verified/active
+    if (user.status === UserStatus.SUSPENDED) {
+      throw new UnauthorizedException('Your account has been suspended. Please contact support.');
+    }
+
     if (user.status !== UserStatus.ACTIVE) {
       throw new UnauthorizedException('Please verify your email address before logging in.');
     }
-    
+
     return user;
   }
 
@@ -164,15 +211,15 @@ export class UserAuthService {
     return this.jwt.sign(payload);
   }
 
-  async login(user: User) {
+  async login(user: User, isNewUser = false) {
     const token = this.generateToken({ id: user.id, email: user.email, role: user.role });
 
     // Exclude passwordHash from response
     const { passwordHash: _, ...userWithoutPassword } = user;
-    return { access_token: token, user: userWithoutPassword };
+    return { access_token: token, user: userWithoutPassword, isNewUser };
   }
 
-  async createInfluencer(email: string, password: string, confirmPassword: string) {
+  async createInfluencer(email: string, password: string, confirmPassword: string, username?: string) {
     // Validate password confirmation
     if (password !== confirmPassword) {
       throw new BadRequestException('Password and confirm password do not match');
@@ -181,9 +228,14 @@ export class UserAuthService {
     const exists = await this.usersRepo.findOne({ where: { email } });
     if (exists) throw new ConflictException('Email already registered');
 
+    if (username) {
+      const usernameExists = await this.usersRepo.findOne({ where: { username } });
+      if (usernameExists) throw new ConflictException('Username already taken');
+    }
+
     const passwordHash = await this.hashing.hash(password);
     // Create user with INFLUENCER role
-    const user = this.usersRepo.create({ email, role: UserRole.INFLUENCER, passwordHash });
+    const user = this.usersRepo.create({ email, role: UserRole.INFLUENCER, passwordHash, username });
     const saved = await this.usersRepo.save(user);
 
     // Exclude passwordHash from response
@@ -196,10 +248,27 @@ export class UserAuthService {
     if (!email) throw new UnauthorizedException('Google profile missing email');
     let user = await this.usersRepo.findOne({ where: { email } });
     if (!user) {
-      user = this.usersRepo.create({ email, role: UserRole.USER, passwordHash: null });
+      // Generate unique referral code
+      const referralCode = await this.referralService.generateUniqueReferralCode();
+
+      user = this.usersRepo.create({ email, role: UserRole.USER, passwordHash: null, referralCode });
       user = await this.usersRepo.save(user);
+
+      // Create wallet
+      await this.walletService.createWallet(user.id, 0);
+
+      // Award New Arrival Bonus
+      const bonusAmount = await this.settingService.getSetting(KCSettingKey.NEW_ARRIVAL_BONUS_AMOUNT);
+      if (bonusAmount > 0) {
+        await this.walletService.credit(
+          user.id,
+          bonusAmount,
+          TransactionPurpose.NEW_ARRIVAL_BONUS
+        );
+      }
+      return this.login(user, true);
     }
-    return this.login(user);
+    return this.login(user, false);
   }
 
   async me(userId: string) {

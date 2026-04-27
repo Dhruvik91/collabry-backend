@@ -15,11 +15,11 @@ import { AllEntities } from '.';
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_NAME'),
         entities: AllEntities,
-        synchronize: false, // Disabled - use migrations instead
+        synchronize: false,
         logging: false,
       }),
       inject: [ConfigService],
     }),
   ],
 })
-export class TypeOrmConnectionModule {}
+export class TypeOrmConnectionModule { }

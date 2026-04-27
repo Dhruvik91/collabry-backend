@@ -8,6 +8,16 @@ export class SaveInfluencerProfileDto {
     @IsString()
     fullName?: string;
 
+    @ApiPropertyOptional({ example: 'johndoe' })
+    @IsOptional()
+    @IsString()
+    username?: string;
+
+    @ApiPropertyOptional({ example: 'john-doe' })
+    @IsOptional()
+    @IsString()
+    slug?: string;
+
     @ApiPropertyOptional({ example: 'https://example.com/avatar.jpg' })
     @IsOptional()
     @IsString()

@@ -20,9 +20,11 @@ export class Conversation {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
+    @ApiProperty({ type: () => User })
     @ManyToOne(() => User, { onDelete: 'CASCADE' })
     userOne: User;
 
+    @ApiProperty({ type: () => User })
     @ManyToOne(() => User, { onDelete: 'CASCADE' })
     userTwo: User;
 
@@ -31,9 +33,11 @@ export class Conversation {
     @Column({ nullable: true })
     lastMessageAt: Date;
 
+    @ApiProperty({ type: () => [Message] })
     @OneToMany(() => Message, (message) => message.conversation)
     messages: Message[];
 
+    @ApiProperty()
     @CreateDateColumn()
     createdAt: Date;
 

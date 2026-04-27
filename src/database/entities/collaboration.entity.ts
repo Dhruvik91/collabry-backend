@@ -6,6 +6,7 @@ import {
     OneToOne,
     CreateDateColumn,
     UpdateDateColumn,
+    DeleteDateColumn,
     JoinColumn,
     Index,
 } from 'typeorm';
@@ -21,11 +22,13 @@ export class Collaboration {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
+    @ApiProperty({ type: () => User })
     @Index()
     @ManyToOne(() => User)
     @JoinColumn({ name: 'requesterId' })
     requester: User;
 
+    @ApiProperty({ type: () => InfluencerProfile })
     @Index()
     @ManyToOne(() => InfluencerProfile)
     @JoinColumn({ name: 'influencerId' })
@@ -64,6 +67,7 @@ export class Collaboration {
     @Column({ type: 'date', nullable: true })
     endDate: Date;
 
+    @ApiProperty({ type: () => Review })
     @OneToOne(() => Review, (review) => review.collaboration)
     review: Review;
 
@@ -72,6 +76,9 @@ export class Collaboration {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    @DeleteDateColumn()
+    deletedAt: Date;
 
     @ApiProperty({ description: 'Proof of completion URLs', type: [String], required: false })
     @Column({ type: 'text', array: true, nullable: true })

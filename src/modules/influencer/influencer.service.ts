@@ -1,15 +1,18 @@
 import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { InfluencerProfile } from '../../database/entities/influencer-profile.entity';
 import { Collaboration } from '../../database/entities/collaboration.entity';
 import { User } from '../../database/entities/user.entity';
+import { Profile } from '../../database/entities/profile.entity';
 import { UserRole, UserStatus, CollaborationStatus } from '../../database/entities/enums';
 import { SaveInfluencerProfileDto } from './dto/save-influencer-profile.dto';
 import { SearchInfluencersDto } from './dto/search-influencers.dto';
 import { RankingService } from '../ranking/ranking.service';
 import { isEntityNotFoundError } from '../../database/errors/entity-not-found.type-guard';
 import { cif } from '../../database/errors/tryQuery';
+import { slugify } from '../../core/utils/slugify';
+import { ConflictException } from '@nestjs/common';
 
 @Injectable()
 export class InfluencerService {
@@ -22,7 +25,10 @@ export class InfluencerService {
         private readonly userRepo: Repository<User>,
         @InjectRepository(Collaboration)
         private readonly collaborationRepo: Repository<Collaboration>,
+        @InjectRepository(Profile)
+        private readonly profileRepo: Repository<Profile>,
         private readonly rankingService: RankingService,
+        private readonly dataSource: DataSource,
     ) { }
 
     /**
@@ -58,10 +64,18 @@ export class InfluencerService {
         }
     }
 
-    async saveInfluencerProfile(userId: string, saveDto: SaveInfluencerProfileDto): Promise<InfluencerProfile> {
+    async saveInfluencerProfile(userId: string, saveDto: SaveInfluencerProfileDto): Promise<InfluencerProfile & { completedCollaborations: number }> {
         const user = await this.userRepo.findOneBy({ id: userId });
         if (!user || user.role !== UserRole.INFLUENCER) {
             throw new ForbiddenException('Only users with INFLUENCER role can have an influencer profile');
+        }
+
+        // Update username if provided and different
+        if (saveDto.username && saveDto.username !== user.username) {
+            const usernameExists = await this.userRepo.findOne({ where: { username: saveDto.username } });
+            if (usernameExists) throw new ConflictException('Username already taken');
+            user.username = saveDto.username;
+            await this.userRepo.save(user);
         }
 
         let profile = await this.influencerRepo.findOne({
@@ -75,6 +89,26 @@ export class InfluencerService {
             });
         } else {
             Object.assign(profile, saveDto);
+        }
+
+        // Generate slug if not provided or if name/username changed and no slug exists
+        if (!profile.slug || (saveDto.fullName && !saveDto.slug)) {
+            const baseForSlug = saveDto.username || user.username || saveDto.fullName || `influencer-${userId.substring(0, 8)}`;
+            let generatedSlug = slugify(baseForSlug);
+            
+            // Basic uniqueness check for slug
+            const slugExists = await this.influencerRepo.findOne({ where: { slug: generatedSlug } });
+            if (slugExists && slugExists.id !== profile.id) {
+                generatedSlug = `${generatedSlug}-${Math.floor(Math.random() * 1000)}`;
+            }
+            profile.slug = generatedSlug;
+        } else if (saveDto.slug) {
+            // If manual slug provided, check uniqueness
+            const slugExists = await this.influencerRepo.findOne({ where: { slug: saveDto.slug } });
+            if (slugExists && slugExists.id !== profile.id) {
+                throw new ConflictException('Profile slug already taken');
+            }
+            profile.slug = saveDto.slug;
         }
 
         // Calculate denormalized metrics if platforms are updated
@@ -105,10 +139,11 @@ export class InfluencerService {
             this.logger.error(`Failed to update ranking after profile save for user ${userId}: ${error.message}`);
         }
 
-        return this.getInfluencerProfile(userId);
+        const completedCollaborations = await this.getCompletedCollaborationsCount(profile.id);
+        return { ...profile, completedCollaborations };
     }
 
-    async searchInfluencers(searchDto: SearchInfluencersDto) {
+    async searchInfluencers(searchDto: SearchInfluencersDto): Promise<{ items: (InfluencerProfile & { completedCollaborations: number })[]; meta: any }> {
         const {
             categories, platform, minFollowers, maxFollowers,
             minEngagementRate, locationCountry, locationCity, gender,
@@ -122,7 +157,7 @@ export class InfluencerService {
             .andWhere('user.status = :status', { status: UserStatus.ACTIVE });
 
         if (search) {
-            query.andWhere('(influencer.fullName ILIKE :search OR profile.bio ILIKE :search)', {
+            query.andWhere('(influencer.fullName ILIKE :search OR influencer.bio ILIKE :search OR profile.bio ILIKE :search)', {
                 search: `%${search}%`,
             });
         }
@@ -132,7 +167,8 @@ export class InfluencerService {
         }
 
         if (platform) {
-            query.andWhere('influencer.platforms::text ILIKE :platform', { platform: `%${platform}%` });
+            // Using JSONB key existence operator for better performance
+            query.andWhere('influencer.platforms ? :platform', { platform });
         }
 
         if (minFollowers !== undefined && minFollowers !== null) {
@@ -172,7 +208,7 @@ export class InfluencerService {
         }
 
         if (audienceGender) {
-            query.andWhere("influencer.audienceGenderRatio->>:audienceGenderType > '0.5'", {
+            query.andWhere("(influencer.audienceGenderRatio->>:audienceGenderType)::float > 0.5", {
                 audienceGenderType: audienceGender.toLowerCase()
             });
         }
@@ -193,8 +229,7 @@ export class InfluencerService {
             query.andWhere('influencer.verified = :verified', { verified });
         }
 
-        // Note: minFollowers filter removed as followersCount is now calculated from platforms JSONB
-        // Future enhancement: Add JSONB query to filter by total followers across platforms
+        // Filter by ranking tier if provided
 
         const [items, total] = await query
             .skip((page - 1) * limit)
@@ -202,13 +237,30 @@ export class InfluencerService {
             .getManyAndCount();
 
         // Map items to include completed collaborations count
-        // Note: ranking sync removed on read for O(N) -> O(1) performance
-        const syncedItems = await Promise.all(
-            items.map(async (item) => {
-                const completedCollaborations = await this.getCompletedCollaborationsCount(item.id);
-                return { ...item, completedCollaborations };
-            })
-        );
+        // Using a single query to fetch all counts for the current page
+        const influencerIds = items.map(i => i.id);
+        let collabCounts: { influencerId: string, count: string }[] = [];
+        
+        if (influencerIds.length > 0) {
+            collabCounts = await this.collaborationRepo
+                .createQueryBuilder('collaboration')
+                .select('collaboration.influencerId', 'influencerId')
+                .addSelect('COUNT(*)', 'count')
+                .where('collaboration.influencerId IN (:...influencerIds)', { influencerIds })
+                .andWhere('collaboration.status = :status', { status: CollaborationStatus.COMPLETED })
+                .groupBy('collaboration.influencerId')
+                .getRawMany();
+        }
+
+        const countsMap = new Map(collabCounts.map(c => [c.influencerId, parseInt(c.count)]));
+
+        const syncedItems = items.map(item => {
+            const syncedItem = {
+                ...item,
+                completedCollaborations: countsMap.get(item.id) || 0,
+            };
+            return syncedItem as InfluencerProfile & { completedCollaborations: number };
+        });
 
         return {
             items: syncedItems,
@@ -238,5 +290,47 @@ export class InfluencerService {
             cif(isEntityNotFoundError, new NotFoundException('Influencer not found'))(error);
             throw error;
         }
+    }
+
+    async getInfluencerBySlug(slug: string): Promise<InfluencerProfile & { completedCollaborations: number }> {
+        try {
+            const profile = await this.influencerRepo.findOne({
+                where: { slug },
+                relations: ['user', 'user.profile'],
+            });
+
+            if (!profile) {
+                throw new NotFoundException('Influencer with this slug not found');
+            }
+
+            const completedCollaborations = await this.getCompletedCollaborationsCount(profile.id);
+            return { ...profile, completedCollaborations };
+        } catch (error) {
+            cif(isEntityNotFoundError, new NotFoundException('Influencer with this slug not found'))(error);
+            throw error;
+        }
+    }
+
+    async updateUserStatus(userId: string, status: UserStatus): Promise<User> {
+        const user = await this.userRepo.findOneBy({ id: userId });
+        if (!user) throw new NotFoundException('User not found');
+
+        user.status = status;
+        return this.userRepo.save(user);
+    }
+
+    async deleteAccount(userId: string): Promise<void> {
+        const user = await this.userRepo.findOneBy({ id: userId });
+        if (!user) throw new NotFoundException('User not found');
+
+        // Use a transaction for consistency
+        await this.dataSource.transaction(async (manager) => {
+            // Soft delete related profiles first (though order doesn't strictly matter for soft delete)
+            await manager.getRepository(InfluencerProfile).softDelete({ user: { id: userId } });
+            await manager.getRepository(Profile).softDelete({ user: { id: userId } });
+            
+            // Soft delete the user
+            await manager.getRepository(User).softDelete(userId);
+        });
     }
 }

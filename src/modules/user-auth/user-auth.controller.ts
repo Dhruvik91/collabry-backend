@@ -6,20 +6,26 @@ import { UserAuthService } from './user-auth.service';
 import { UserRole } from '../../database/entities/enums';
 import { AllowUnauthorized } from '../auth/unauthorized/allow-unauthorixed';
 import {
-  ApiCreatedResponse,
-  ApiOkResponse,
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-
+import {
+  ApiOkResponseEnvelope,
+  ApiCreatedResponseEnvelope,
+  ApiBadRequestResponseEnvelope,
+  ApiUnauthorizedResponseEnvelope,
+  ApiNotFoundResponseEnvelope,
+  ApiConflictResponseEnvelope,
+} from '../../core/swagger/response-envelope';
+import { MessageResponseDto, SuccessResponseDto } from '../../core/dto/message-response.dto';
+import { AuthResponseDto, VerifyEmailResponseDto } from './dto/auth-response.dto';
+import { User } from '../../database/entities/user.entity';
 import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto';
 import { SignupDto, CreateInfluencerDto } from './dto/auth.dto';
 import { VerifyEmailDto, ResendOtpDto } from './dto/verify-email.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/Guards/roles.guard';
-
-
 
 @ApiTags('User Auth')
 @Controller('v1/user-auth')
@@ -30,16 +36,20 @@ export class UserAuthController {
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('signup')
   @ApiOperation({ summary: 'Sign up a new user (regular users only)' })
-  @ApiCreatedResponse({ description: 'User registered and verification code sent' })
+  @ApiCreatedResponseEnvelope(MessageResponseDto)
+  @ApiBadRequestResponseEnvelope('Password mismatch or Admin role signup attempt')
+  @ApiConflictResponseEnvelope('Email or Username already registered')
   async signup(@Body() body: SignupDto) {
-    return this.auth.signup(body.email, body.password, body.confirmPassword, body.role);
+    return this.auth.signup(body.email, body.password, body.confirmPassword, body.role, body.referralCode, body.username);
   }
 
   @AllowUnauthorized()
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('verify-email')
   @ApiOperation({ summary: 'Verify email with OTP and get access token' })
-  @ApiOkResponse({ description: 'Email verified and JWT returned in response body' })
+  @ApiOkResponseEnvelope(VerifyEmailResponseDto)
+  @ApiBadRequestResponseEnvelope('Invalid/Expired OTP or already verified')
+  @ApiNotFoundResponseEnvelope('User not found')
   async verifyEmail(@Body() body: VerifyEmailDto) {
     return this.auth.verifyEmail(body);
   }
@@ -48,7 +58,9 @@ export class UserAuthController {
   @Throttle({ default: { limit: 3, ttl: 60000 } })
   @Post('resend-verify-email')
   @ApiOperation({ summary: 'Resend verification OTP email' })
-  @ApiOkResponse({ description: 'New verification code sent' })
+  @ApiOkResponseEnvelope(MessageResponseDto)
+  @ApiBadRequestResponseEnvelope('Account already verified')
+  @ApiNotFoundResponseEnvelope('User not found')
   async resendVerifyEmail(@Body() body: ResendOtpDto) {
     return this.auth.resendVerifyEmail(body.email);
   }
@@ -58,7 +70,8 @@ export class UserAuthController {
   @UseGuards(AuthGuard('local-user'))
   @Post('login')
   @ApiOperation({ summary: 'Login for all user types (USER, INFLUENCER, ADMIN)' })
-  @ApiOkResponse({ description: 'Successfully authenticated, JWT token returned in response body' })
+  @ApiOkResponseEnvelope(AuthResponseDto)
+  @ApiUnauthorizedResponseEnvelope('Invalid credentials or account suspended/unverified')
   async login(@Req() req: Request) {
     // req.user is set by Local Strategy
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -70,7 +83,8 @@ export class UserAuthController {
     @Roles(UserRole.USER, UserRole.INFLUENCER, UserRole.ADMIN)
     @Get('me')
     @ApiOperation({ summary: 'Get current authenticated user profile' })
-    @ApiOkResponse({ description: 'Returns user information for current JWT' })
+    @ApiOkResponseEnvelope(User)
+    @ApiUnauthorizedResponseEnvelope('Invalid or missing JWT')
     async me(@Req() req: Request) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const payload = (req as any).user as { id: string };
@@ -81,16 +95,19 @@ export class UserAuthController {
   @UseGuards(AuthGuard('jwt-user'), RolesGuard)
   @Post('admin/create-influencer')
   @ApiOperation({ summary: 'Admin creates an influencer account' })
-  @ApiCreatedResponse({ description: 'Influencer account created successfully' })
+  @ApiCreatedResponseEnvelope(User)
+  @ApiBadRequestResponseEnvelope('Password mismatch')
+  @ApiConflictResponseEnvelope('Email or Username already taken')
   async createInfluencer(@Body() body: CreateInfluencerDto) {
-    return this.auth.createInfluencer(body.email, body.password, body.confirmPassword);
+    return this.auth.createInfluencer(body.email, body.password, body.confirmPassword, body.username);
   }
 
   @UseGuards(AuthGuard('jwt-user'), RolesGuard)
   @Roles(UserRole.USER, UserRole.INFLUENCER, UserRole.ADMIN)
   @Post('logout')
   @ApiOperation({ summary: 'Logout current user (client should clear stored JWT)' })
-  @ApiOkResponse({ description: 'Successfully logged out' })
+  @ApiOkResponseEnvelope(SuccessResponseDto)
+  @ApiUnauthorizedResponseEnvelope('Invalid or missing JWT')
   async logout() {
     return { success: true };
   }
@@ -123,7 +140,7 @@ export class UserAuthController {
   @Throttle({ default: { limit: 3, ttl: 60000 } })
   @Post('forgot-password')
   @ApiOperation({ summary: 'Request password reset email' })
-  @ApiOkResponse({ description: 'Password reset email sent if account exists' })
+  @ApiOkResponseEnvelope(MessageResponseDto)
   async forgotPassword(@Body() body: ForgotPasswordDto) {
     return this.auth.forgotPassword(body.email);
   }
@@ -132,7 +149,8 @@ export class UserAuthController {
   @Throttle({ default: { limit: 3, ttl: 60000 } })
   @Post('reset-password')
   @ApiOperation({ summary: 'Reset password using token from email' })
-  @ApiOkResponse({ description: 'Password successfully reset' })
+  @ApiOkResponseEnvelope(MessageResponseDto)
+  @ApiBadRequestResponseEnvelope('Invalid or expired token')
   async resetPassword(@Body() body: ResetPasswordDto) {
     return this.auth.resetPassword(body.userId, body.token, body.newPassword);
   }
@@ -141,7 +159,9 @@ export class UserAuthController {
   @Roles(UserRole.USER, UserRole.INFLUENCER, UserRole.ADMIN)
   @Patch('change-password')
   @ApiOperation({ summary: 'Update password for authenticated user' })
-  @ApiOkResponse({ description: 'Password successfully updated' })
+  @ApiOkResponseEnvelope(MessageResponseDto)
+  @ApiBadRequestResponseEnvelope('Incorrect current password or social account')
+  @ApiNotFoundResponseEnvelope('User not found')
   async changePassword(@Req() req: Request, @Body() body: ChangePasswordDto) {
     const user = (req as any).user;
     return this.auth.changePassword(user.id, body.currentPassword, body.newPassword);

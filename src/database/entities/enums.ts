@@ -6,6 +6,7 @@ export enum UserRole {
 
 export enum UserStatus {
     ACTIVE = 'ACTIVE',
+    INACTIVE = 'INACTIVE',
     SUSPENDED = 'SUSPENDED',
     PENDING = 'PENDING',
 }
@@ -74,4 +75,37 @@ export enum BidStatus {
     PENDING = 'PENDING',
     ACCEPTED = 'ACCEPTED',
     REJECTED = 'REJECTED',
+}
+
+export enum TransactionType {
+    CREDIT = 'CREDIT',
+    DEBIT = 'DEBIT',
+}
+
+export enum PaymentStatus {
+    PENDING = 'PENDING',
+    SUCCESS = 'SUCCESS',
+    FAILED = 'FAILED',
+    CANCELLED = 'CANCELLED',
+    REFUNDED = 'REFUNDED',
+}
+
+export enum RazorpayWebhookEvent {
+    PAYMENT_CAPTURED = 'payment.captured',
+    PAYMENT_FAILED = 'payment.failed',
+    PAYMENT_AUTHORIZED = 'payment.authorized',
+    ORDER_PAID = 'order.paid',
+    REFUND_PROCESSED = 'refund.processed',
+}
+
+export enum TransactionPurpose {
+    AUCTION_CREATION = 'AUCTION_CREATION',
+    COLLABORATION_CREATION = 'COLLABORATION_CREATION',
+    BID_PLACEMENT = 'BID_PLACEMENT',
+    WEEKLY_REWARD = 'WEEKLY_REWARD',
+    NEW_ARRIVAL_BONUS = 'NEW_ARRIVAL_BONUS',
+    REFERRAL_REWARD = 'REFERRAL_REWARD',
+    SIGNUP_BONUS = 'SIGNUP_BONUS',
+    SYSTEM_ADJUSTMENT = 'SYSTEM_ADJUSTMENT',
+    KCOIN_TOPUP = 'KCOIN_TOPUP',
 }

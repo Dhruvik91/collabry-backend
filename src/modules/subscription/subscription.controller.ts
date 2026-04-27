@@ -1,7 +1,11 @@
 import { Controller, Get } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiOkResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import {
+    ApiOkResponseEnvelope,
+} from '../../core/swagger/response-envelope';
 import { SubscriptionService } from './subscription.service';
 import { AllowUnauthorized } from '../auth/unauthorized/allow-unauthorixed';
+import { SubscriptionPlan } from '../../database/entities/subscription-plan.entity';
 
 @ApiTags('Subscription')
 @Controller('v1/subscription')
@@ -11,7 +15,7 @@ export class SubscriptionController {
     @AllowUnauthorized()
     @Get('plans')
     @ApiOperation({ summary: 'List all available subscription plans' })
-    @ApiOkResponse({ description: 'Returns a list of subscription plans' })
+    @ApiOkResponseEnvelope(SubscriptionPlan, true)
     async findAll() {
         return this.subscriptionService.getAllPlans();
     }

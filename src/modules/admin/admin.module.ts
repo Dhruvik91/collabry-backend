@@ -5,6 +5,8 @@ import { AdminService } from './admin.service';
 import { ReportModule } from '../report/report.module';
 import { SubscriptionModule } from '../subscription/subscription.module';
 import { VerificationModule } from '../verification/verification.module';
+import { KCSettingModule } from '../kc-setting/kc-setting.module';
+import { KcWalletModule } from '../kc-wallet/kc-wallet.module';
 import { User } from '../../database/entities/user.entity';
 import { Collaboration } from '../../database/entities/collaboration.entity';
 import { VerificationRequest } from '../../database/entities/verification-request.entity';
@@ -13,6 +15,7 @@ import { Auction } from '../../database/entities/auction.entity';
 import { Bid } from '../../database/entities/bid.entity';
 import { Conversation } from '../../database/entities/conversation.entity';
 import { Message } from '../../database/entities/message.entity';
+import { PaymentOrder } from '../../database/entities/payment-order.entity';
 
 @Module({
     imports: [
@@ -24,11 +27,14 @@ import { Message } from '../../database/entities/message.entity';
             Auction,
             Bid,
             Conversation,
-            Message
+            Message,
+            PaymentOrder
         ]),
         ReportModule,
         SubscriptionModule,
         VerificationModule,
+        KCSettingModule,
+        KcWalletModule,
     ],
     controllers: [AdminController],
     providers: [AdminService],

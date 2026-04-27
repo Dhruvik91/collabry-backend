@@ -53,10 +53,10 @@ export class RankingBreakdownDto {
 
     @ApiProperty({
         description: 'Verification bonus',
-        example: { isVerified: true, score: 5, maxScore: 5 },
+        example: { verified: true, score: 5, maxScore: 5 },
     })
     verificationBonus: {
-        isVerified: boolean;
+        verified: boolean;
         score: number;
         maxScore: number;
     };

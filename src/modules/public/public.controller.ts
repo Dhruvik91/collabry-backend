@@ -19,6 +19,14 @@ export class PublicController {
     }
 
     @AllowUnauthorized()
+    @Get('influencer/p/:slug')
+    @ApiOperation({ summary: 'Get aggregate public data for an influencer by slug' })
+    @ApiOkResponse({ type: PublicInfluencerProfileDto })
+    async getInfluencerDataBySlug(@Param('slug') slug: string) {
+        return this.publicService.getInfluencerPublicDataBySlug(slug);
+    }
+
+    @AllowUnauthorized()
     @Get('brand/:id')
     @ApiOperation({ summary: 'Get aggregate public data for a brand' })
     @ApiOkResponse({ type: PublicBrandProfileDto })

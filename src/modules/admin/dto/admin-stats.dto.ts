@@ -85,6 +85,26 @@ export class PlatformGrowthDto {
     newReviews: number;
 }
 
+export class TrendPointDto {
+    @ApiProperty({ example: '2024-03-22' })
+    label: string;
+    @ApiProperty({ example: 4500 })
+    value: number;
+}
+
+export class FinanceStatsDto {
+    @ApiProperty()
+    totalRevenue: number;
+    @ApiProperty()
+    totalCoinsSold: number;
+    @ApiProperty()
+    orderCount: number;
+    @ApiProperty()
+    successRate: number;
+    @ApiProperty({ type: [TrendPointDto] })
+    revenueTrends: TrendPointDto[];
+}
+
 export class AdminStatsDto {
     @ApiProperty({ description: 'User statistics', type: UserStatsDto })
     users: UserStatsDto;
@@ -97,6 +117,9 @@ export class AdminStatsDto {
 
     @ApiProperty({ description: 'Review statistics', type: ReviewStatsDto })
     reviews: ReviewStatsDto;
+
+    @ApiProperty({ description: 'Financial statistics', type: FinanceStatsDto })
+    finance: FinanceStatsDto;
 
     @ApiProperty({ description: 'Platform growth data (last 8 weeks)', type: [PlatformGrowthDto] })
     growth: PlatformGrowthDto[];

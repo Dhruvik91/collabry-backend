@@ -3,6 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { UserRole, UserStatus } from './enums';
 import { InfluencerProfile } from './influencer-profile.entity';
 import { Profile } from './profile.entity';
+import { Wallet } from './wallet.entity';
 import { Exclude } from 'class-transformer';
 
 @Entity('users')
@@ -11,9 +12,14 @@ export class User {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @ApiProperty()
-    @Column({ unique: true })
+    @Index({ unique: true, where: '"deletedAt" IS NULL' })
+    @Column()
     email: string;
+    
+    @ApiProperty()
+    @Index({ unique: true, where: '"deletedAt" IS NULL' })
+    @Column({ nullable: true })
+    username: string;
 
     @Exclude()
     @Column({ nullable: true, select: false })
@@ -55,11 +61,27 @@ export class User {
     @Column({ nullable: true, select: false })
     otpExpires: Date;
 
+    @ApiProperty({ type: () => Profile })
     @OneToOne(() => Profile, (profile) => profile.user, { cascade: true })
     profile: Profile;
 
+    @ApiProperty({ type: () => InfluencerProfile })
     @OneToOne(() => InfluencerProfile, (profile) => profile.user)
     influencerProfile: InfluencerProfile;
+
+    @ApiProperty()
+    @Index({ unique: true, where: '"deletedAt" IS NULL' })
+    @Column({ nullable: true })
+    referralCode: string;
+
+    @ApiProperty()
+    @Column({ nullable: true })
+    @Index()
+    referredBy: string;
+
+    @ApiProperty({ type: () => Wallet })
+    @OneToOne(() => Wallet, (wallet) => wallet.user, { cascade: true })
+    wallet: Wallet;
 
     @CreateDateColumn()
     createdAt: Date;

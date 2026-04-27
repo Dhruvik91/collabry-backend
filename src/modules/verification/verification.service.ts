@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { VerificationRequest } from '../../database/entities/verification-request.entity';
 import { InfluencerProfile } from '../../database/entities/influencer-profile.entity';
+import { User } from '../../database/entities/user.entity';
+import { Profile } from '../../database/entities/profile.entity';
 import { CreateVerificationRequestDto } from './dto/create-verification-request.dto';
 import { VerificationStatus } from '../../database/entities/enums';
 import { MailerService } from '../mailer/mailer.service';
@@ -13,25 +15,17 @@ export class VerificationService {
     constructor(
         @InjectRepository(VerificationRequest)
         private readonly requestRepo: Repository<VerificationRequest>,
-        @InjectRepository(InfluencerProfile)
-        private readonly influencerRepo: Repository<InfluencerProfile>,
+        @InjectRepository(User)
+        private readonly userRepo: Repository<User>,
         private readonly dataSource: DataSource,
         private readonly mailerService: MailerService,
         private readonly rankingService: RankingService,
     ) { }
 
     async createRequest(userId: string, createDto: CreateVerificationRequestDto): Promise<VerificationRequest> {
-        const influencer = await this.influencerRepo.findOne({
-            where: { user: { id: userId } },
-        });
-
-        if (!influencer) {
-            throw new BadRequestException('Only influencers can submit verification requests');
-        }
-
         // Check for pending request
         const pendingRequest = await this.requestRepo.findOne({
-            where: { influencerProfile: { id: influencer.id }, status: VerificationStatus.PENDING },
+            where: { user: { id: userId }, status: VerificationStatus.PENDING },
         });
 
         if (pendingRequest) {
@@ -39,7 +33,7 @@ export class VerificationService {
         }
 
         const request = this.requestRepo.create({
-            influencerProfile: { id: influencer.id } as any,
+            user: { id: userId } as any,
             documents: createDto.documents,
             status: VerificationStatus.PENDING,
         });
@@ -48,18 +42,15 @@ export class VerificationService {
     }
 
     async getMyRequests(userId: string): Promise<VerificationRequest[]> {
-        const influencer = await this.influencerRepo.findOne({ where: { user: { id: userId } } });
-        if (!influencer) return [];
-
         return await this.requestRepo.find({
-            where: { influencerProfile: { id: influencer.id } },
+            where: { user: { id: userId } },
             order: { createdAt: 'DESC' },
         });
     }
 
     async getAllRequests(): Promise<VerificationRequest[]> {
         return await this.requestRepo.find({
-            relations: ['influencerProfile', 'influencerProfile.user', 'influencerProfile.user.profile'],
+            relations: ['user', 'user.profile', 'user.influencerProfile'],
             order: { createdAt: 'DESC' },
         });
     }
@@ -68,7 +59,7 @@ export class VerificationService {
         const savedRequest = await this.dataSource.transaction(async (manager) => {
             const request = await manager.findOne(VerificationRequest, {
                 where: { id },
-                relations: ['influencerProfile', 'influencerProfile.user'],
+                relations: ['user', 'user.profile', 'user.influencerProfile'],
             });
 
             if (!request) throw new NotFoundException('Verification request not found');
@@ -80,12 +71,18 @@ export class VerificationService {
             
             const saved = await manager.save(VerificationRequest, request);
 
-            if (status === VerificationStatus.APPROVED) {
-                request.influencerProfile.verified = true;
-                await manager.save(InfluencerProfile, request.influencerProfile);
-            } else if (status === VerificationStatus.REJECTED) {
-                request.influencerProfile.verified = false;
-                await manager.save(InfluencerProfile, request.influencerProfile);
+            const isVerified = status === VerificationStatus.APPROVED;
+            
+            // Update main Profile
+            if (request.user.profile) {
+                request.user.profile.verified = isVerified;
+                await manager.save(Profile, request.user.profile);
+            }
+
+            // Update InfluencerProfile if exists
+            if (request.user.influencerProfile) {
+                request.user.influencerProfile.verified = isVerified;
+                await manager.save(InfluencerProfile, request.user.influencerProfile);
             }
 
             return saved;
@@ -95,17 +92,17 @@ export class VerificationService {
         try {
             const requestWithUser = await this.requestRepo.findOne({
                 where: { id: savedRequest.id },
-                relations: ['influencerProfile', 'influencerProfile.user'],
+                relations: ['user'],
             });
             
-            if (requestWithUser?.influencerProfile?.user?.id) {
-                await this.rankingService.updateRanking(requestWithUser.influencerProfile.user.id);
+            if (requestWithUser?.user?.id) {
+                await this.rankingService.updateRanking(requestWithUser.user.id);
             }
 
-            // Notify Influencer via Email
-            if (requestWithUser?.influencerProfile?.user?.email) {
+            // Notify User via Email
+            if (requestWithUser?.user?.email) {
                 await this.mailerService.sendVerificationUpdateEmail(
-                    requestWithUser.influencerProfile.user.email,
+                    requestWithUser.user.email,
                     status,
                 );
             }

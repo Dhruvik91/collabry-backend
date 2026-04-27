@@ -9,7 +9,7 @@ import { Auction } from '../../database/entities/auction.entity';
 import { Bid } from '../../database/entities/bid.entity';
 import { Conversation } from '../../database/entities/conversation.entity';
 import { Message } from '../../database/entities/message.entity';
-import { UserRole, CollaborationStatus, VerificationStatus, AuctionStatus } from '../../database/entities/enums';
+import { UserRole, CollaborationStatus, VerificationStatus, AuctionStatus, UserStatus } from '../../database/entities/enums';
 import {
     AdminStatsDto,
     UserStatsDto,
@@ -17,7 +17,23 @@ import {
     VerificationStatsDto,
     ReviewStatsDto,
     PlatformGrowthDto,
+    FinanceStatsDto,
+    TrendPointDto,
 } from './dto/admin-stats.dto';
+import { 
+    AdminFinanceFilterDto, 
+    DateRangeType, 
+    AdminOrderFilterDto, 
+    AdminUserFilterDto, 
+    AdminBulkStatusDto,
+    AdminUpdateVerificationDto
+} from './dto/admin-management.dto';
+import { PaymentOrder } from '../../database/entities/payment-order.entity';
+import { PaymentStatus } from '../../database/entities/enums';
+import { KCSettingService, KCSettingKey } from '../kc-setting/kc-setting.service';
+import { WalletService } from '../kc-wallet/wallet.service';
+import { TransactionPurpose } from '../../database/entities/enums';
+import { Between, ILike } from 'typeorm';
 
 @Injectable()
 export class AdminService {
@@ -40,20 +56,25 @@ export class AdminService {
         private readonly conversationRepo: Repository<Conversation>,
         @InjectRepository(Message)
         private readonly messageRepo: Repository<Message>,
+        @InjectRepository(PaymentOrder)
+        private readonly orderRepo: Repository<PaymentOrder>,
+        private readonly settingService: KCSettingService,
+        private readonly walletService: WalletService,
     ) { }
 
     /**
      * Get comprehensive platform statistics
      * @returns Platform statistics
      */
-    async getStatistics(): Promise<AdminStatsDto> {
+    async getStatistics(filter?: AdminFinanceFilterDto): Promise<AdminStatsDto> {
         try {
-            const [users, collaborations, verifications, reviews, growth] = await Promise.all([
+            const [users, collaborations, verifications, reviews, growth, finance] = await Promise.all([
                 this.getUserStats(),
                 this.getCollaborationStats(),
                 this.getVerificationStats(),
                 this.getReviewStats(),
                 this.getGrowthStats(),
+                this.getFinanceStats(filter),
             ]);
 
             return {
@@ -62,11 +83,104 @@ export class AdminService {
                 verifications,
                 reviews,
                 growth,
+                finance,
             };
         } catch (error) {
             this.logger.error('Error fetching admin statistics:', error);
             throw error;
         }
+    }
+
+    /**
+     * Get financial statistics with dynamic aggregation
+     */
+    async getFinanceStats(filter?: AdminFinanceFilterDto): Promise<FinanceStatsDto> {
+        const { startDate, endDate } = this.calculateDateRange(filter);
+
+        // 1. Basic Stats
+        const [successOrders, totalOrders] = await Promise.all([
+            this.orderRepo.find({
+                where: {
+                    status: PaymentStatus.SUCCESS,
+                    createdAt: Between(startDate, endDate),
+                },
+            }),
+            this.orderRepo.count({
+                where: {
+                    createdAt: Between(startDate, endDate),
+                },
+            }),
+        ]);
+
+        const totalRevenue = successOrders.reduce((sum, o) => sum + Number(o.amount), 0);
+        const totalCoinsSold = successOrders.reduce((sum, o) => sum + o.coins, 0);
+        const successRate = totalOrders > 0 ? (successOrders.length / totalOrders) * 100 : 0;
+
+        // 2. Trends with Dynamic Aggregation level
+        const diffMs = endDate.getTime() - startDate.getTime();
+        const diffMonths = diffMs / (1000 * 60 * 60 * 24 * 30);
+        
+        let interval = 'day';
+        if (diffMonths >= 2 && diffMonths <= 12) interval = 'week';
+        else if (diffMonths > 12) interval = 'month';
+
+        const trendsRaw = await this.orderRepo.query(`
+            SELECT date_trunc('${interval}', "createdAt") as label, SUM(amount)::float as value
+            FROM payment_orders
+            WHERE status = 'SUCCESS' AND "createdAt" BETWEEN $1 AND $2
+            GROUP BY label
+            ORDER BY label ASC
+        `, [startDate, endDate]);
+
+        const revenueTrends = trendsRaw.map(t => ({
+            label: new Date(t.label).toLocaleDateString(),
+            value: t.value,
+        }));
+
+        return {
+            totalRevenue,
+            totalCoinsSold,
+            orderCount: totalOrders,
+            successRate,
+            revenueTrends,
+        };
+    }
+
+    private calculateDateRange(filter?: AdminFinanceFilterDto): { startDate: Date, endDate: Date } {
+        const now = new Date();
+        let startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // Default Today
+        let endDate = new Date();
+
+        if (!filter) return { startDate, endDate };
+
+        switch (filter.range) {
+            case DateRangeType.TODAY:
+                startDate = new Date(now.setHours(0, 0, 0, 0));
+                break;
+            case DateRangeType.THIS_WEEK:
+                startDate = new Date(now.setDate(now.getDate() - now.getDay()));
+                break;
+            case DateRangeType.THIS_MONTH:
+                startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                break;
+            case DateRangeType.LAST_MONTH:
+                startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                endDate = new Date(now.getFullYear(), now.getMonth(), 0);
+                break;
+            case DateRangeType.THIS_YEAR:
+                startDate = new Date(now.getFullYear(), 0, 1);
+                break;
+            case DateRangeType.LAST_YEAR:
+                startDate = new Date(now.getFullYear() - 1, 0, 1);
+                endDate = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59);
+                break;
+            case DateRangeType.CUSTOM:
+                if (filter.startDate) startDate = new Date(filter.startDate);
+                if (filter.endDate) endDate = new Date(filter.endDate);
+                break;
+        }
+
+        return { startDate, endDate };
     }
 
     /**
@@ -318,6 +432,134 @@ export class AdminService {
 
         return await query.getMany();
     }
+    async getAllOrders(filters: AdminOrderFilterDto) {
+        const { page = 1, limit = 20, status, userId, planId, startDate, endDate, search } = filters;
+        const query = this.orderRepo.createQueryBuilder('order')
+            .leftJoinAndSelect('order.user', 'user')
+            .leftJoinAndSelect('user.profile', 'profile')
+            .leftJoinAndSelect('order.plan', 'plan')
+            .orderBy('order.createdAt', 'DESC')
+            .skip((page - 1) * limit)
+            .take(limit);
+
+        if (status) query.andWhere('order.status = :status', { status });
+        if (userId) query.andWhere('user.id = :userId', { userId });
+        if (planId) query.andWhere('plan.id = :planId', { planId });
+
+        if (search) {
+            query.andWhere(
+                '(user.email ILike :search OR user.username ILike :search OR profile.fullName ILike :search)',
+                { search: `%${search}%` }
+            );
+        }
+
+        if (startDate && endDate) {
+            query.andWhere('order.createdAt BETWEEN :startDate AND :endDate', { 
+                startDate: new Date(startDate), 
+                endDate: new Date(endDate) 
+            });
+        }
+
+        const [items, total] = await query.getManyAndCount();
+        return {
+            items,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        };
+    }
+
+    /**
+     * Get all users with pagination and filters
+     */
+    async getAllUsers(filters: AdminUserFilterDto) {
+        const { page = 1, limit = 20, role, status, search, startDate, endDate } = filters;
+        const query = this.userRepo.createQueryBuilder('user')
+            .leftJoinAndSelect('user.profile', 'profile')
+            .leftJoinAndSelect('user.influencerProfile', 'influencer')
+            .orderBy('user.createdAt', 'DESC')
+            .skip((page - 1) * limit)
+            .take(limit);
+
+        if (role) query.andWhere('user.role = :role', { role });
+        if (status) query.andWhere('user.status = :status', { status });
+        if (search) {
+            query.andWhere(
+                '(user.email ILike :search OR user.username ILike :search OR profile.fullName ILike :search)',
+                { search: `%${search}%` }
+            );
+        }
+        if (startDate && endDate) {
+            query.andWhere('user.createdAt BETWEEN :startDate AND :endDate', { 
+                startDate: new Date(startDate), 
+                endDate: new Date(endDate) 
+            });
+        }
+
+        const [items, total] = await query.getManyAndCount();
+        return {
+            items,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        };
+    }
+
+    /**
+     * Update user status (Ban/Unban)
+     */
+    async updateUserStatus(userId: string, status: UserStatus) {
+        const user = await this.userRepo.findOne({ where: { id: userId } });
+        if (!user) throw new Error('User not found');
+        user.status = status;
+        return await this.userRepo.save(user);
+    }
+
+    /**
+     * Bulk update user status
+     */
+    async bulkUpdateUserStatus(dto: AdminBulkStatusDto) {
+        return await this.userRepo.update(dto.userIds, { status: dto.status });
+    }
+
+    /**
+     * Manually update user verification status (Direct Verification)
+     */
+    async verifyUser(userId: string, verified: boolean) {
+        const user = await this.userRepo.findOne({ 
+            where: { id: userId },
+            relations: ['profile', 'influencerProfile'] 
+        });
+        if (!user) {
+            throw new Error('User not found');
+        }
+        
+        // Update main Profile
+        if (user.profile) {
+            await this.userRepo.query(`
+                UPDATE profiles 
+                SET "verified" = $1 
+                WHERE id = $2
+            `, [verified, user.profile.id]);
+        }
+
+        // Update InfluencerProfile if exists
+        if (user.influencerProfile) {
+            await this.userRepo.query(`
+                UPDATE influencer_profiles 
+                SET "verified" = $1 
+                WHERE id = $2
+            `, [verified, user.influencerProfile.id]);
+        }
+        
+        return { message: `User verification status updated to ${verified}` };
+    }
 
     /**
      * Get all conversations in the system
@@ -337,7 +579,7 @@ export class AdminService {
     }
 
     /**
-     * Get all messages for a specific conversation (Admin View)
+     * Get conversation messages for a specific conversation (Admin View)
      */
     async getConversationMessages(conversationId: string) {
         return await this.messageRepo.find({
@@ -345,5 +587,31 @@ export class AdminService {
             relations: ['sender', 'sender.profile', 'sender.influencerProfile'],
             order: { createdAt: 'ASC' },
         });
+    }
+
+    /**
+     * Get all platform settings
+     */
+    async getSettings() {
+        return await this.settingService.getAllSettings();
+    }
+
+    /**
+     * Update a platform setting
+     */
+    async updateSetting(key: KCSettingKey, value: number) {
+        return await this.settingService.updateSetting(key, value);
+    }
+
+    /**
+     * Add coins directly to a user's wallet (Admin Only)
+     */
+    async addCoinsToUser(userId: string, amount: number) {
+        return await this.walletService.credit(
+            userId,
+            amount,
+            TransactionPurpose.SYSTEM_ADJUSTMENT,
+            { adminAction: true, timestamp: new Date().toISOString() }
+        );
     }
 }

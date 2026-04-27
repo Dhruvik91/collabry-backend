@@ -6,6 +6,7 @@ import {
     JoinColumn,
     CreateDateColumn,
     UpdateDateColumn,
+    DeleteDateColumn,
     Index,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
@@ -17,6 +18,7 @@ export class Profile {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
+    @ApiProperty({ type: () => User })
     @OneToOne(() => User, (user) => user.profile, { onDelete: 'CASCADE' })
     @JoinColumn()
     user: User;
@@ -26,8 +28,8 @@ export class Profile {
     fullName: string;
 
     @ApiProperty()
-    @Index()
-    @Column({ unique: true, nullable: true })
+    @Index({ unique: true, where: '"deletedAt" IS NULL' })
+    @Column({ nullable: true })
     username: string;
 
     @ApiProperty()
@@ -46,9 +48,17 @@ export class Profile {
     @Column({ type: 'jsonb', nullable: true })
     socialLinks: any;
 
+    @ApiProperty()
+    @Column({ default: false })
+    verified: boolean;
+
+    @ApiProperty()
     @CreateDateColumn()
     createdAt: Date;
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    @DeleteDateColumn()
+    deletedAt: Date;
 }

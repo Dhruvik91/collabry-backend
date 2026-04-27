@@ -5,6 +5,7 @@ import {
     ManyToOne,
     CreateDateColumn,
     UpdateDateColumn,
+    DeleteDateColumn,
     JoinColumn,
     Index,
 } from 'typeorm';
@@ -19,11 +20,13 @@ export class Bid {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
+    @ApiProperty({ type: () => Auction })
     @Index()
     @ManyToOne(() => Auction, (auction) => auction.bids, { onDelete: 'CASCADE' })
     @JoinColumn({ name: 'auctionId' })
     auction: Auction;
 
+    @ApiProperty({ type: () => User })
     @Index()
     @ManyToOne(() => User)
     @JoinColumn({ name: 'influencerId' })
@@ -51,4 +54,7 @@ export class Bid {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    @DeleteDateColumn()
+    deletedAt: Date;
 }

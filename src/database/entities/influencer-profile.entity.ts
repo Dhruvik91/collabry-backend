@@ -7,6 +7,7 @@ import {
     OneToMany,
     CreateDateColumn,
     UpdateDateColumn,
+    DeleteDateColumn,
     Index,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
@@ -20,9 +21,15 @@ export class InfluencerProfile {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
+    @ApiProperty({ type: () => User })
     @OneToOne(() => User, (user) => user.influencerProfile, { onDelete: 'CASCADE' })
     @JoinColumn()
     user: User;
+
+    @ApiProperty()
+    @Index({ unique: true, where: '"deletedAt" IS NULL' })
+    @Column({ nullable: true })
+    slug: string;
 
     @ApiProperty()
     @Column({ nullable: true })
@@ -129,12 +136,17 @@ export class InfluencerProfile {
     @Column({ nullable: true })
     rankingTier: string;
 
+    @ApiProperty({ type: () => [Collaboration] })
     @OneToMany(() => Collaboration, (collaboration) => collaboration.influencer)
     collaborations: Collaboration[];
 
+    @ApiProperty()
     @CreateDateColumn()
     createdAt: Date;
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    @DeleteDateColumn()
+    deletedAt: Date;
 }

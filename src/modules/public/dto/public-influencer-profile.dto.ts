@@ -22,6 +22,9 @@ export class PublicInfluencerProfileDto {
     fullName: string;
 
     @ApiPropertyOptional()
+    slug?: string;
+
+    @ApiPropertyOptional()
     avatarUrl?: string;
 
     @ApiPropertyOptional()
@@ -92,4 +95,7 @@ export class PublicInfluencerProfileDto {
 
     @ApiPropertyOptional()
     maxPrice?: number;
+
+    @ApiPropertyOptional({ type: [String] })
+    collaborationTypes?: string[];
 }
