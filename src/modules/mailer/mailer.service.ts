@@ -27,54 +27,58 @@ export class MailerService {
   <meta name="color-scheme" content="light">
   <meta name="supported-color-schemes" content="light">
   <title>Kollabary</title>
-  <!--[if mso]>
   <style>
-    table, td { font-family: Arial, sans-serif !important; }
+    @media only screen and (max-width: 600px) {
+      .inner-container { width: 100% !important; border-radius: 0 !important; border: none !important; }
+      .content-padding { padding: 24px 20px !important; }
+    }
   </style>
-  <![endif]-->
 </head>
-<body style="margin: 0; padding: 0; background-color: #faf9fb; font-family: Matter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
   <!-- Outer wrapper -->
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #faf9fb; padding: 32px 16px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8fafc; padding: 48px 16px;">
     <tr>
       <td align="center">
         <!-- Inner card -->
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width: 460px; background-color: #ffffff; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 20px rgba(233, 30, 140, 0.06), 0 1px 3px rgba(0, 0, 0, 0.02);">
+        <table role="presentation" class="inner-container" width="100%" cellpadding="0" cellspacing="0" style="max-width: 520px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
 
-          <!-- Header band -->
+          <!-- Header -->
           <tr>
-            <td style="padding: 32px 24px 20px 24px; text-align: center;">
-              <!-- Logo PNG -->
-              <img src="https://kollabary.s3.ap-south-1.amazonaws.com/email-template-logo.png" alt="Kollabary" width="140" style="display: inline-block; border: 0;">
+            <td style="padding: 40px 40px 32px 40px; text-align: center;">
+              <img src="https://kollabary.s3.ap-south-1.amazonaws.com/email-template-logo.png" alt="Kollabary" width="130" style="display: inline-block; border: 0;">
             </td>
           </tr>
 
-          <!-- Body -->
+          <!-- Content Body -->
           <tr>
-            <td style="padding: 32px 24px 24px 24px;">
+            <td class="content-padding" style="padding: 0 40px 40px 40px;">
               ${content}
-            </td>
-          </tr>
-
-          <!-- Divider -->
-          <tr>
-            <td style="padding: 0 24px;">
-              <hr style="border: none; height: 1px; background: linear-gradient(to right, transparent, #f0ebf8, transparent); margin: 0;">
             </td>
           </tr>
 
           <!-- Footer -->
           <tr>
-            <td style="padding: 20px 24px 24px 24px; text-align: center;">
-              <p style="margin: 0 0 6px 0; font-size: 11px; color: #8b7fa0; line-height: 1.5;">
-                This email was sent by Kollabary. Please do not reply directly.
+            <td style="padding: 32px 40px; background-color: #fcfdfe; border-top: 1px solid #f1f5f9; text-align: center;">
+              <p style="margin: 0 0 8px 0; font-size: 12px; color: #64748b; line-height: 1.6;">
+                This is an automated message from Kollabary. If you have questions, please visit our support center.
               </p>
-              <p style="margin: 0; font-size: 11px; color: #a8a1b5;">
+              <p style="margin: 0; font-size: 12px; color: #94a3b8; font-weight: 500;">
                 &copy; ${year} Kollabary. All rights reserved.
               </p>
             </td>
           </tr>
 
+        </table>
+
+        <!-- Unsubscribe/Legal -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width: 520px; margin-top: 24px;">
+           <tr>
+            <td style="text-align: center; padding: 0 16px;">
+              <p style="margin: 0; font-size: 11px; color: #94a3b8; line-height: 1.5;">
+                You are receiving this because you registered on kollabary.com. 
+              </p>
+            </td>
+          </tr>
         </table>
       </td>
     </tr>
@@ -88,39 +92,32 @@ export class MailerService {
     const resetLink = `${frontendUrl}/auth/reset-password?token=${resetToken}&id=${userId}`;
 
     const content = `
-      <!-- Icon -->
-      <div style="text-align: center; margin-bottom: 20px;">
-        <div style="display: inline-block; width: 56px; height: 56px; background: #fff1f8; border-radius: 16px; line-height: 56px; text-align: center;">
-          <span style="font-size: 28px;">🔒</span>
-        </div>
-      </div>
-
-      <h2 style="margin: 0 0 10px 0; font-size: 20px; font-weight: 800; color: #1d284d; text-align: center; letter-spacing: -0.4px;">Reset Your Password</h2>
-      <p style="margin: 0 0 24px 0; font-size: 14px; color: #514b61; text-align: center; line-height: 1.6;">
-        We received a request to reset your Kollabary password. Click the button below to create a new one.
+      <h1 style="margin: 0 0 16px 0; font-size: 24px; font-weight: 700; color: #1e293b; text-align: center; letter-spacing: -0.02em;">Reset your password</h1>
+      <p style="margin: 0 0 32px 0; font-size: 16px; color: #475569; text-align: center; line-height: 1.6;">
+        We received a request to reset your password. Click the button below to proceed.
       </p>
 
       <!-- CTA Button -->
-      <div style="text-align: center; margin: 0 0 24px 0;">
+      <div style="text-align: center; margin: 0 0 32px 0;">
         <a href="${resetLink}"
            target="_blank"
-           style="display: inline-block; background: linear-gradient(90deg, #E91E8C 0%, #6B1B6F 100%); color: #ffffff; padding: 14px 36px; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 12px; box-shadow: 0 4px 12px rgba(233, 30, 140, 0.2); letter-spacing: 0.2px;">
+           style="display: inline-block; background-color: #E91E8C; color: #ffffff; padding: 14px 32px; font-size: 15px; font-weight: 600; text-decoration: none; border-radius: 6px; box-shadow: 0 2px 4px rgba(233, 30, 140, 0.15);">
           Reset Password
         </a>
       </div>
 
       <!-- Info box -->
-      <div style="background: #faf9fb; border: 1px solid #f0ebf8; border-radius: 14px; padding: 16px; margin-bottom: 24px;">
-        <p style="margin: 0 0 4px 0; font-size: 13px; font-weight: 700; color: #E91E8C;">⏱ Expires in 1 hour</p>
-        <p style="margin: 0; font-size: 13px; color: #6b5f7b; line-height: 1.5;">
-          For security, this link will expire in 1 hour. If you didn't request this, you can safely ignore this email.
+      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 32px;">
+        <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #E91E8C;">Link expires in 1 hour</p>
+        <p style="margin: 0; font-size: 14px; color: #64748b; line-height: 1.5;">
+          If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.
         </p>
       </div>
 
       <!-- Fallback link -->
-      <p style="margin: 0; font-size: 11px; color: #a8a1b5; text-align: center; line-height: 1.6;">
-        If the button doesn't work, copy and paste this link:<br>
-        <a href="${resetLink}" style="color: #6B1B6F; word-break: break-all; font-size: 10px;">${resetLink}</a>
+      <p style="margin: 0; font-size: 12px; color: #94a3b8; text-align: center; line-height: 1.6;">
+        Button not working? Copy and paste this link into your browser:<br>
+        <a href="${resetLink}" style="color: #6B1B6F; word-break: break-all;">${resetLink}</a>
       </p>`;
 
     try {
@@ -142,31 +139,24 @@ export class MailerService {
     const dashboardLink = `${frontendUrl}/collaborations`;
 
     const content = `
-      <!-- Icon -->
-      <div style="text-align: center; margin-bottom: 20px;">
-        <div style="display: inline-block; width: 56px; height: 56px; background: #fff1f8; border-radius: 16px; line-height: 56px; text-align: center;">
-          <span style="font-size: 28px;">🤝</span>
-        </div>
-      </div>
-
-      <h2 style="margin: 0 0 10px 0; font-size: 20px; font-weight: 800; color: #1d284d; text-align: center; letter-spacing: -0.4px;">New Collaboration Request</h2>
-      <p style="margin: 0 0 24px 0; font-size: 14px; color: #514b61; text-align: center; line-height: 1.6;">
-        You've received a new proposal on Kollabary! Review the details below.
+      <h1 style="margin: 0 0 16px 0; font-size: 24px; font-weight: 700; color: #1e293b; text-align: center; letter-spacing: -0.02em;">New Collaboration Proposal</h1>
+      <p style="margin: 0 0 32px 0; font-size: 16px; color: #475569; text-align: center; line-height: 1.6;">
+        You've received a new collaboration request. Review the details below to respond.
       </p>
 
       <!-- Details card -->
-      <div style="background: #faf9fb; border: 1px solid #f0ebf8; border-radius: 16px; padding: 16px 20px; margin-bottom: 24px;">
+      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; margin-bottom: 32px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
           <tr>
-            <td style="padding-bottom: 12px;">
-              <p style="margin: 0; font-size: 10px; color: #a8a1b5; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">From</p>
-              <p style="margin: 4px 0 0 0; font-size: 15px; font-weight: 800; color: #1d284d;">${requesterName}</p>
+            <td style="padding-bottom: 20px;">
+              <p style="margin: 0; font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">From</p>
+              <p style="margin: 4px 0 0 0; font-size: 16px; font-weight: 600; color: #1e293b;">${requesterName}</p>
             </td>
           </tr>
           <tr>
             <td>
-              <p style="margin: 0; font-size: 10px; color: #a8a1b5; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Project</p>
-              <p style="margin: 4px 0 0 0; font-size: 15px; font-weight: 800; color: #E91E8C;">${collaborationTitle}</p>
+              <p style="margin: 0; font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Project Title</p>
+              <p style="margin: 4px 0 0 0; font-size: 16px; font-weight: 600; color: #E91E8C;">${collaborationTitle}</p>
             </td>
           </tr>
         </table>
@@ -176,8 +166,8 @@ export class MailerService {
       <div style="text-align: center;">
         <a href="${dashboardLink}"
            target="_blank"
-           style="display: inline-block; background: linear-gradient(90deg, #E91E8C 0%, #6B1B6F 100%); color: #ffffff; padding: 14px 36px; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 12px; box-shadow: 0 4px 12px rgba(233, 30, 140, 0.2); letter-spacing: 0.2px;">
-          View Request
+           style="display: inline-block; background-color: #E91E8C; color: #ffffff; padding: 14px 36px; font-size: 15px; font-weight: 600; text-decoration: none; border-radius: 6px; box-shadow: 0 2px 4px rgba(233, 30, 140, 0.15);">
+          Review Proposal
         </a>
       </div>`;
 
@@ -206,35 +196,27 @@ export class MailerService {
     const statusLabel = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
 
     const content = `
-      <!-- Icon -->
-      <div style="text-align: center; margin-bottom: 20px;">
-        <div style="display: inline-block; width: 56px; height: 56px; background: #fff1f8; border-radius: 16px; line-height: 56px; text-align: center;">
-          <span style="font-size: 28px;">🛡️</span>
-        </div>
-      </div>
-
-      <h2 style="margin: 0 0 10px 0; font-size: 20px; font-weight: 800; color: #1d284d; text-align: center; letter-spacing: -0.4px;">Verification Update</h2>
-      <p style="margin: 0 0 24px 0; font-size: 14px; color: #514b61; text-align: center; line-height: 1.6;">
-        Your profile verification request has been reviewed by our team.
+      <h1 style="margin: 0 0 16px 0; font-size: 24px; font-weight: 700; color: #1e293b; text-align: center; letter-spacing: -0.02em;">Verification Update</h1>
+      <p style="margin: 0 0 32px 0; font-size: 16px; color: #475569; text-align: center; line-height: 1.6;">
+        The review of your profile verification request is complete.
       </p>
 
       <!-- Status badge -->
-      <div style="background: ${statusBg}; border: 1px solid ${statusBorder}; border-radius: 16px; padding: 20px; margin-bottom: 24px; text-align: center;">
-        <p style="margin: 0 0 6px 0; font-size: 24px;">${emoji}</p>
-        <p style="margin: 0; font-size: 18px; font-weight: 800; color: ${statusColor}; letter-spacing: -0.3px;">${statusLabel}</p>
-        <p style="margin: 10px 0 0 0; font-size: 13px; color: #514b61; line-height: 1.5;">
+      <div style="background-color: ${statusBg}; border: 1px solid ${statusBorder}; border-radius: 8px; padding: 24px; margin-bottom: 32px; text-align: center;">
+        <p style="margin: 0; font-size: 18px; font-weight: 700; color: ${statusColor}; text-transform: uppercase; letter-spacing: 0.05em;">${statusLabel}</p>
+        <div style="margin-top: 16px; font-size: 15px; color: #475569; line-height: 1.6;">
           ${isApproved
         ? 'Great news! Your profile is now verified. The verified badge is now live on your profile.'
-        : 'Unfortunately, your request was not approved this time. Review the feedback in your settings and try again.'}
-        </p>
+        : 'Unfortunately, your request was not approved this time. Please review the feedback in your settings and feel free to try again.'}
+        </div>
       </div>
 
       <!-- CTA Button -->
       <div style="text-align: center;">
         <a href="${settingsLink}"
            target="_blank"
-           style="display: inline-block; background: linear-gradient(90deg, #E91E8C 0%, #6B1B6F 100%); color: #ffffff; padding: 14px 36px; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 12px; box-shadow: 0 4px 12px rgba(233, 30, 140, 0.2); letter-spacing: 0.2px;">
-          ${isApproved ? 'View Profile' : 'Go to Settings'}
+           style="display: inline-block; background-color: #E91E8C; color: #ffffff; padding: 14px 36px; font-size: 15px; font-weight: 600; text-decoration: none; border-radius: 6px; box-shadow: 0 2px 4px rgba(233, 30, 140, 0.15);">
+          ${isApproved ? 'View Profile' : 'Check Feedback'}
         </a>
       </div>`;
 
@@ -253,30 +235,23 @@ export class MailerService {
 
   async sendVerificationEmail(email: string, otp: string): Promise<boolean> {
     const content = `
-      <!-- Icon -->
-      <div style="text-align: center; margin-bottom: 20px;">
-        <div style="display: inline-block; width: 56px; height: 56px; background: #fff1f8; border-radius: 16px; line-height: 56px; text-align: center;">
-          <span style="font-size: 28px;">🛡️</span>
-        </div>
-      </div>
-
-      <h2 style="margin: 0 0 10px 0; font-size: 20px; font-weight: 800; color: #1d284d; text-align: center; letter-spacing: -0.4px;">Verify Your Email</h2>
-      <p style="margin: 0 0 24px 0; font-size: 14px; color: #514b61; text-align: center; line-height: 1.6;">
-        Welcome to Kollabary! Use the code below to complete your registration.
+      <h1 style="margin: 0 0 16px 0; font-size: 24px; font-weight: 700; color: #1e293b; text-align: center; letter-spacing: -0.02em;">Verify your email</h1>
+      <p style="margin: 0 0 32px 0; font-size: 16px; color: #475569; text-align: center; line-height: 1.6;">
+        Thanks for joining Kollabary! Please use the verification code below to complete your sign up.
       </p>
 
       <!-- OTP Box -->
-      <div style="text-align: center; margin: 0 0 24px 0;">
-        <div style="display: inline-block; background: #faf9fb; border: 2px dashed #E91E8C; border-radius: 16px; padding: 16px 32px;">
-          <span style="font-size: 32px; font-weight: 800; color: #E91E8C; letter-spacing: 8px;">${otp}</span>
+      <div style="text-align: center; margin: 0 0 32px 0;">
+        <div style="display: inline-block; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px 48px;">
+          <span style="font-size: 32px; font-weight: 700; color: #E91E8C; letter-spacing: 0.2em;">${otp}</span>
         </div>
       </div>
 
       <!-- Info box -->
-      <div style="background: #faf9fb; border: 1px solid #f0ebf8; border-radius: 14px; padding: 16px; margin-bottom: 20px;">
-        <p style="margin: 0 0 4px 0; font-size: 13px; font-weight: 700; color: #E91E8C;">⏱ Expires in 10 minutes</p>
-        <p style="margin: 0; font-size: 13px; color: #6b5f7b; line-height: 1.5;">
-          For security, this code will expire in 10 minutes. If you didn't request this, you can safely ignore this email.
+      <div style="background-color: #fffaf0; border: 1px solid #feebc8; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+        <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #c05621;">Code expires in 10 minutes</p>
+        <p style="margin: 0; font-size: 14px; color: #7b341e; line-height: 1.5;">
+          For security reasons, this code will expire soon. If you didn't request this, please ignore this email.
         </p>
       </div>`;
 
@@ -296,42 +271,35 @@ export class MailerService {
 
   async sendPaymentSuccessEmail(email: string, name: string, amount: number, coins: number, orderId: string): Promise<boolean> {
     const content = `
-      <!-- Icon -->
-      <div style="text-align: center; margin-bottom: 20px;">
-        <div style="display: inline-block; width: 56px; height: 56px; background: #f0fdf4; border-radius: 16px; line-height: 56px; text-align: center;">
-          <span style="font-size: 28px;">💰</span>
-        </div>
-      </div>
-
-      <h2 style="margin: 0 0 10px 0; font-size: 20px; font-weight: 800; color: #1d284d; text-align: center; letter-spacing: -0.4px;">Payment Successful!</h2>
-      <p style="margin: 0 0 24px 0; font-size: 14px; color: #514b61; text-align: center; line-height: 1.6;">
-        Your top-up was successful. KC coins have been added to your wallet.
+      <h1 style="margin: 0 0 16px 0; font-size: 24px; font-weight: 700; color: #1e293b; text-align: center; letter-spacing: -0.02em;">Payment successful</h1>
+      <p style="margin: 0 0 32px 0; font-size: 16px; color: #475569; text-align: center; line-height: 1.6;">
+        Your wallet has been credited. You can now use your coins for auctions and collaborations.
       </p>
 
       <!-- Details card -->
-      <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 16px; padding: 20px; margin-bottom: 24px;">
+      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; margin-bottom: 32px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
           <tr>
-            <td style="padding-bottom: 12px;">
-              <p style="margin: 0; font-size: 10px; color: #16a34a; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Amount Paid</p>
-              <p style="margin: 4px 0 0 0; font-size: 18px; font-weight: 800; color: #1d284d;">₹${amount}</p>
+            <td style="padding-bottom: 16px;">
+              <p style="margin: 0; font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Amount Paid</p>
+              <p style="margin: 4px 0 0 0; font-size: 18px; font-weight: 700; color: #1e293b;">₹${amount}</p>
             </td>
-            <td style="padding-bottom: 12px; text-align: right;">
-              <p style="margin: 0; font-size: 10px; color: #16a34a; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">K Coins Added</p>
-              <p style="margin: 4px 0 0 0; font-size: 18px; font-weight: 800; color: #E91E8C;">${coins} KC</p>
+            <td style="padding-bottom: 16px; text-align: right;">
+              <p style="margin: 0; font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">K Coins Added</p>
+              <p style="margin: 4px 0 0 0; font-size: 18px; font-weight: 700; color: #E91E8C;">${coins} K</p>
             </td>
           </tr>
           <tr>
-            <td colspan="2" style="padding-top: 12px; border-top: 1px dashed #bbf7d0;">
-              <p style="margin: 0; font-size: 10px; color: #16a34a; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Order ID</p>
-              <p style="margin: 4px 0 0 0; font-size: 13px; font-weight: 600; color: #514b61;">${orderId}</p>
+            <td colspan="2" style="padding-top: 16px; border-top: 1px solid #e2e8f0;">
+              <p style="margin: 0; font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Transaction ID</p>
+              <p style="margin: 4px 0 0 0; font-size: 14px; font-weight: 500; color: #1e293b; font-family: monospace;">${orderId}</p>
             </td>
           </tr>
         </table>
       </div>
 
-      <p style="margin: 0; font-size: 13px; color: #6b5f7b; text-align: center; line-height: 1.5;">
-        Thank you for choosing Kollabary! You can now use your KC coins for auctions and collaborations.
+      <p style="margin: 0; font-size: 14px; color: #64748b; text-align: center; line-height: 1.6;">
+        Thank you for your purchase! A receipt has been attached to your account history.
       </p>`;
 
     try {
