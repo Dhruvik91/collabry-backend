@@ -4,7 +4,7 @@
 CONTAINER_NAME="medbridges-kolab"
 IMAGE_NAME="medbridges-kolab-image"
 ENV_FILE=".env"
-PORT=3000
+PORT=3008
 
 echo "----- Pulling latest code -----"
 # git pull

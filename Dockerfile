@@ -35,7 +35,7 @@ COPY --from=builder /app/dist ./dist
 # Use non-root user
 USER node
 
-ENV PORT=3000
-EXPOSE 3000
+ENV PORT=3008
+EXPOSE 3008
 
 CMD ["node", "dist/main.js"]
