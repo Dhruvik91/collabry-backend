@@ -12,6 +12,8 @@ import { ReferralService } from '../referral/referral.service';
 import { WalletService } from '../kc-wallet/wallet.service';
 import { SignupDto } from './dto/auth.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
+import { KCSettingService, KCSettingKey } from '../kc-setting/kc-setting.service';
+import { TransactionPurpose } from '../../database/entities/enums';
 
 export type JwtPayload = { id: string; email: string; role: UserRole };
 
@@ -24,6 +26,7 @@ export class UserAuthService {
     private readonly mailerService: MailerService,
     private readonly referralService: ReferralService,
     private readonly walletService: WalletService,
+    private readonly settingService: KCSettingService,
     private readonly dataSource: DataSource,
   ) { }
 
@@ -132,6 +135,16 @@ export class UserAuthService {
     // Exclude sensitive fields from response
     const { otp: _, otpExpires: __, ...userWithoutOtp } = savedUser;
     
+    // Award New Arrival Bonus
+    const bonusAmount = await this.settingService.getSetting(KCSettingKey.NEW_ARRIVAL_BONUS_AMOUNT);
+    if (bonusAmount > 0) {
+      await this.walletService.credit(
+        user.id,
+        bonusAmount,
+        TransactionPurpose.NEW_ARRIVAL_BONUS
+      );
+    }
+
     // Reward referral if applicable
     await this.referralService.rewardReferral(user.id);
 
@@ -243,6 +256,16 @@ export class UserAuthService {
 
       // Create wallet
       await this.walletService.createWallet(user.id, 0);
+
+      // Award New Arrival Bonus
+      const bonusAmount = await this.settingService.getSetting(KCSettingKey.NEW_ARRIVAL_BONUS_AMOUNT);
+      if (bonusAmount > 0) {
+        await this.walletService.credit(
+          user.id,
+          bonusAmount,
+          TransactionPurpose.NEW_ARRIVAL_BONUS
+        );
+      }
     }
     return this.login(user);
   }

@@ -24,6 +24,7 @@ import {
     AdminBulkStatusDto 
 } from './dto/admin-management.dto';
 import { UserRole, ReportStatus, AuctionStatus, UserStatus } from '../../database/entities/enums';
+import { KCSettingKey } from '../kc-setting/kc-setting.service';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/Guards/roles.guard';
 import { JwtAuthGuard } from '../auth/Guards/jwt-guard';
@@ -223,5 +224,23 @@ export class AdminController {
     @ApiNotFoundResponseEnvelope('Conversation not found')
     async findConversationMessages(@Param('id') id: string) {
         return this.adminService.getConversationMessages(id);
+    }
+
+    // --- Settings ---
+    @Get('settings')
+    @ApiOperation({ summary: 'Get all platform settings' })
+    @ApiOkResponseEnvelope(Object, true)
+    async findAllSettings() {
+        return this.adminService.getSettings();
+    }
+
+    @Patch('settings/:key')
+    @ApiOperation({ summary: 'Update a platform setting' })
+    @ApiOkResponseEnvelope(Object)
+    async updateSetting(
+        @Param('key') key: KCSettingKey,
+        @Body('value') value: number
+    ) {
+        return this.adminService.updateSetting(key, value);
     }
 }

@@ -19,11 +19,11 @@ export class KCCronService {
     ) { }
 
     @Cron(CronExpression.EVERY_WEEK)
-    async handleWeeklyAllowance() {
-        this.logger.log('Starting weekly KC allowance job...');
+    async handleWeeklyRewards() {
+        this.logger.log('Starting weekly rewards distribution job...');
 
-        const brandAllowance = await this.settingService.getSetting(KCSettingKey.DAILY_ALLOWANCE_BRAND);
-        const influencerAllowance = await this.settingService.getSetting(KCSettingKey.DAILY_ALLOWANCE_INFLUENCER);
+        const brandAllowance = await this.settingService.getSetting(KCSettingKey.WEEKLY_REWARD_BRAND);
+        const influencerAllowance = await this.settingService.getSetting(KCSettingKey.WEEKLY_REWARD_INFLUENCER);
 
         await this.dataSource.transaction(async (manager) => {
             // Bulk update for Brands (UserRole.USER)
@@ -37,7 +37,7 @@ export class KCCronService {
             }
         });
 
-        this.logger.log('Weekly KC allowance job completed.');
+        this.logger.log('Weekly rewards distribution job completed.');
     }
 
     private async awardBulkAllowance(manager: any, role: UserRole, amount: number) {
@@ -64,7 +64,7 @@ export class KCCronService {
                 wallet: { id: w.id },
                 amount,
                 type: TransactionType.CREDIT,
-                purpose: TransactionPurpose.DAILY_ALLOWANCE,
+                purpose: TransactionPurpose.WEEKLY_REWARD,
             }));
 
             // Bulk insert transactions

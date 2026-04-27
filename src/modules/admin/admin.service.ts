@@ -30,6 +30,7 @@ import {
 } from './dto/admin-management.dto';
 import { PaymentOrder } from '../../database/entities/payment-order.entity';
 import { PaymentStatus } from '../../database/entities/enums';
+import { KCSettingService, KCSettingKey } from '../kc-setting/kc-setting.service';
 import { Between, ILike } from 'typeorm';
 
 @Injectable()
@@ -55,6 +56,7 @@ export class AdminService {
         private readonly messageRepo: Repository<Message>,
         @InjectRepository(PaymentOrder)
         private readonly orderRepo: Repository<PaymentOrder>,
+        private readonly settingService: KCSettingService,
     ) { }
 
     /**
@@ -563,7 +565,7 @@ export class AdminService {
     }
 
     /**
-     * Get all messages for a specific conversation (Admin View)
+     * Get conversation messages for a specific conversation (Admin View)
      */
     async getConversationMessages(conversationId: string) {
         return await this.messageRepo.find({
@@ -571,5 +573,19 @@ export class AdminService {
             relations: ['sender', 'sender.profile', 'sender.influencerProfile'],
             order: { createdAt: 'ASC' },
         });
+    }
+
+    /**
+     * Get all platform settings
+     */
+    async getSettings() {
+        return await this.settingService.getAllSettings();
+    }
+
+    /**
+     * Update a platform setting
+     */
+    async updateSetting(key: KCSettingKey, value: number) {
+        return await this.settingService.updateSetting(key, value);
     }
 }
