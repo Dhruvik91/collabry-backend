@@ -44,7 +44,8 @@ export class KCSettingService implements OnModuleInit {
 
     async getSetting(key: KCSettingKey): Promise<number> {
         const setting = await this.settingRepo.findOne({ where: { key } });
-        return setting ? Number(setting.value) : 0;
+        const val = setting ? Number(setting.value) : 0;
+        return val;
     }
 
     async getAllSettings(): Promise<KCSetting[]> {

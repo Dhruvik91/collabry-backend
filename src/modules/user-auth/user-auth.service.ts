@@ -10,7 +10,6 @@ import { HashingService } from '../../core/hashing/hashing';
 import { MailerService } from '../mailer/mailer.service';
 import { ReferralService } from '../referral/referral.service';
 import { WalletService } from '../kc-wallet/wallet.service';
-import { SignupDto } from './dto/auth.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { KCSettingService, KCSettingKey } from '../kc-setting/kc-setting.service';
 import { TransactionPurpose } from '../../database/entities/enums';
@@ -50,7 +49,7 @@ export class UserAuthService {
     }
 
     const passwordHash = await this.hashing.hash(password);
-    
+
     // Generate secure 6-digit OTP
     const otp = randomInt(100000, 999999).toString();
     const otpHash = await this.hashing.hash(otp);
@@ -61,9 +60,9 @@ export class UserAuthService {
     const referralCode = await this.referralService.generateUniqueReferralCode();
 
     // Create user with PENDING status
-    const user = this.usersRepo.create({ 
-      email, 
-      role, 
+    const user = this.usersRepo.create({
+      email,
+      role,
       passwordHash,
       status: UserStatus.PENDING,
       emailVerified: false,
@@ -73,11 +72,11 @@ export class UserAuthService {
       referredBy,
       username,
     });
-    
+
     // Use a transaction to ensure user and referral tracking are atomic
     await this.dataSource.transaction(async (manager) => {
       const savedUser = await manager.save(user);
-      
+
       // Initialize wallet
       await this.walletService.createWallet(savedUser.id, 0, manager);
 
@@ -126,15 +125,12 @@ export class UserAuthService {
     user.emailVerified = true;
     user.otp = null;
     user.otpExpires = null;
-    
+
     const savedUser = await this.usersRepo.save(user);
 
-    // Generate token for the verified user
-    const token = this.generateToken({ id: savedUser.id, email: savedUser.email, role: savedUser.role });
+    // Reward referral if applicable
+    await this.referralService.rewardReferral(user.id);
 
-    // Exclude sensitive fields from response
-    const { otp: _, otpExpires: __, ...userWithoutOtp } = savedUser;
-    
     // Award New Arrival Bonus
     const bonusAmount = await this.settingService.getSetting(KCSettingKey.NEW_ARRIVAL_BONUS_AMOUNT);
     if (bonusAmount > 0) {
@@ -145,13 +141,11 @@ export class UserAuthService {
       );
     }
 
-    // Reward referral if applicable
-    await this.referralService.rewardReferral(user.id);
+    const loginData = await this.login(savedUser, true);
 
-    return { 
+    return {
       message: 'Email verified successfully',
-      access_token: token, 
-      user: userWithoutOtp 
+      ...loginData
     };
   }
 
@@ -177,7 +171,7 @@ export class UserAuthService {
 
     user.otp = otpHash;
     user.otpExpires = otpExpires;
-    
+
     await this.usersRepo.save(user);
 
     // Send new verification email
@@ -194,16 +188,16 @@ export class UserAuthService {
     if (!user || !user.passwordHash) return null;
     const match = await this.hashing.compare(password, user.passwordHash);
     if (!match) return null;
-    
+
     // Ensure user is verified/active
     if (user.status === UserStatus.SUSPENDED) {
       throw new UnauthorizedException('Your account has been suspended. Please contact support.');
     }
-    
+
     if (user.status !== UserStatus.ACTIVE) {
       throw new UnauthorizedException('Please verify your email address before logging in.');
     }
-    
+
     return user;
   }
 
@@ -211,12 +205,12 @@ export class UserAuthService {
     return this.jwt.sign(payload);
   }
 
-  async login(user: User) {
+  async login(user: User, isNewUser = false) {
     const token = this.generateToken({ id: user.id, email: user.email, role: user.role });
 
     // Exclude passwordHash from response
     const { passwordHash: _, ...userWithoutPassword } = user;
-    return { access_token: token, user: userWithoutPassword };
+    return { access_token: token, user: userWithoutPassword, isNewUser };
   }
 
   async createInfluencer(email: string, password: string, confirmPassword: string, username?: string) {
@@ -250,7 +244,7 @@ export class UserAuthService {
     if (!user) {
       // Generate unique referral code
       const referralCode = await this.referralService.generateUniqueReferralCode();
-      
+
       user = this.usersRepo.create({ email, role: UserRole.USER, passwordHash: null, referralCode });
       user = await this.usersRepo.save(user);
 
@@ -266,8 +260,9 @@ export class UserAuthService {
           TransactionPurpose.NEW_ARRIVAL_BONUS
         );
       }
+      return this.login(user, true);
     }
-    return this.login(user);
+    return this.login(user, false);
   }
 
   async me(userId: string) {
