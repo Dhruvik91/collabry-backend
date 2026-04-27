@@ -4,7 +4,7 @@ export class AddFullNameToInfluencerProfile1771483426027 implements MigrationInt
     name = 'AddFullNameToInfluencerProfile1771483426027'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`ALTER TABLE "influencer_profiles" ADD "fullName" character varying`);
+        await queryRunner.query(`ALTER TABLE "influencer_profiles" ADD COLUMN IF NOT EXISTS "fullName" character varying`);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {

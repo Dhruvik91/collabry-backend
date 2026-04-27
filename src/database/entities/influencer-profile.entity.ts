@@ -27,8 +27,8 @@ export class InfluencerProfile {
     user: User;
 
     @ApiProperty()
-    @Column({ unique: true, nullable: true })
-    @Index()
+    @Index({ unique: true, where: '"deletedAt" IS NULL' })
+    @Column({ nullable: true })
     slug: string;
 
     @ApiProperty()

@@ -12,12 +12,13 @@ export class User {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @Column({ unique: true })
+    @Index({ unique: true, where: '"deletedAt" IS NULL' })
+    @Column()
     email: string;
     
     @ApiProperty()
-    @Column({ unique: true, nullable: true })
-    @Index()
+    @Index({ unique: true, where: '"deletedAt" IS NULL' })
+    @Column({ nullable: true })
     username: string;
 
     @Exclude()
@@ -69,8 +70,8 @@ export class User {
     influencerProfile: InfluencerProfile;
 
     @ApiProperty()
-    @Column({ unique: true, nullable: true })
-    @Index()
+    @Index({ unique: true, where: '"deletedAt" IS NULL' })
+    @Column({ nullable: true })
     referralCode: string;
 
     @ApiProperty()

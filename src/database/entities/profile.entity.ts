@@ -6,6 +6,7 @@ import {
     JoinColumn,
     CreateDateColumn,
     UpdateDateColumn,
+    DeleteDateColumn,
     Index,
 } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
@@ -27,8 +28,8 @@ export class Profile {
     fullName: string;
 
     @ApiProperty()
-    @Index()
-    @Column({ unique: true, nullable: true })
+    @Index({ unique: true, where: '"deletedAt" IS NULL' })
+    @Column({ nullable: true })
     username: string;
 
     @ApiProperty()
@@ -53,4 +54,7 @@ export class Profile {
 
     @UpdateDateColumn()
     updatedAt: Date;
+
+    @DeleteDateColumn()
+    deletedAt: Date;
 }

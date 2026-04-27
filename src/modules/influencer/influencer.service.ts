@@ -1,9 +1,10 @@
 import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { InfluencerProfile } from '../../database/entities/influencer-profile.entity';
 import { Collaboration } from '../../database/entities/collaboration.entity';
 import { User } from '../../database/entities/user.entity';
+import { Profile } from '../../database/entities/profile.entity';
 import { UserRole, UserStatus, CollaborationStatus } from '../../database/entities/enums';
 import { SaveInfluencerProfileDto } from './dto/save-influencer-profile.dto';
 import { SearchInfluencersDto } from './dto/search-influencers.dto';
@@ -24,7 +25,10 @@ export class InfluencerService {
         private readonly userRepo: Repository<User>,
         @InjectRepository(Collaboration)
         private readonly collaborationRepo: Repository<Collaboration>,
+        @InjectRepository(Profile)
+        private readonly profileRepo: Repository<Profile>,
         private readonly rankingService: RankingService,
+        private readonly dataSource: DataSource,
     ) { }
 
     /**
@@ -319,6 +323,14 @@ export class InfluencerService {
         const user = await this.userRepo.findOneBy({ id: userId });
         if (!user) throw new NotFoundException('User not found');
 
-        await this.userRepo.softDelete(userId);
+        // Use a transaction for consistency
+        await this.dataSource.transaction(async (manager) => {
+            // Soft delete related profiles first (though order doesn't strictly matter for soft delete)
+            await manager.getRepository(InfluencerProfile).softDelete({ user: { id: userId } });
+            await manager.getRepository(Profile).softDelete({ user: { id: userId } });
+            
+            // Soft delete the user
+            await manager.getRepository(User).softDelete(userId);
+        });
     }
 }
