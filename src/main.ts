@@ -1,9 +1,11 @@
 import { NestFactory, Reflector } from '@nestjs/core';
 import helmet from 'helmet';
+import basicAuth from 'express-basic-auth';
 import { AppModule } from './app.module';
 import { FailureResponseTransformer } from './core/exception-filters/failure-exception';
 import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
 import { SuccessResponseTransformer } from './core/interceptor/success-response-interceptor';
+import { LoggingInterceptor } from './core/interceptor/logging.interceptor';
 import { ConfigService } from '@nestjs/config';
 import { JwtAuthGuard } from './modules/auth/Guards/jwt-guard';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
@@ -23,6 +25,7 @@ async function bootstrap() {
   app.use(helmet());
   app.useGlobalFilters(new FailureResponseTransformer());
   app.useGlobalInterceptors(
+    new LoggingInterceptor(),
     new ClassSerializerInterceptor(reflector),
     new SuccessResponseTransformer(),
   );
@@ -38,6 +41,17 @@ async function bootstrap() {
 
   app.useGlobalGuards(new JwtAuthGuard(reflector));
   app.setGlobalPrefix('api');
+
+  app.use(
+    ['/docs', '/docs-json'],
+    basicAuth({
+      challenge: true,
+      users: {
+        [config.get<string>('SWAGGER_USER') || 'admin']:
+          config.get<string>('SWAGGER_PASSWORD') || 'kollabary@2026',
+      },
+    }),
+  );
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Kollabary API')
