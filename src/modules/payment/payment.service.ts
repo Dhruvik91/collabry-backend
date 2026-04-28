@@ -9,7 +9,7 @@ import { WalletService } from '../kc-wallet/wallet.service';
 import { InitiateTopUpDto, VerifyPaymentDto } from './dto/payment.dto';
 import { ConfigService } from '@nestjs/config';
 import { User } from '../../database/entities/user.entity';
-import { MailerService } from '../mailer/mailer.service';
+import { AppMailerService } from '../mailer/mailer.service';
 
 @Injectable()
 export class PaymentService {
@@ -26,7 +26,7 @@ export class PaymentService {
         private readonly walletService: WalletService,
         private readonly dataSource: DataSource,
         private readonly configService: ConfigService,
-        private readonly mailerService: MailerService,
+        private readonly mailerService: AppMailerService,
     ) { }
 
     async initiateTopUp(userId: string, dto: InitiateTopUpDto) {

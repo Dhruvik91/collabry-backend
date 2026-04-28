@@ -7,7 +7,7 @@ import { JwtService } from '@nestjs/jwt';
 import { User } from '../../database/entities/user.entity';
 import { UserRole, UserStatus } from '../../database/entities/enums';
 import { HashingService } from '../../core/hashing/hashing';
-import { MailerService } from '../mailer/mailer.service';
+import { AppMailerService } from '../mailer/mailer.service';
 import { ReferralService } from '../referral/referral.service';
 import { WalletService } from '../kc-wallet/wallet.service';
 import { VerifyEmailDto } from './dto/verify-email.dto';
@@ -22,7 +22,7 @@ export class UserAuthService {
     @InjectRepository(User) private readonly usersRepo: Repository<User>,
     private readonly hashing: HashingService,
     private readonly jwt: JwtService,
-    private readonly mailerService: MailerService,
+    private readonly mailerService: AppMailerService,
     private readonly referralService: ReferralService,
     private readonly walletService: WalletService,
     private readonly settingService: KCSettingService,

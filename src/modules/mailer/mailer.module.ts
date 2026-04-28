@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { MailerModule as NestMailerModule } from '@nestjs-modules/mailer';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { MailerService } from './mailer.service';
+import { AppMailerService } from './mailer.service';
+import { SendgridModule } from '../sendgrid/sendgrid.module';
 
 @Module({
   imports: [
+    SendgridModule,
     NestMailerModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -24,7 +26,7 @@ import { MailerService } from './mailer.service';
       inject: [ConfigService],
     }),
   ],
-  providers: [MailerService],
-  exports: [MailerService],
+  providers: [AppMailerService],
+  exports: [AppMailerService],
 })
 export class MailerConfigModule { }

@@ -7,7 +7,7 @@ import { User } from '../../database/entities/user.entity';
 import { Profile } from '../../database/entities/profile.entity';
 import { CreateVerificationRequestDto } from './dto/create-verification-request.dto';
 import { VerificationStatus } from '../../database/entities/enums';
-import { MailerService } from '../mailer/mailer.service';
+import { AppMailerService } from '../mailer/mailer.service';
 import { RankingService } from '../ranking/ranking.service';
 
 @Injectable()
@@ -18,7 +18,7 @@ export class VerificationService {
         @InjectRepository(User)
         private readonly userRepo: Repository<User>,
         private readonly dataSource: DataSource,
-        private readonly mailerService: MailerService,
+        private readonly mailerService: AppMailerService,
         private readonly rankingService: RankingService,
     ) { }
 
