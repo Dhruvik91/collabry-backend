@@ -17,6 +17,7 @@ import { RolesGuard } from '../auth/Guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../../database/entities/enums';
 import { PaymentOrder } from '../../database/entities/payment-order.entity';
+import { AllowUnauthorized } from '../auth/unauthorized/allow-unauthorixed';
 
 @ApiTags('Payments')
 @ApiBearerAuth()
@@ -77,6 +78,7 @@ export class PaymentController {
     }
 
     @Post('webhook/razorpay')
+    @AllowUnauthorized()
     @ApiOperation({ summary: 'Razorpay Webhook handler' })
     async handleWebhook(@Body() payload: any, @Req() req: any) {
         const signature = req.headers['x-razorpay-signature'];
