@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsEnum, IsNumber, IsOptional, IsJSON } from 'class-validator';
+import { IsNotEmpty, IsEnum, IsNumber, IsOptional, IsString, IsBoolean } from 'class-validator';
 import { SubscriptionTier } from '../../../database/entities/enums';
 
 export class SaveSubscriptionPlanDto {
@@ -16,4 +16,24 @@ export class SaveSubscriptionPlanDto {
     @ApiProperty({ example: { collaborators: 10, searchFilters: true } })
     @IsOptional()
     features?: any;
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsString()
+    description?: string;
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsString()
+    imageUrl?: string;
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsBoolean()
+    isPopular?: boolean;
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsBoolean()
+    isActive?: boolean;
 }

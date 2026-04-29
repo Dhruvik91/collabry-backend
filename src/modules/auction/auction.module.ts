@@ -9,6 +9,7 @@ import { AuctionService } from './auction.service';
 import { CollaborationModule } from '../collaboration/collaboration.module';
 import { KcWalletModule } from '../kc-wallet/kc-wallet.module';
 import { KCSettingModule } from '../kc-setting/kc-setting.module';
+import { MailerConfigModule } from '../mailer/mailer.module';
 
 @Module({
     imports: [
@@ -16,6 +17,7 @@ import { KCSettingModule } from '../kc-setting/kc-setting.module';
         CollaborationModule,
         KcWalletModule,
         KCSettingModule,
+        MailerConfigModule,
     ],
     controllers: [AuctionController],
     providers: [AuctionService],

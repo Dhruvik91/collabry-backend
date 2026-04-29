@@ -22,10 +22,25 @@ export class CreateTopUpPlanDto {
     @Min(0)
     bonusCoins?: number;
 
-    @ApiProperty()
+    @ApiProperty({ required: false })
     @IsOptional()
     @IsBoolean()
     isActive?: boolean;
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsString()
+    description?: string;
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsString()
+    imageUrl?: string;
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsBoolean()
+    isPopular?: boolean;
 }
 
 export class UpdateTopUpPlanDto {
@@ -56,4 +71,19 @@ export class UpdateTopUpPlanDto {
     @IsOptional()
     @IsBoolean()
     isActive?: boolean;
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsString()
+    description?: string;
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsString()
+    imageUrl?: string;
+
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsBoolean()
+    isPopular?: boolean;
 }
