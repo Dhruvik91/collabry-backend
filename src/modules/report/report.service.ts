@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Report } from '../../database/entities/report.entity';
 import { Profile } from '../../database/entities/profile.entity';
 import { InfluencerProfile } from '../../database/entities/influencer-profile.entity';
+import { Review } from '../../database/entities/review.entity';
 import { CreateReportDto } from './dto/create-report.dto';
 import { ReportStatus } from '../../database/entities/enums';
 
@@ -16,22 +17,31 @@ export class ReportService {
     private readonly influencerProfileRepo: Repository<InfluencerProfile>,
     @InjectRepository(Profile)
     private readonly profileRepo: Repository<Profile>,
+    @InjectRepository(Review)
+    private readonly reviewRepo: Repository<Review>,
   ) { }
 
   async createReport(reporterId: string, createDto: CreateReportDto): Promise<Report> {
-    let resolvedTargetUserId = createDto.targetUserId || createDto.targetId;
+    let resolvedTargetUserId = createDto.targetUserId;
 
-    // Efficiently resolve target user ID in a single pass if possible
+    // Resolve target user ID if only targetId (profile ID) is provided
     if (!resolvedTargetUserId && createDto.targetId) {
-        // Try all possible profile owners in parallel
-        const [influencer, brand] = await Promise.all([
+        // Try all possible profile owners and review authors in parallel
+        const [influencer, brand, review] = await Promise.all([
             this.influencerProfileRepo.findOne({ where: { id: createDto.targetId }, relations: ['user'] }),
-            this.profileRepo.findOne({ where: { id: createDto.targetId }, relations: ['user'] })
+            this.profileRepo.findOne({ where: { id: createDto.targetId }, relations: ['user'] }),
+            this.reviewRepo.findOne({ where: { id: createDto.targetId }, relations: ['reviewer'] })
         ]);
 
-        const profile = influencer || brand;
-        if (profile && profile.user) {
-            resolvedTargetUserId = profile.user.id;
+        if (influencer?.user) {
+            resolvedTargetUserId = influencer.user.id;
+        } else if (brand?.user) {
+            resolvedTargetUserId = brand.user.id;
+        } else if (review?.reviewer) {
+            resolvedTargetUserId = review.reviewer.id;
+        } else {
+            // Fallback: assume targetId might be the user ID if not found in profiles/reviews
+            resolvedTargetUserId = createDto.targetId;
         }
     }
 
