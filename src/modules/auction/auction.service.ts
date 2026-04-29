@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Auction } from '../../database/entities/auction.entity';
@@ -14,9 +14,12 @@ import { SocketGateway } from '../socket/socket.gateway';
 import { WalletService } from '../kc-wallet/wallet.service';
 import { KCSettingService, KCSettingKey } from '../kc-setting/kc-setting.service';
 import { TransactionPurpose } from '../../database/entities/enums';
+import { AppMailerService } from '../mailer/mailer.service';
 
 @Injectable()
 export class AuctionService {
+    private readonly logger = new Logger(AuctionService.name);
+
     constructor(
         @InjectRepository(Auction)
         private auctionRepository: Repository<Auction>,
@@ -29,6 +32,7 @@ export class AuctionService {
         private socketGateway: SocketGateway,
         private walletService: WalletService,
         private settingService: KCSettingService,
+        private mailerService: AppMailerService,
     ) {}
 
     async createAuction(createAuctionDto: CreateAuctionDto, userId: string): Promise<Auction> {
@@ -228,7 +232,7 @@ export class AuctionService {
     async acceptBid(bidId: string, brandId: string): Promise<any> {
         const bid = await this.bidRepository.findOne({
             where: { id: bidId },
-            relations: ['auction', 'auction.creator', 'influencer'],
+            relations: ['auction', 'auction.creator', 'auction.creator.profile', 'influencer'],
         });
 
         if (!bid) {
@@ -302,6 +306,14 @@ export class AuctionService {
             auctionTitle: bid.auction.title,
             bidAmount: bid.amount
         });
+
+        // Send email notification to influencer
+        this.mailerService.sendBidAcceptedEmail(
+            bid.influencer.email,
+            bid.auction.title,
+            bid.amount,
+            bid.auction.creator.profile?.fullName || bid.auction.creator.username || 'A Brand'
+        ).catch(err => this.logger.error(`Failed to send bid acceptance email to ${bid.influencer.email}`, err));
         
         return { message: 'Bid accepted and collaboration created', bid, collaborationId: result.collaborationId };
     }
