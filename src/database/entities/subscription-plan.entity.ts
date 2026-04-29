@@ -23,4 +23,20 @@ export class SubscriptionPlan {
     @ApiProperty()
     @Column({ type: 'jsonb', nullable: true })
     features: any;
+
+    @ApiProperty({ required: false })
+    @Column({ type: 'text', nullable: true })
+    description: string;
+
+    @ApiProperty({ required: false })
+    @Column({ type: 'text', nullable: true })
+    imageUrl: string;
+
+    @ApiProperty()
+    @Column({ default: false })
+    isPopular: boolean;
+
+    @ApiProperty()
+    @Column({ default: true })
+    isActive: boolean;
 }

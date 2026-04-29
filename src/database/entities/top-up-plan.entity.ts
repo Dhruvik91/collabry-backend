@@ -27,6 +27,18 @@ export class TopUpPlan {
     @Column({ default: true })
     isActive: boolean;
 
+    @ApiProperty({ required: false })
+    @Column({ type: 'text', nullable: true })
+    description: string;
+
+    @ApiProperty({ required: false })
+    @Column({ type: 'text', nullable: true })
+    imageUrl: string;
+
+    @ApiProperty()
+    @Column({ default: false })
+    isPopular: boolean;
+
     @CreateDateColumn()
     createdAt: Date;
 
