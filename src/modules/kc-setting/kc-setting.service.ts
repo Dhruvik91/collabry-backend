@@ -12,6 +12,7 @@ export enum KCSettingKey {
     NEW_ARRIVAL_BONUS_AMOUNT = 'NEW_ARRIVAL_BONUS_AMOUNT',
     REFERRAL_REWARD_REFERRER = 'REFERRAL_REWARD_REFERRER',
     REFERRAL_REWARD_REFERRED = 'REFERRAL_REWARD_REFERRED',
+    PITCH_PRICE = 'PITCH_PRICE',
 }
 
 @Injectable()
@@ -32,6 +33,7 @@ export class KCSettingService implements OnModuleInit {
             { key: KCSettingKey.NEW_ARRIVAL_BONUS_AMOUNT, value: 500 },
             { key: KCSettingKey.REFERRAL_REWARD_REFERRER, value: 1000 },
             { key: KCSettingKey.REFERRAL_REWARD_REFERRED, value: 500 },
+            { key: KCSettingKey.PITCH_PRICE, value: 250 },
         ];
 
         for (const item of defaults) {

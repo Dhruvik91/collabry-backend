@@ -21,6 +21,7 @@ import { KCSetting } from './entities/kc-setting.entity';
 import { Referral } from './entities/referral.entity';
 import { TopUpPlan } from './entities/top-up-plan.entity';
 import { PaymentOrder } from './entities/payment-order.entity';
+import { Pitch } from './entities/pitch.entity';
 
 export const AllEntities = [
   AdminAction,
@@ -46,6 +47,7 @@ export const AllEntities = [
   Referral,
   TopUpPlan,
   PaymentOrder,
+  Pitch,
 ];
 
 export const CustomRepository = [

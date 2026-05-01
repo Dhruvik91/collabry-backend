@@ -33,6 +33,7 @@ import { TopUpModule } from './modules/top-up/top-up.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { RolesGuard } from './modules/auth/Guards/roles.guard';
 import { SendgridModule } from './modules/sendgrid/sendgrid.module';
+import { PitchModule } from './modules/pitch/pitch.module';
 
 
 @Module({
@@ -67,6 +68,7 @@ import { SendgridModule } from './modules/sendgrid/sendgrid.module';
     ReferralModule,
     TopUpModule,
     PaymentModule,
+    PitchModule,
 
     // Utility modules
 
