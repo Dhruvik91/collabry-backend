@@ -49,6 +49,7 @@ export class PitchService {
                 influencer,
                 target,
                 message: dto.message,
+                workUrl: dto.workUrl,
                 status: PitchStatus.PENDING,
             });
 

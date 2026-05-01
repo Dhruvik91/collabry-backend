@@ -11,4 +11,9 @@ export class CreatePitchDto {
     @IsNotEmpty()
     @IsString()
     message: string;
+
+    @ApiProperty({ required: false })
+    @IsString()
+    @IsNotEmpty()
+    workUrl?: string;
 }

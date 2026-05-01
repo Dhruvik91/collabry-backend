@@ -44,6 +44,10 @@ export class Pitch {
     })
     status: PitchStatus;
 
+    @ApiProperty({ required: false })
+    @Column({ type: 'text', nullable: true })
+    workUrl: string;
+
     @CreateDateColumn()
     createdAt: Date;
 
