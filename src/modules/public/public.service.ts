@@ -180,6 +180,7 @@ export class PublicService {
             bio: brandProfile.bio,
             location: brandProfile.location,
             socialLinks: brandProfile.socialLinks,
+            verified: (brandProfile as any).verified || false,
             stats: {
                 totalAuctions: stats.totalAuctions ?? 0,
                 activeAuctionsCount: stats.activeAuctionsCount ?? 0,
@@ -187,6 +188,7 @@ export class PublicService {
             },
             collaboratorCount: collaborators.length,
             collaborators,
+            auctions: (brandProfile as any).auctions || [],
         };
     }
 }
