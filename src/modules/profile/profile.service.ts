@@ -167,12 +167,12 @@ export class ProfileService {
         const profile = await this.getProfileById(profileId);
         const userId = profile.user.id;
 
-        const [totalAuctions, activeAuctions, completedCollaborations] = await Promise.all([
+        const [totalAuctions, auctions, completedCollaborations] = await Promise.all([
             this.auctionRepo.count({ where: { creator: { id: userId } } }),
             this.auctionRepo.find({ 
-                where: { creator: { id: userId }, status: AuctionStatus.OPEN },
+                where: { creator: { id: userId } },
                 order: { createdAt: 'DESC' },
-                take: 5
+                take: 50
             }),
             this.collaborationRepo.count({ 
                 where: [
@@ -185,10 +185,10 @@ export class ProfileService {
             ...profile,
             stats: {
                 totalAuctions,
-                activeAuctionsCount: activeAuctions.length,
+                activeAuctionsCount: auctions.filter(a => a.status === AuctionStatus.OPEN).length,
                 completedCollaborations,
             },
-            activeAuctions,
+            auctions,
         };
     }
 

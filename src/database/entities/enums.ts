@@ -82,6 +82,12 @@ export enum TransactionType {
     DEBIT = 'DEBIT',
 }
 
+export enum PitchStatus {
+    PENDING = 'PENDING',
+    ACCEPTED = 'ACCEPTED',
+    REJECTED = 'REJECTED',
+}
+
 export enum PaymentStatus {
     PENDING = 'PENDING',
     SUCCESS = 'SUCCESS',
@@ -108,4 +114,5 @@ export enum TransactionPurpose {
     SIGNUP_BONUS = 'SIGNUP_BONUS',
     SYSTEM_ADJUSTMENT = 'SYSTEM_ADJUSTMENT',
     KCOIN_TOPUP = 'KCOIN_TOPUP',
+    PITCH_CREATION = 'PITCH_CREATION',
 }

@@ -47,6 +47,9 @@ export class PublicBrandProfileDto {
     @ApiPropertyOptional()
     socialLinks?: Record<string, string>;
 
+    @ApiProperty()
+    verified: boolean;
+
     @ApiProperty({ type: PublicBrandStatsDto })
     stats: PublicBrandStatsDto;
 
@@ -55,4 +58,7 @@ export class PublicBrandProfileDto {
 
     @ApiProperty({ type: [PublicCollaboratorSummaryDto] })
     collaborators: PublicCollaboratorSummaryDto[];
+
+    @ApiPropertyOptional({ type: [Object] })
+    auctions?: any[];
 }
