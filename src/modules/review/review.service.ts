@@ -76,7 +76,7 @@ export class ReviewService {
             throw new BadRequestException('No valid collaboration found to review. You must have a collaboration with this influencer.');
         }
 
-        if (collaboration.requester.id !== reviewerId) {
+        if (collaboration.requester?.id !== reviewerId) {
             throw new ForbiddenException('Only the requester can leave a review');
         }
 
@@ -153,7 +153,7 @@ export class ReviewService {
             throw new NotFoundException('Review not found');
         }
 
-        if (review.reviewer.id !== userId) {
+        if (review.reviewer?.id !== userId) {
             throw new ForbiddenException('You can only update your own reviews');
         }
 
@@ -161,15 +161,19 @@ export class ReviewService {
         if (updateDto.comment) review.comment = updateDto.comment;
 
         const savedReview = await this.reviewRepo.save(review);
-        await this.updateInfluencerAverageRating(review.influencer.id);
+        if (review.influencer?.id) {
+            await this.updateInfluencerAverageRating(review.influencer.id);
+        }
 
         // Update ranking
-        const profile = await this.influencerProfileRepo.findOne({
-            where: { id: review.influencer.id },
-            relations: ['user'],
-        });
-        if (profile) {
-            await this.rankingService.updateRanking(profile.user.id);
+        if (review.influencer?.id) {
+            const profile = await this.influencerProfileRepo.findOne({
+                where: { id: review.influencer.id },
+                relations: ['user'],
+            });
+            if (profile?.user?.id) {
+                await this.rankingService.updateRanking(profile.user.id);
+            }
         }
 
         return savedReview;
@@ -185,19 +189,24 @@ export class ReviewService {
             throw new NotFoundException('Review not found');
         }
 
-        if (review.reviewer.id !== userId) {
+        if (review.reviewer?.id !== userId) {
             throw new ForbiddenException('You can only delete your own reviews');
         }
 
-        const influencerProfileId = review.influencer.id;
-        const influencerUserId = review.influencer.user.id;
+        const influencerProfileId = review.influencer?.id;
+        const influencerUserId = review.influencer?.user?.id;
         
         // Use softRemove for historical integrity
         await this.reviewRepo.softRemove(review);
-        await this.updateInfluencerAverageRating(influencerProfileId);
+        
+        if (influencerProfileId) {
+            await this.updateInfluencerAverageRating(influencerProfileId);
+        }
 
         // Update ranking
-        await this.rankingService.updateRanking(influencerUserId);
+        if (influencerUserId) {
+            await this.rankingService.updateRanking(influencerUserId);
+        }
     }
 
     private async updateInfluencerAverageRating(influencerProfileId: string): Promise<void> {

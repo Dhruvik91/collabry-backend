@@ -1,12 +1,14 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Profile } from '../../database/entities/profile.entity';
 import { User } from '../../database/entities/user.entity';
 import { InfluencerProfile } from '../../database/entities/influencer-profile.entity';
 import { Auction } from '../../database/entities/auction.entity';
+import { Bid } from '../../database/entities/bid.entity';
+import { Pitch } from '../../database/entities/pitch.entity';
 import { Collaboration } from '../../database/entities/collaboration.entity';
-import { AuctionStatus, CollaborationStatus, UserStatus } from '../../database/entities/enums';
+import { AuctionStatus, CollaborationStatus, UserStatus, BidStatus, PitchStatus } from '../../database/entities/enums';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { SaveProfileDto } from './dto/save-profile.dto';
 import { SearchProfilesDto } from './dto/search-profiles.dto';
@@ -53,7 +55,7 @@ export class ProfileService {
                 relations: ['user'],
             });
 
-            if (existingProfile && existingProfile.user.id !== userId) {
+            if (existingProfile && existingProfile.user?.id && existingProfile.user.id !== userId) {
                 throw new ConflictException('Username already taken');
             }
         }
@@ -165,16 +167,20 @@ export class ProfileService {
 
     async getBrandProfile(profileId: string) {
         const profile = await this.getProfileById(profileId);
-        const userId = profile.user.id;
+        const userId = profile.user?.id;
+
+        if (!userId) {
+            throw new BadRequestException('Profile user not found or deleted');
+        }
 
         const [totalAuctions, auctions, completedCollaborations] = await Promise.all([
             this.auctionRepo.count({ where: { creator: { id: userId } } }),
-            this.auctionRepo.find({ 
+            this.auctionRepo.find({
                 where: { creator: { id: userId } },
                 order: { createdAt: 'DESC' },
                 take: 50
             }),
-            this.collaborationRepo.count({ 
+            this.collaborationRepo.count({
                 where: [
                     { requester: { id: userId }, status: CollaborationStatus.COMPLETED },
                 ]
@@ -196,6 +202,28 @@ export class ProfileService {
         const user = await this.userRepo.findOne({ where: { id: userId } });
         if (!user) throw new NotFoundException('User not found');
 
+        // If suspending or deactivating, handle active auctions/bids
+        if (status === UserStatus.SUSPENDED || status === UserStatus.INACTIVE) {
+            await this.dataSource.transaction(async (manager) => {
+                // Cancel active auctions created by the user
+                await manager.update(Auction,
+                    { creator: { id: userId }, status: AuctionStatus.OPEN },
+                    { status: AuctionStatus.CANCELLED }
+                );
+
+                // Reject pending bids placed by the user
+                await manager.update(Bid,
+                    { influencer: { id: userId }, status: BidStatus.PENDING },
+                    { status: BidStatus.REJECTED }
+                );
+
+                // Update user status
+                user.status = status;
+                await manager.save(user);
+            });
+            return user;
+        }
+
         user.status = status;
         return await this.userRepo.save(user);
     }
@@ -209,7 +237,7 @@ export class ProfileService {
     }
 
     /**
-     * Soft delete user, profile, and influencer profile
+     * Soft delete user, profile, influencer profile, and related active content
      */
     async deleteAccount(userId: string) {
         return await this.dataSource.transaction(async (manager) => {
@@ -221,7 +249,31 @@ export class ProfileService {
 
             if (!user) throw new NotFoundException('User not found');
 
-            // Soft delete in order
+            // 1. Soft delete related content first to preserve data integrity
+            // Soft delete user's auctions
+            await manager.getRepository(Auction).softDelete({ creator: { id: userId } });
+
+            // Soft delete user's bids
+            await manager.getRepository(Bid).softDelete({ influencer: { id: userId } });
+
+            // Soft delete user's pitches (sent and received)
+            await manager.getRepository(Pitch).softDelete({ influencer: { id: userId } });
+            await manager.getRepository(Pitch).softDelete({ target: { id: userId } });
+
+            // Cancel active collaborations (optional - keeping completed ones for history)
+            await manager.update(Collaboration,
+                { requester: { id: userId }, status: CollaborationStatus.REQUESTED },
+                { status: CollaborationStatus.CANCELLED }
+            );
+            // Also as influencer (Note: influencerId in Collaboration refers to InfluencerProfile.id)
+            if (user.influencerProfile) {
+                await manager.update(Collaboration,
+                    { influencer: { id: user.influencerProfile.id }, status: CollaborationStatus.REQUESTED },
+                    { status: CollaborationStatus.CANCELLED }
+                );
+            }
+
+            // 2. Soft delete profiles
             if (user.influencerProfile) {
                 await manager.softRemove(InfluencerProfile, user.influencerProfile);
             }
@@ -230,6 +282,7 @@ export class ProfileService {
                 await manager.softRemove(Profile, user.profile);
             }
 
+            // 3. Soft delete the user
             return await manager.softRemove(User, user);
         });
     }

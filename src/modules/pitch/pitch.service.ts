@@ -1,9 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Pitch } from '../../database/entities/pitch.entity';
 import { User } from '../../database/entities/user.entity';
-import { PitchStatus, TransactionPurpose, UserRole } from '../../database/entities/enums';
+import { PitchStatus, TransactionPurpose, UserRole, UserStatus } from '../../database/entities/enums';
 import { WalletService } from '../kc-wallet/wallet.service';
 import { KCSettingService, KCSettingKey } from '../kc-setting/kc-setting.service';
 import { CreatePitchDto } from './dto/create-pitch.dto';
@@ -28,8 +28,16 @@ export class PitchService {
             throw new ForbiddenException('Only influencers can create pitches');
         }
 
+        if (influencer.status !== UserStatus.ACTIVE) {
+            throw new ForbiddenException('Your account must be active to create pitches');
+        }
+
         const target = await this.userRepo.findOne({ where: { id: dto.targetId } });
         if (!target) throw new NotFoundException('Target user not found');
+
+        if (target.status !== UserStatus.ACTIVE) {
+            throw new BadRequestException('Target user account is not active');
+        }
 
         // Get pitch price
         const price = await this.settingService.getSetting(KCSettingKey.PITCH_PRICE);
@@ -110,8 +118,8 @@ export class PitchService {
         const pitch = await this.getPitchById(id);
 
         // Only target can accept/reject pitch
-        if (pitch.target.id !== userId) {
-            throw new ForbiddenException('You are not authorized to update this pitch');
+        if (pitch.target?.id !== userId) {
+            throw new ForbiddenException('Only the target brand can update the pitch status');
         }
 
         pitch.status = dto.status;
