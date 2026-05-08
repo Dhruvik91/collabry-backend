@@ -102,8 +102,8 @@ export class MessagingService {
             throw new NotFoundException('Conversation not found');
         }
 
-        const isUserOne = conversation.userOne.id === userId;
-        const isUserTwo = conversation.userTwo.id === userId;
+        const isUserOne = conversation.userOne?.id === userId;
+        const isUserTwo = conversation.userTwo?.id === userId;
 
         if (!isUserOne && !isUserTwo) {
             throw new ForbiddenException('You are not a participant in this conversation');
@@ -128,8 +128,12 @@ export class MessagingService {
         this.socketGateway.emitToConversation(conversationId, 'new_message', savedMessage);
         
         // Also emit to both users' private rooms (for sidebar/list updates)
-        this.socketGateway.emitToUser(conversation.userOne.id, 'new_message', savedMessage);
-        this.socketGateway.emitToUser(conversation.userTwo.id, 'new_message', savedMessage);
+        if (conversation.userOne?.id) {
+            this.socketGateway.emitToUser(conversation.userOne.id, 'new_message', savedMessage);
+        }
+        if (conversation.userTwo?.id) {
+            this.socketGateway.emitToUser(conversation.userTwo.id, 'new_message', savedMessage);
+        }
         
         return savedMessage;
     }
@@ -144,7 +148,7 @@ export class MessagingService {
             throw new NotFoundException('Conversation not found');
         }
 
-        if (conversation.userOne.id !== userId && conversation.userTwo.id !== userId) {
+        if (conversation.userOne?.id !== userId && conversation.userTwo?.id !== userId) {
             throw new ForbiddenException('You are not a participant in this conversation');
         }
 
@@ -165,7 +169,7 @@ export class MessagingService {
             throw new NotFoundException('Message not found');
         }
 
-        if (message.sender.id !== userId) {
+        if (message.sender?.id !== userId) {
             throw new ForbiddenException('You can only update your own messages');
         }
 
@@ -195,7 +199,7 @@ export class MessagingService {
             throw new NotFoundException('Message not found');
         }
 
-        if (message.sender.id !== userId) {
+        if (message.sender?.id !== userId) {
             throw new ForbiddenException('You can only delete your own messages');
         }
 
@@ -218,7 +222,7 @@ export class MessagingService {
             throw new NotFoundException('Conversation not found');
         }
 
-        if (conversation.userOne.id !== userId && conversation.userTwo.id !== userId) {
+        if (conversation.userOne?.id !== userId && conversation.userTwo?.id !== userId) {
             throw new ForbiddenException('You are not a participant in this conversation');
         }
 

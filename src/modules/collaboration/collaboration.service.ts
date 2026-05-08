@@ -10,7 +10,7 @@ import { CreateCollaborationDto } from './dto/create-collaboration.dto';
 import { UpdateCollaborationStatusDto } from './dto/update-collaboration-status.dto';
 import { UpdateCollaborationDto } from './dto/update-collaboration.dto';
 import { FilterCollaborationsDto } from './dto/filter-collaborations.dto';
-import { CollaborationStatus, UserRole, TransactionPurpose } from '../../database/entities/enums';
+import { CollaborationStatus, UserRole, TransactionPurpose, UserStatus } from '../../database/entities/enums';
 import { WalletService } from '../kc-wallet/wallet.service';
 import { KCSettingService, KCSettingKey } from '../kc-setting/kc-setting.service';
 import { isEntityNotFoundError } from '../../database/errors/entity-not-found.type-guard';
@@ -34,6 +34,10 @@ export class CollaborationService {
     async createCollaboration(requesterId: string, createDto: CreateCollaborationDto): Promise<Collaboration> {
         const requester = await this.userRepo.findOne({ where: { id: requesterId }, relations: ['profile'] });
 
+        if (!requester || requester.status !== UserStatus.ACTIVE) {
+            throw new ForbiddenException('Your account must be active to request collaborations');
+        }
+
         // Robustly resolve influencer profile by either Profile ID or User ID in a single query
         let influencerProfile = await this.influencerProfileRepo.findOne({
             where: [
@@ -51,6 +55,10 @@ export class CollaborationService {
 
         if (!influencerUser || influencerUser.role !== UserRole.INFLUENCER) {
             throw new BadRequestException('Target user must be an influencer');
+        }
+
+        if (influencerUser.status !== UserStatus.ACTIVE) {
+            throw new BadRequestException('Target influencer account is not active');
         }
 
         if (requesterId === influencerUser.id) {
@@ -158,7 +166,8 @@ export class CollaborationService {
                 throw new NotFoundException('Collaboration not found');
             }
 
-            if (collaboration.requester.id !== userId && collaboration.influencer.user.id !== userId) {
+            if (collaboration.requester?.id && collaboration.requester.id !== userId && 
+                collaboration.influencer?.user?.id && collaboration.influencer.user.id !== userId) {
                 throw new ForbiddenException('You do not have access to this collaboration');
             }
 
@@ -171,8 +180,8 @@ export class CollaborationService {
     async updateStatus(id: string, userId: string, statusDto: UpdateCollaborationStatusDto): Promise<Collaboration> {
         const collaboration = await this.getCollaborationById(id, userId);
 
-        const isInfluencer = collaboration.influencer.user.id === userId;
-        const isRequester = collaboration.requester.id === userId;
+        const isInfluencer = collaboration.influencer?.user?.id === userId;
+        const isRequester = collaboration.requester?.id === userId;
 
         // Validation based on current status and new status
         switch (statusDto.status) {
@@ -217,7 +226,9 @@ export class CollaborationService {
         const updatedCollaboration = await this.collaborationRepo.manager.transaction(async (manager) => {
             const saved = await manager.save(collaboration);
             // Update Ranking for the influencer
-            await this.rankingService.updateRanking(collaboration.influencer.user.id);
+            if (collaboration.influencer?.user?.id) {
+                await this.rankingService.updateRanking(collaboration.influencer.user.id);
+            }
             return saved;
         });
 
@@ -228,12 +239,12 @@ export class CollaborationService {
         const collaboration = await this.getCollaborationById(id, userId);
 
         // Only the requester (brand) can update the collaboration details (title, description, etc.) during REQUESTED/ACCEPTED
-        if (collaboration.requester.id !== userId && (collaboration.status === CollaborationStatus.REQUESTED || collaboration.status === CollaborationStatus.ACCEPTED)) {
+        if (collaboration.requester?.id !== userId && (collaboration.status === CollaborationStatus.REQUESTED || collaboration.status === CollaborationStatus.ACCEPTED)) {
             throw new ForbiddenException('Only the requester can update collaboration details at this stage');
         }
 
         // Only the influencer can update proof fields
-        const isInfluencer = collaboration.influencer.user.id === userId;
+        const isInfluencer = collaboration.influencer?.user?.id === userId;
         const updateKeys = Object.keys(updateDto);
         const proofFields = ['proofUrls', 'proofSubmittedAt'];
         const isUpdatingProof = updateKeys.some(key => proofFields.includes(key));
@@ -269,7 +280,7 @@ export class CollaborationService {
         const updated = await this.collaborationRepo.manager.transaction(async (manager) => {
             const saved = await manager.save(collaboration);
             // If proof was submitted, we might want to trigger a ranking update or notification
-            if (updateDto.proofUrls) {
+            if (updateDto.proofUrls && collaboration.influencer?.user?.id) {
                 await this.rankingService.updateRanking(collaboration.influencer.user.id);
             }
             return saved;
@@ -280,19 +291,16 @@ export class CollaborationService {
 
     async deleteCollaboration(id: string, userId: string): Promise<void> {
         const collaboration = await this.getCollaborationById(id, userId);
-        const influencerUserId = collaboration.influencer.user.id;
+        const influencerUserId = collaboration.influencer?.user?.id;
 
-        // Allow both influencer and requester to delete if it's already cancelled or rejected?
-        // Usually, only the owner (requester) can delete the request.
-        if (collaboration.requester.id !== userId && collaboration.influencer.user.id !== userId) {
-            throw new ForbiddenException('You do not have permission to delete this collaboration');
-        }
 
         // Use softRemove for historical integrity
         await this.collaborationRepo.softRemove(collaboration);
 
         // Update Ranking (though for REQUESTED it might not change much)
-        await this.rankingService.updateRanking(influencerUserId);
+        if (influencerUserId) {
+            await this.rankingService.updateRanking(influencerUserId);
+        }
     }
 
     async getMyInfluencers(userId: string, filters?: any) {

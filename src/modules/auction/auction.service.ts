@@ -5,7 +5,7 @@ import { Auction } from '../../database/entities/auction.entity';
 import { Bid } from '../../database/entities/bid.entity';
 import { User } from '../../database/entities/user.entity';
 import { Collaboration } from '../../database/entities/collaboration.entity';
-import { AuctionStatus, BidStatus, UserRole, CollaborationStatus } from '../../database/entities/enums';
+import { AuctionStatus, BidStatus, UserRole, CollaborationStatus, UserStatus } from '../../database/entities/enums';
 import { InfluencerProfile } from '../../database/entities/influencer-profile.entity';
 import { CreateAuctionDto } from './dto/create-auction.dto';
 import { UpdateAuctionDto } from './dto/update-auction.dto';
@@ -41,6 +41,10 @@ export class AuctionService {
 
         if (creator.role !== UserRole.USER && creator.role !== UserRole.ADMIN) {
             throw new ForbiddenException('Only brands can create auctions');
+        }
+
+        if (creator.status !== UserStatus.ACTIVE) {
+            throw new ForbiddenException('Your account must be active to create auctions');
         }
 
         const savedAuction = await this.auctionRepository.manager.transaction(async (manager) => {
@@ -81,7 +85,7 @@ export class AuctionService {
     async findAll(filters: { status?: AuctionStatus; category?: string; search?: string; page?: number; limit?: number }): Promise<any> {
         const { page = 1, limit = 10, status, category, search } = filters;
         const query = this.auctionRepository.createQueryBuilder('auction')
-            .leftJoinAndSelect('auction.creator', 'creator')
+            .innerJoinAndSelect('auction.creator', 'creator')
             .leftJoinAndSelect('creator.profile', 'profile')
             .leftJoinAndSelect('auction.bids', 'bids'); // Include bids for count if needed
 
@@ -90,6 +94,9 @@ export class AuctionService {
         } else {
             query.andWhere('auction.status = :status', { status: AuctionStatus.OPEN });
         }
+
+        // Only show auctions from active users
+        query.andWhere('creator.status = :userStatus', { userStatus: UserStatus.ACTIVE });
 
         if (category) {
             query.andWhere('auction.category = :category', { category });
@@ -135,7 +142,7 @@ export class AuctionService {
     async updateAuction(id: string, updateAuctionDto: UpdateAuctionDto, userId: string): Promise<Auction> {
         const auction = await this.findOne(id);
 
-        if (auction.creator.id !== userId) {
+        if (auction.creator?.id && auction.creator.id !== userId) {
             throw new ForbiddenException('You can only update your own auctions');
         }
 
@@ -151,7 +158,7 @@ export class AuctionService {
     async removeAuction(id: string, userId: string): Promise<void> {
         const auction = await this.findOne(id);
 
-        if (auction.creator.id !== userId) {
+        if (auction.creator?.id && auction.creator.id !== userId) {
             throw new ForbiddenException('You can only delete your own auctions');
         }
 
@@ -173,10 +180,18 @@ export class AuctionService {
             throw new ForbiddenException('Only influencers can place bids');
         }
 
+        if (influencer.status !== UserStatus.ACTIVE) {
+            throw new ForbiddenException('Your account must be active to place bids');
+        }
+
         const auction = await this.findOne(auctionId);
 
         if (auction.status !== AuctionStatus.OPEN) {
             throw new BadRequestException('Bidding is closed for this auction');
+        }
+
+        if (auction.creator?.status !== UserStatus.ACTIVE) {
+            throw new BadRequestException('This auction is no longer available as the creator account is not active');
         }
 
         if (new Date() > new Date(auction.deadline)) {
@@ -220,11 +235,13 @@ export class AuctionService {
 
         // Emit new bid event to the auction room and the creator
         this.socketGateway.emitToAuction(auctionId, 'new_bid', bidToEmit);
-        this.socketGateway.emitToUser(auction.creator.id, 'new_bid_notification', {
-            auctionId,
-            auctionTitle: auction.title,
-            bid: bidToEmit
-        });
+        if (auction.creator?.id) {
+            this.socketGateway.emitToUser(auction.creator.id, 'new_bid_notification', {
+                auctionId,
+                auctionTitle: auction.title,
+                bid: bidToEmit
+            });
+        }
         
         return savedBid;
     }
@@ -239,7 +256,7 @@ export class AuctionService {
             throw new NotFoundException(`Bid with ID ${bidId} not found`);
         }
 
-        if (bid.auction.creator.id !== brandId) {
+        if (bid.auction?.creator?.id && bid.auction.creator.id !== brandId) {
             throw new ForbiddenException('You can only accept bids for your own auctions');
         }
 
@@ -266,6 +283,9 @@ export class AuctionService {
 
             // 4. Create collaboration
             const influencerProfileRepo = manager.getRepository(InfluencerProfile);
+            if (!bid.influencer?.id) {
+                throw new BadRequestException('Influencer no longer exists');
+            }
             const influencerProfile = await influencerProfileRepo.findOne({
                 where: { user: { id: bid.influencer.id } }
             });
@@ -276,7 +296,7 @@ export class AuctionService {
 
             const collabRepo = manager.getRepository(Collaboration);
             const collaboration = collabRepo.create({
-                requester: { id: bid.auction.creator.id } as any,
+                requester: { id: bid.auction.creator?.id || brandId } as any,
                 influencer: { id: influencerProfile.id } as any,
                 title: bid.auction.title,
                 description: bid.auction.description,
@@ -299,21 +319,25 @@ export class AuctionService {
         });
         
         // Emit bid accepted and auction completed events (Outside transaction for performance)
-        this.socketGateway.emitToAuction(bid.auction.id, 'bid_accepted', { bidId, influencerId: bid.influencer.id });
-        this.socketGateway.emitToAuction(bid.auction.id, 'auction_completed', { auctionId: bid.auction.id, winnerId: bid.influencer.id });
-        this.socketGateway.emitToUser(bid.influencer.id, 'bid_accepted_notification', {
-            auctionId: bid.auction.id,
-            auctionTitle: bid.auction.title,
-            bidAmount: bid.amount
-        });
+        if (bid.auction?.id && bid.influencer?.id) {
+            this.socketGateway.emitToAuction(bid.auction.id, 'bid_accepted', { bidId, influencerId: bid.influencer.id });
+            this.socketGateway.emitToAuction(bid.auction.id, 'auction_completed', { auctionId: bid.auction.id, winnerId: bid.influencer.id });
+            this.socketGateway.emitToUser(bid.influencer.id, 'bid_accepted_notification', {
+                auctionId: bid.auction.id,
+                auctionTitle: bid.auction.title,
+                bidAmount: bid.amount
+            });
+        }
 
         // Send email notification to influencer
-        this.mailerService.sendBidAcceptedEmail(
-            bid.influencer.email,
-            bid.auction.title,
-            bid.amount,
-            bid.auction.creator.profile?.fullName || bid.auction.creator.username || 'A Brand'
-        ).catch(err => this.logger.error(`Failed to send bid acceptance email to ${bid.influencer.email}`, err));
+        if (bid.influencer?.email && bid.auction) {
+            this.mailerService.sendBidAcceptedEmail(
+                bid.influencer.email,
+                bid.auction.title,
+                bid.amount,
+                bid.auction.creator?.profile?.fullName || bid.auction.creator?.username || 'A Brand'
+            ).catch(err => this.logger.error(`Failed to send bid acceptance email to ${bid.influencer?.email}`, err));
+        }
         
         return { message: 'Bid accepted and collaboration created', bid, collaborationId: result.collaborationId };
     }
@@ -328,7 +352,7 @@ export class AuctionService {
             throw new NotFoundException(`Bid with ID ${bidId} not found`);
         }
 
-        if (bid.auction.creator.id !== brandId) {
+        if (bid.auction?.creator?.id && bid.auction.creator.id !== brandId) {
             throw new ForbiddenException('You can only reject bids for your own auctions');
         }
 
@@ -344,11 +368,13 @@ export class AuctionService {
         await this.bidRepository.save(bid);
 
         // Emit bid rejected event
-        this.socketGateway.emitToUser(bid.influencer.id, 'bid_rejected', {
-            auctionId: bid.auction.id,
-            auctionTitle: bid.auction.title,
-            bidId
-        });
+        if (bid.influencer?.id && bid.auction) {
+            this.socketGateway.emitToUser(bid.influencer.id, 'bid_rejected', {
+                auctionId: bid.auction.id,
+                auctionTitle: bid.auction.title,
+                bidId
+            });
+        }
 
         return { message: 'Bid rejected successfully', bid };
     }
@@ -356,7 +382,7 @@ export class AuctionService {
     async findMyBids(influencerId: string, page = 1, limit = 10, search?: string): Promise<any> {
         const query = this.bidRepository.createQueryBuilder('bid')
             .leftJoinAndSelect('bid.auction', 'auction')
-            .leftJoinAndSelect('auction.creator', 'creator')
+            .innerJoinAndSelect('auction.creator', 'creator')
             .leftJoinAndSelect('creator.profile', 'profile')
             .where('bid.influencerId = :influencerId', { influencerId })
             .orderBy('bid.createdAt', 'DESC');
@@ -386,7 +412,7 @@ export class AuctionService {
 
     async findMyAuctions(userId: string, page = 1, limit = 10, search?: string): Promise<any> {
         const query = this.auctionRepository.createQueryBuilder('auction')
-            .leftJoinAndSelect('auction.creator', 'creator')
+            .innerJoinAndSelect('auction.creator', 'creator')
             .leftJoinAndSelect('creator.profile', 'profile')
             .leftJoinAndSelect('auction.bids', 'bids')
             .leftJoinAndSelect('bids.influencer', 'influencer')
