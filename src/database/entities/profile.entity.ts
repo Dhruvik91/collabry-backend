@@ -49,6 +49,34 @@ export class Profile {
     socialLinks: any;
 
     @ApiProperty()
+    @Column({ type: 'text', array: true, nullable: true })
+    categories: string[];
+
+    @ApiProperty()
+    @Column({ nullable: true })
+    website: string;
+
+    @ApiProperty()
+    @Column({ nullable: true })
+    industry: string;
+
+    @ApiProperty()
+    @Column({ nullable: true })
+    companySize: string;
+
+    @ApiProperty()
+    @Column({ nullable: true, type: 'text' })
+    brandTone: string;
+
+    @ApiProperty()
+    @Column({ nullable: true })
+    contactEmail: string;
+
+    @ApiProperty()
+    @Column({ nullable: true })
+    contactPhone: string;
+
+    @ApiProperty()
     @Column({ default: false })
     verified: boolean;
 
