@@ -7,6 +7,7 @@ import { StartConversationDto } from './dto/start-conversation.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { isUniqueConstraintError } from '../../database/errors/unique-constraint.type-guard';
 import { SocketGateway } from '../socket/socket.gateway';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class MessagingService {
@@ -16,6 +17,7 @@ export class MessagingService {
         @InjectRepository(Message)
         private readonly messageRepo: Repository<Message>,
         private readonly socketGateway: SocketGateway,
+        private readonly notificationsService: NotificationsService,
     ) { }
 
     async getOrCreateConversation(userId: string, startDto: StartConversationDto): Promise<Conversation> {
@@ -89,11 +91,11 @@ export class MessagingService {
         const conversation = await this.conversationRepo.findOne({
             where: { id: conversationId },
             relations: [
-                'userOne', 
-                'userTwo', 
-                'userOne.profile', 
-                'userTwo.profile', 
-                'userOne.influencerProfile', 
+                'userOne',
+                'userTwo',
+                'userOne.profile',
+                'userTwo.profile',
+                'userOne.influencerProfile',
                 'userTwo.influencerProfile'
             ],
         });
@@ -126,7 +128,7 @@ export class MessagingService {
         // Emit new message event to the room (for the active chat window)
         // savedMessage now contains the sender with profile info from the conversation relations
         this.socketGateway.emitToConversation(conversationId, 'new_message', savedMessage);
-        
+
         // Also emit to both users' private rooms (for sidebar/list updates)
         if (conversation.userOne?.id) {
             this.socketGateway.emitToUser(conversation.userOne.id, 'new_message', savedMessage);
@@ -134,7 +136,24 @@ export class MessagingService {
         if (conversation.userTwo?.id) {
             this.socketGateway.emitToUser(conversation.userTwo.id, 'new_message', savedMessage);
         }
-        
+
+        // Trigger push notification to the recipient in the background
+        const recipient = isUserOne ? conversation.userTwo : conversation.userOne;
+        const senderName = sender.influencerProfile?.fullName ||
+            sender.profile?.fullName ||
+            sender.username ||
+            'A user';
+
+        this.notificationsService.sendPushToUser(recipient.id, {
+            title: `New message from ${senderName}`,
+            body: savedMessage.message,
+            url: `/messages`,
+            icon: sender.profile?.avatarUrl || sender.influencerProfile?.avatarUrl,
+        }).catch((err) => {
+            // Log it but do not crash the message sending process
+            this.notificationsService['logger'].error(`Failed to send background push: ${err.message}`);
+        });
+
         return savedMessage;
     }
 
@@ -176,7 +195,7 @@ export class MessagingService {
         message.message = updateDto.message;
         message.updatedAt = new Date();
         const savedMessage = await this.messageRepo.save(message);
-        
+
         // Reload for WebSocket
         const fullMessage = await this.messageRepo.findOne({
             where: { id: savedMessage.id },
@@ -185,7 +204,7 @@ export class MessagingService {
 
         // Emit updated message event
         this.socketGateway.emitToConversation(message.conversation?.id || '', 'message_updated', fullMessage || savedMessage);
-        
+
         return savedMessage;
     }
 
@@ -205,7 +224,7 @@ export class MessagingService {
 
         const conversationId = message.conversation?.id;
         await this.messageRepo.remove(message);
-        
+
         // Emit deleted message event
         if (conversationId) {
             this.socketGateway.emitToConversation(conversationId, 'message_deleted', { messageId, conversationId });

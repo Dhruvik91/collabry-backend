@@ -22,6 +22,7 @@ import { Referral } from './entities/referral.entity';
 import { TopUpPlan } from './entities/top-up-plan.entity';
 import { PaymentOrder } from './entities/payment-order.entity';
 import { Pitch } from './entities/pitch.entity';
+import { PushSubscription } from './entities/push-subscription.entity';
 
 export const AllEntities = [
   AdminAction,
@@ -48,6 +49,7 @@ export const AllEntities = [
   TopUpPlan,
   PaymentOrder,
   Pitch,
+  PushSubscription,
 ];
 
 export const CustomRepository = [
