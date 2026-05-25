@@ -4,9 +4,13 @@ import { Conversation } from '../../database/entities/conversation.entity';
 import { Message } from '../../database/entities/message.entity';
 import { MessagingController } from './messaging.controller';
 import { MessagingService } from './messaging.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([Conversation, Message])],
+    imports: [
+        TypeOrmModule.forFeature([Conversation, Message]),
+        NotificationsModule,
+    ],
     controllers: [MessagingController],
     providers: [MessagingService],
     exports: [MessagingService],

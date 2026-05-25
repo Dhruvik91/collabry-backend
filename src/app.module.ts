@@ -31,9 +31,9 @@ import { KCSettingModule } from './modules/kc-setting/kc-setting.module';
 import { ReferralModule } from './modules/referral/referral.module';
 import { TopUpModule } from './modules/top-up/top-up.module';
 import { PaymentModule } from './modules/payment/payment.module';
-import { RolesGuard } from './modules/auth/Guards/roles.guard';
 import { SendgridModule } from './modules/sendgrid/sendgrid.module';
 import { PitchModule } from './modules/pitch/pitch.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 
 
 @Module({
@@ -75,6 +75,7 @@ import { PitchModule } from './modules/pitch/pitch.module';
     AwsModule,
     UploadsModule,
     SendgridModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [
