@@ -69,3 +69,14 @@ export class CreateInfluencerDto {
     @IsOptional()
     referralCode?: string;
 }
+
+export class FirebaseLoginDto {
+    @ApiProperty({ example: 'firebase_id_token_here', description: 'Firebase client ID Token' })
+    @IsString()
+    idToken: string;
+
+    @ApiProperty({ enum: UserRole, example: UserRole.USER, description: 'User role', required: false })
+    @IsEnum(UserRole, { message: 'Invalid role' })
+    @IsOptional()
+    role?: UserRole;
+}

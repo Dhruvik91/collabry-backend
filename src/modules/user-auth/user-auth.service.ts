@@ -3,6 +3,7 @@ import { randomBytes, randomInt } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 
 import { User } from '../../database/entities/user.entity';
 import { UserRole, UserStatus } from '../../database/entities/enums';
@@ -27,6 +28,7 @@ export class UserAuthService {
     private readonly walletService: WalletService,
     private readonly settingService: KCSettingService,
     private readonly dataSource: DataSource,
+    private readonly configService: ConfigService,
   ) { }
 
   async signup(email: string, password: string, confirmPassword: string, role: UserRole = UserRole.USER, referredBy?: string, username?: string) {
@@ -363,5 +365,102 @@ export class UserAuthService {
     await this.usersRepo.save(user);
 
     return { message: 'Password updated successfully' };
+  }
+
+  private firebaseApp: any = null;
+
+  private getFirebaseApp() {
+    if (this.firebaseApp) return this.firebaseApp;
+
+    const projectId = this.configService.get<string>('FIREBASE_PROJECT_ID');
+    const clientEmail = this.configService.get<string>('FIREBASE_CLIENT_EMAIL');
+    const privateKey = this.configService.get<string>('FIREBASE_PRIVATE_KEY');
+
+    if (!projectId || !clientEmail || !privateKey) {
+      throw new BadRequestException('Firebase Admin credentials are not configured');
+    }
+
+    // Replace literal '\n' in the private key string if passed as environment variable
+    const formattedPrivateKey = privateKey.replace(/\\n/g, '\n');
+
+    try {
+      const admin = require('firebase-admin');
+      if (admin.apps.length === 0) {
+        this.firebaseApp = admin.initializeApp({
+          credential: admin.credential.cert({
+            projectId,
+            clientEmail,
+            privateKey: formattedPrivateKey,
+          }),
+        });
+      } else {
+        this.firebaseApp = admin.apps[0];
+      }
+      return this.firebaseApp;
+    } catch (error) {
+      throw new BadRequestException(`Failed to initialize Firebase Admin SDK: ${error.message}`);
+    }
+  }
+
+  async verifyFirebaseToken(idToken: string): Promise<any> {
+    this.getFirebaseApp();
+    try {
+      const admin = require('firebase-admin');
+      const decodedToken = await admin.auth().verifyIdToken(idToken);
+      return decodedToken;
+    } catch (error) {
+      throw new UnauthorizedException(`Invalid Firebase token: ${error.message}`);
+    }
+  }
+
+  async loginWithFirebase(idToken: string, requestedRole: UserRole = UserRole.USER) {
+    const decodedToken = await this.verifyFirebaseToken(idToken);
+    const { email, uid: firebaseUid } = decodedToken;
+
+    if (!email) {
+      throw new BadRequestException('Firebase token does not contain email');
+    }
+
+    let user = await this.usersRepo.findOne({
+      where: [{ firebaseUid }, { email }],
+    });
+
+    if (!user) {
+      // Create user if they don't exist
+      const referralCode = await this.referralService.generateUniqueReferralCode();
+      user = this.usersRepo.create({
+        email,
+        firebaseUid,
+        role: requestedRole === UserRole.ADMIN ? UserRole.USER : requestedRole, // prevent admin registration
+        status: UserStatus.ACTIVE, // Firebase verified users are active immediately
+        emailVerified: true,
+        passwordHash: null,
+        referralCode,
+      });
+
+      user = await this.usersRepo.save(user);
+
+      // Create wallet
+      await this.walletService.createWallet(user.id, 0);
+
+      // Award New Arrival Bonus
+      const bonusAmount = await this.settingService.getSetting(KCSettingKey.NEW_ARRIVAL_BONUS_AMOUNT);
+      if (bonusAmount > 0) {
+        await this.walletService.credit(
+          user.id,
+          bonusAmount,
+          TransactionPurpose.NEW_ARRIVAL_BONUS
+        );
+      }
+
+      return this.login(user, true);
+    } else {
+      // If user exists but has no firebaseUid associated, associate it now
+      if (!user.firebaseUid) {
+        user.firebaseUid = firebaseUid;
+        user = await this.usersRepo.save(user);
+      }
+      return this.login(user, false);
+    }
   }
 }
