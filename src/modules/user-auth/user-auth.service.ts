@@ -372,26 +372,78 @@ export class UserAuthService {
   private getFirebaseApp() {
     if (this.firebaseApp) return this.firebaseApp;
 
-    const projectId = this.configService.get<string>('FIREBASE_PROJECT_ID');
-    const clientEmail = this.configService.get<string>('FIREBASE_CLIENT_EMAIL');
-    const privateKey = this.configService.get<string>('FIREBASE_PRIVATE_KEY');
-
-    if (!projectId || !clientEmail || !privateKey) {
-      throw new BadRequestException('Firebase Admin credentials are not configured');
-    }
-
-    // Replace literal '\n' in the private key string if passed as environment variable
-    const formattedPrivateKey = privateKey.replace(/\\n/g, '\n');
-
     try {
       const admin = require('firebase-admin');
       if (admin.apps.length === 0) {
+        let credential;
+
+        const serviceAccountVar = this.configService.get<string>('FIREBASE_SERVICE_ACCOUNT');
+        const fs = require('fs');
+        const path = require('path');
+        let serviceAccountObj: any = null;
+
+        if (serviceAccountVar) {
+          const trimmed = serviceAccountVar.trim();
+          if (trimmed.startsWith('{')) {
+            try {
+              serviceAccountObj = JSON.parse(trimmed);
+            } catch (e) {
+              throw new Error(`FIREBASE_SERVICE_ACCOUNT is set as JSON but parsing failed: ${e.message}`);
+            }
+          } else {
+            // Treat it as a file path
+            try {
+              const filePath = path.isAbsolute(trimmed) ? trimmed : path.join(process.cwd(), trimmed);
+              if (fs.existsSync(filePath)) {
+                serviceAccountObj = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+              } else {
+                throw new Error(`Service account file not found at path: ${filePath}`);
+              }
+            } catch (e) {
+              throw new Error(`Failed to load service account file from path: ${e.message}`);
+            }
+          }
+        }
+
+        // If not found in environment variable, check for default local file
+        if (!serviceAccountObj) {
+          const defaultFilePath = path.join(process.cwd(), 'firebase-service-account.json');
+          if (fs.existsSync(defaultFilePath)) {
+            try {
+              serviceAccountObj = JSON.parse(fs.readFileSync(defaultFilePath, 'utf8'));
+            } catch (e) {
+              throw new Error(`Failed to parse default firebase-service-account.json file: ${e.message}`);
+            }
+          }
+        }
+
+        // If credentials object is resolved, use it
+        if (serviceAccountObj) {
+          credential = admin.credential.cert(serviceAccountObj);
+        } else {
+          // Fallback to individual keys
+          const projectId = this.configService.get<string>('FIREBASE_PROJECT_ID');
+          const clientEmail = this.configService.get<string>('FIREBASE_CLIENT_EMAIL');
+          const privateKey = this.configService.get<string>('FIREBASE_PRIVATE_KEY');
+
+          if (projectId && clientEmail && privateKey) {
+            const formattedPrivateKey = privateKey.replace(/\\n/g, '\n');
+            credential = admin.credential.cert({
+              projectId,
+              clientEmail,
+              privateKey: formattedPrivateKey,
+            });
+          } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+            credential = admin.credential.applicationDefault();
+          } else {
+            throw new Error(
+              'Firebase Admin credentials are not configured. Please define FIREBASE_SERVICE_ACCOUNT (JSON string or path to JSON file), place a firebase-service-account.json file in the project root, or configure individual keys (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY).'
+            );
+          }
+        }
+
         this.firebaseApp = admin.initializeApp({
-          credential: admin.credential.cert({
-            projectId,
-            clientEmail,
-            privateKey: formattedPrivateKey,
-          }),
+          credential,
         });
       } else {
         this.firebaseApp = admin.apps[0];
