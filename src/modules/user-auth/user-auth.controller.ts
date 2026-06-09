@@ -86,7 +86,7 @@ export class UserAuthController {
   @ApiOkResponseEnvelope(AuthResponseDto)
   @ApiUnauthorizedResponseEnvelope('Invalid Firebase ID token')
   async firebaseLogin(@Body() body: FirebaseLoginDto) {
-    return this.auth.loginWithFirebase(body.idToken, body.role);
+    return this.auth.loginWithFirebase(body.idToken, body.role, body.referralCode);
   }
 
     @UseGuards(AuthGuard('jwt-user'), RolesGuard)

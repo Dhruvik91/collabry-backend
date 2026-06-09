@@ -79,4 +79,9 @@ export class FirebaseLoginDto {
     @IsEnum(UserRole, { message: 'Invalid role' })
     @IsOptional()
     role?: UserRole;
+
+    @ApiProperty({ example: 'ABC12345', description: 'Referral code', required: false })
+    @IsString()
+    @IsOptional()
+    referralCode?: string;
 }

@@ -465,7 +465,7 @@ export class UserAuthService {
     }
   }
 
-  async loginWithFirebase(idToken: string, requestedRole: UserRole = UserRole.USER) {
+  async loginWithFirebase(idToken: string, requestedRole: UserRole = UserRole.USER, referralCode?: string) {
     const decodedToken = await this.verifyFirebaseToken(idToken);
     const { email, uid: firebaseUid } = decodedToken;
 
@@ -479,7 +479,7 @@ export class UserAuthService {
 
     if (!user) {
       // Create user if they don't exist
-      const referralCode = await this.referralService.generateUniqueReferralCode();
+      const userReferralCode = await this.referralService.generateUniqueReferralCode();
       user = this.usersRepo.create({
         email,
         firebaseUid,
@@ -487,13 +487,27 @@ export class UserAuthService {
         status: UserStatus.ACTIVE, // Firebase verified users are active immediately
         emailVerified: true,
         passwordHash: null,
-        referralCode,
+        referralCode: userReferralCode,
+        referredBy: referralCode,
       });
 
-      user = await this.usersRepo.save(user);
+      // Use a transaction to ensure user, wallet, and referral registration are atomic
+      await this.dataSource.transaction(async (manager) => {
+        user = await manager.save(user);
 
-      // Create wallet
-      await this.walletService.createWallet(user.id, 0);
+        // Create wallet
+        await this.walletService.createWallet(user.id, 0, manager);
+
+        // Link referral if provided
+        if (referralCode) {
+          await this.referralService.registerReferral(user.id, referralCode, manager);
+        }
+      });
+
+      // Reward referral if applicable
+      if (referralCode) {
+        await this.referralService.rewardReferral(user.id);
+      }
 
       // Award New Arrival Bonus
       const bonusAmount = await this.settingService.getSetting(KCSettingKey.NEW_ARRIVAL_BONUS_AMOUNT);
