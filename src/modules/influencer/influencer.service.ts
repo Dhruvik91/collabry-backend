@@ -139,8 +139,14 @@ export class InfluencerService {
             this.logger.error(`Failed to update ranking after profile save for user ${userId}: ${error.message}`);
         }
 
+        // Reload the profile to include the user relation with updated username
+        const reloadedProfile = await this.influencerRepo.findOne({
+            where: { id: profile.id },
+            relations: ['user'],
+        });
+
         const completedCollaborations = await this.getCompletedCollaborationsCount(profile.id);
-        return { ...profile, completedCollaborations };
+        return { ...reloadedProfile, completedCollaborations } as any;
     }
 
     async searchInfluencers(searchDto: SearchInfluencersDto): Promise<{ items: (InfluencerProfile & { completedCollaborations: number })[]; meta: any }> {
