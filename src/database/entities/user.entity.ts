@@ -46,6 +46,11 @@ export class User {
     @Column({ default: false })
     emailVerified: boolean;
 
+    @ApiProperty()
+    @Index({ unique: true, where: '"deletedAt" IS NULL' })
+    @Column({ nullable: true })
+    firebaseUid: string;
+
     @Exclude()
     @Column({ nullable: true, select: false })
     passwordResetToken: string;

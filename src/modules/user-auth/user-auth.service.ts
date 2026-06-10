@@ -3,6 +3,7 @@ import { randomBytes, randomInt } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 
 import { User } from '../../database/entities/user.entity';
 import { UserRole, UserStatus } from '../../database/entities/enums';
@@ -27,6 +28,7 @@ export class UserAuthService {
     private readonly walletService: WalletService,
     private readonly settingService: KCSettingService,
     private readonly dataSource: DataSource,
+    private readonly configService: ConfigService,
   ) { }
 
   async signup(email: string, password: string, confirmPassword: string, role: UserRole = UserRole.USER, referredBy?: string, username?: string) {
@@ -363,5 +365,168 @@ export class UserAuthService {
     await this.usersRepo.save(user);
 
     return { message: 'Password updated successfully' };
+  }
+
+  private firebaseApp: any = null;
+
+  private getFirebaseApp() {
+    if (this.firebaseApp) return this.firebaseApp;
+
+    try {
+      const admin = require('firebase-admin');
+      if (admin.apps.length === 0) {
+        let credential;
+
+        const serviceAccountVar = this.configService.get<string>('FIREBASE_SERVICE_ACCOUNT');
+        const fs = require('fs');
+        const path = require('path');
+        let serviceAccountObj: any = null;
+
+        if (serviceAccountVar) {
+          const trimmed = serviceAccountVar.trim();
+          if (trimmed.startsWith('{')) {
+            try {
+              serviceAccountObj = JSON.parse(trimmed);
+            } catch (e) {
+              throw new Error(`FIREBASE_SERVICE_ACCOUNT is set as JSON but parsing failed: ${e.message}`);
+            }
+          } else {
+            // Treat it as a file path
+            try {
+              const filePath = path.isAbsolute(trimmed) ? trimmed : path.join(process.cwd(), trimmed);
+              if (fs.existsSync(filePath)) {
+                serviceAccountObj = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+              } else {
+                throw new Error(`Service account file not found at path: ${filePath}`);
+              }
+            } catch (e) {
+              throw new Error(`Failed to load service account file from path: ${e.message}`);
+            }
+          }
+        }
+
+        // If not found in environment variable, check for default local file
+        if (!serviceAccountObj) {
+          const defaultFilePath = path.join(process.cwd(), 'firebase-service-account.json');
+          if (fs.existsSync(defaultFilePath)) {
+            try {
+              serviceAccountObj = JSON.parse(fs.readFileSync(defaultFilePath, 'utf8'));
+            } catch (e) {
+              throw new Error(`Failed to parse default firebase-service-account.json file: ${e.message}`);
+            }
+          }
+        }
+
+        // If credentials object is resolved, use it
+        if (serviceAccountObj) {
+          credential = admin.credential.cert(serviceAccountObj);
+        } else {
+          // Fallback to individual keys
+          const projectId = this.configService.get<string>('FIREBASE_PROJECT_ID');
+          const clientEmail = this.configService.get<string>('FIREBASE_CLIENT_EMAIL');
+          const privateKey = this.configService.get<string>('FIREBASE_PRIVATE_KEY');
+
+          if (projectId && clientEmail && privateKey) {
+            const formattedPrivateKey = privateKey.replace(/\\n/g, '\n');
+            credential = admin.credential.cert({
+              projectId,
+              clientEmail,
+              privateKey: formattedPrivateKey,
+            });
+          } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+            credential = admin.credential.applicationDefault();
+          } else {
+            throw new Error(
+              'Firebase Admin credentials are not configured. Please define FIREBASE_SERVICE_ACCOUNT (JSON string or path to JSON file), place a firebase-service-account.json file in the project root, or configure individual keys (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY).'
+            );
+          }
+        }
+
+        this.firebaseApp = admin.initializeApp({
+          credential,
+        });
+      } else {
+        this.firebaseApp = admin.apps[0];
+      }
+      return this.firebaseApp;
+    } catch (error) {
+      throw new BadRequestException(`Failed to initialize Firebase Admin SDK: ${error.message}`);
+    }
+  }
+
+  async verifyFirebaseToken(idToken: string): Promise<any> {
+    this.getFirebaseApp();
+    try {
+      const admin = require('firebase-admin');
+      const decodedToken = await admin.auth().verifyIdToken(idToken);
+      return decodedToken;
+    } catch (error) {
+      throw new UnauthorizedException(`Invalid Firebase token: ${error.message}`);
+    }
+  }
+
+  async loginWithFirebase(idToken: string, requestedRole: UserRole = UserRole.USER, referralCode?: string) {
+    const decodedToken = await this.verifyFirebaseToken(idToken);
+    const { email, uid: firebaseUid } = decodedToken;
+
+    if (!email) {
+      throw new BadRequestException('Firebase token does not contain email');
+    }
+
+    let user = await this.usersRepo.findOne({
+      where: [{ firebaseUid }, { email }],
+    });
+
+    if (!user) {
+      // Create user if they don't exist
+      const userReferralCode = await this.referralService.generateUniqueReferralCode();
+      user = this.usersRepo.create({
+        email,
+        firebaseUid,
+        role: requestedRole === UserRole.ADMIN ? UserRole.USER : requestedRole, // prevent admin registration
+        status: UserStatus.ACTIVE, // Firebase verified users are active immediately
+        emailVerified: true,
+        passwordHash: null,
+        referralCode: userReferralCode,
+        referredBy: referralCode,
+      });
+
+      // Use a transaction to ensure user, wallet, and referral registration are atomic
+      await this.dataSource.transaction(async (manager) => {
+        user = await manager.save(user);
+
+        // Create wallet
+        await this.walletService.createWallet(user.id, 0, manager);
+
+        // Link referral if provided
+        if (referralCode) {
+          await this.referralService.registerReferral(user.id, referralCode, manager);
+        }
+      });
+
+      // Reward referral if applicable
+      if (referralCode) {
+        await this.referralService.rewardReferral(user.id);
+      }
+
+      // Award New Arrival Bonus
+      const bonusAmount = await this.settingService.getSetting(KCSettingKey.NEW_ARRIVAL_BONUS_AMOUNT);
+      if (bonusAmount > 0) {
+        await this.walletService.credit(
+          user.id,
+          bonusAmount,
+          TransactionPurpose.NEW_ARRIVAL_BONUS
+        );
+      }
+
+      return this.login(user, true);
+    } else {
+      // If user exists but has no firebaseUid associated, associate it now
+      if (!user.firebaseUid) {
+        user.firebaseUid = firebaseUid;
+        user = await this.usersRepo.save(user);
+      }
+      return this.login(user, false);
+    }
   }
 }
