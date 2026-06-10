@@ -21,7 +21,7 @@ import { MessageResponseDto, SuccessResponseDto } from '../../core/dto/message-r
 import { AuthResponseDto, VerifyEmailResponseDto } from './dto/auth-response.dto';
 import { User } from '../../database/entities/user.entity';
 import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto';
-import { SignupDto, CreateInfluencerDto } from './dto/auth.dto';
+import { SignupDto, CreateInfluencerDto, FirebaseLoginDto } from './dto/auth.dto';
 import { VerifyEmailDto, ResendOtpDto } from './dto/verify-email.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -77,6 +77,16 @@ export class UserAuthController {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const user = (req as any).user;
     return this.auth.login(user);
+  }
+
+  @AllowUnauthorized()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Post('firebase-login')
+  @ApiOperation({ summary: 'Login or signup with Firebase ID Token' })
+  @ApiOkResponseEnvelope(AuthResponseDto)
+  @ApiUnauthorizedResponseEnvelope('Invalid Firebase ID token')
+  async firebaseLogin(@Body() body: FirebaseLoginDto) {
+    return this.auth.loginWithFirebase(body.idToken, body.role, body.referralCode);
   }
 
     @UseGuards(AuthGuard('jwt-user'), RolesGuard)
