@@ -166,7 +166,7 @@ Privileged platform operations.
 | Endpoint | Purpose |
 |-----------|---------|
 | `/v1/verification` | Submit identity/influence verification documents |
-| `/v1/uploads` | Direct-to-S3 uploads (Max 5MB) |
+| `/v1/uploads` | Direct-to-S3 uploads (Max 30MB) |
 | `/v1/review` | Post-collaboration ratings and feedback |
 | `/v1/report` | Report abusive or fraudulent users |
 | `/v1/subscription` | View available pricing plans |
