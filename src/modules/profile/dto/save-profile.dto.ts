@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUrl, IsObject } from 'class-validator';
+import { IsOptional, IsString, IsUrl, IsObject, ValidateIf } from 'class-validator';
 
 export class SaveProfileDto {
     @ApiPropertyOptional({ example: 'John Doe' })
@@ -41,6 +41,7 @@ export class SaveProfileDto {
 
     @ApiPropertyOptional({ example: 'https://kollabary.com' })
     @IsOptional()
+    @ValidateIf(o => o.website !== '' && o.website !== null && o.website !== undefined)
     @IsUrl()
     website?: string;
 

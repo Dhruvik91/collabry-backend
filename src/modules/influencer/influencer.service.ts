@@ -237,6 +237,17 @@ export class InfluencerService {
 
         // Filter by ranking tier if provided
 
+        query.addSelect((subQuery) => {
+            return subQuery
+                .select('COUNT(collaboration.id)', 'count')
+                .from(Collaboration, 'collaboration')
+                .where('collaboration.influencerId = influencer.id')
+                .andWhere('collaboration.status = :collabStatus', { collabStatus: CollaborationStatus.COMPLETED });
+        }, 'completed_collaborations_count');
+
+        query.orderBy('completed_collaborations_count', 'DESC')
+            .addOrderBy('influencer.createdAt', 'DESC');
+
         const [items, total] = await query
             .skip((page - 1) * limit)
             .take(limit)

@@ -116,7 +116,10 @@ export class ProfileService {
                 .from(Collaboration, 'collaboration')
                 .where('collaboration.requesterId = user.id')
                 .andWhere('collaboration.status = :collabStatus', { collabStatus: CollaborationStatus.COMPLETED });
-        }, 'completedCollaborations');
+        }, 'completed_collaborations');
+
+        query.orderBy('completed_collaborations', 'DESC')
+            .addOrderBy('profile.createdAt', 'DESC');
 
         const { entities, raw } = await query
             .skip((page - 1) * limit)
@@ -131,7 +134,7 @@ export class ProfileService {
                 ...profile,
                 stats: {
                     totalAuctions: parseInt(rawItem.totalAuctions || '0'),
-                    completedCollaborations: parseInt(rawItem.completedCollaborations || '0'),
+                    completedCollaborations: parseInt(rawItem.completed_collaborations || '0'),
                     activeAuctionsCount: 0, // We don't calculate this in list view for performance
                 },
             };
