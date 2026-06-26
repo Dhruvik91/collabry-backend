@@ -32,6 +32,7 @@ import { ReferralModule } from './modules/referral/referral.module';
 import { TopUpModule } from './modules/top-up/top-up.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { SendgridModule } from './modules/sendgrid/sendgrid.module';
+import { ResendModule } from './modules/resend/resend.module';
 import { PitchModule } from './modules/pitch/pitch.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 
@@ -75,6 +76,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     AwsModule,
     UploadsModule,
     SendgridModule,
+    ResendModule,
     NotificationsModule,
   ],
   controllers: [AppController],
