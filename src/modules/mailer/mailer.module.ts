@@ -2,11 +2,11 @@ import { Module } from '@nestjs/common';
 import { MailerModule as NestMailerModule } from '@nestjs-modules/mailer';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AppMailerService } from './mailer.service';
-import { SendgridModule } from '../sendgrid/sendgrid.module';
+import { ResendModule } from '../resend/resend.module';
 
 @Module({
   imports: [
-    SendgridModule,
+    ResendModule,
     NestMailerModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MailerService as NestMailerService } from '@nestjs-modules/mailer';
 import { ConfigService } from '@nestjs/config';
-import { SendgridService } from '../sendgrid/sendgrid.service';
+import { ResendService } from '../resend/resend.service';
 
 
 @Injectable()
@@ -11,16 +11,16 @@ export class AppMailerService {
   constructor(
     private readonly mailer: NestMailerService,
     private readonly configService: ConfigService,
-    private readonly sendgridService: SendgridService,
+    private readonly resendService: ResendService,
   ) { }
 
   /**
-   * Dispatches mail through SendGrid if configured, otherwise falls back to defaults.
+   * Dispatches mail through Resend if configured, otherwise falls back to defaults.
    */
   private async dispatchMail(options: { to: string; subject: string; html: string }): Promise<void> {
-    const apiKey = this.configService.get<string>('SENDGRID_API_KEY');
+    const apiKey = this.configService.get<string>('RESEND_API_KEY');
     if (apiKey) {
-      await this.sendgridService.sendMail(options);
+      await this.resendService.sendMail(options);
     } else {
       await this.mailer.sendMail(options);
     }
