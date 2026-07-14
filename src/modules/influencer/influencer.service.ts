@@ -198,7 +198,7 @@ export class InfluencerService {
         }
 
         if (gender) {
-            query.andWhere('influencer.gender = :gender', { gender });
+            query.andWhere('LOWER(influencer.gender) = LOWER(:gender)', { gender });
         }
 
         if (languages && languages.length > 0) {

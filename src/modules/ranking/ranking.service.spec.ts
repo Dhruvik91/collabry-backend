@@ -75,14 +75,14 @@ describe('RankingService', () => {
 
     it('should calculate "Elite Creator" for high-performing influencers', async () => {
         influencerRepo.findOne.mockResolvedValue({ id: 'prof-1', user: { id: 'user-1' }, verified: true });
-        collaborationRepo.count.mockResolvedValue(35); // Completed
+        collaborationRepo.count.mockResolvedValue(65); // Completed
         collaborationRepo.createQueryBuilder().getCount.mockResolvedValue(25); // Paid
         reviewRepo.find.mockResolvedValue([{ rating: 5 }, { rating: 4 }, { rating: 5 }]); // Avg 4.66
 
         // For completion rate
         collaborationRepo.count.mockImplementation((opt) => {
-            if (opt.where.status) return Promise.resolve(35); // Completed
-            return Promise.resolve(38); // Accepted/Cancelled (92% completion)
+            if (opt.where.status) return Promise.resolve(65); // Completed
+            return Promise.resolve(68); // Accepted/Cancelled (92% completion)
         });
 
         const result = await service.calculateRanking('user-1');

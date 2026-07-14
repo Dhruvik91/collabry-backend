@@ -17,12 +17,14 @@ describe('Sorting Verification', () => {
     // Track mock calls
     let influencerOrderByCalls: any[] = [];
     let influencerAddOrderByCalls: any[] = [];
+    let influencerAndWhereCalls: any[] = [];
     let profileOrderByCalls: any[] = [];
     let profileAddOrderByCalls: any[] = [];
 
     beforeEach(async () => {
         influencerOrderByCalls = [];
         influencerAddOrderByCalls = [];
+        influencerAndWhereCalls = [];
         profileOrderByCalls = [];
         profileAddOrderByCalls = [];
 
@@ -31,7 +33,10 @@ describe('Sorting Verification', () => {
             innerJoinAndSelect: jest.fn().mockReturnThis(),
             leftJoinAndSelect: jest.fn().mockReturnThis(),
             where: jest.fn().mockReturnThis(),
-            andWhere: jest.fn().mockReturnThis(),
+            andWhere: jest.fn().mockImplementation((queryStr, params) => {
+                influencerAndWhereCalls.push({ queryStr, params });
+                return mockInfluencerQueryBuilder;
+            }),
             addSelect: jest.fn().mockReturnThis(),
             orderBy: jest.fn().mockImplementation((val, order) => {
                 influencerOrderByCalls.push({ val, order });
@@ -131,5 +136,14 @@ describe('Sorting Verification', () => {
         expect(profileAddOrderByCalls.length).toBe(1);
         expect(profileAddOrderByCalls[0].val).toBe('profile.createdAt');
         expect(profileAddOrderByCalls[0].order).toBe('DESC');
+    });
+
+    it('influencerService.searchInfluencers should filter by gender case-insensitively', async () => {
+        await influencerService.searchInfluencers({ page: 1, limit: 10, gender: 'Female' } as any);
+
+        const genderFilter = influencerAndWhereCalls.find(call => call.queryStr.includes('gender'));
+        expect(genderFilter).toBeDefined();
+        expect(genderFilter.queryStr).toBe('LOWER(influencer.gender) = LOWER(:gender)');
+        expect(genderFilter.params).toEqual({ gender: 'Female' });
     });
 });
