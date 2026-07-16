@@ -294,7 +294,7 @@ export class AppMailerService {
 
   async sendPaymentSuccessEmail(email: string, name: string, amount: number, coins: number, orderId: string): Promise<boolean> {
     const coinUrl = 'https://kollabary.s3.ap-south-1.amazonaws.com/kollabary-coin.png';
-    
+
     const content = `
       <div style="text-align: center; margin-bottom: 16px;">
         <img src="${coinUrl}" alt="K-Coin" width="48" style="display: inline-block;">
@@ -366,7 +366,7 @@ export class AppMailerService {
             </td>
             <td style="padding-bottom: 12px; text-align: right;">
               <p class="text-sub" style="margin: 0; font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Bid Amount</p>
-              <p style="margin: 2px 0 0 0; font-size: 16px; font-weight: 700; color: #E91E8C;">${amount} K</p>
+              <p style="margin: 2px 0 0 0; font-size: 16px; font-weight: 700; color: #E91E8C;">₹${amount}</p>
             </td>
           </tr>
           <tr>
