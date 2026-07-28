@@ -1,8 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { MailerService as NestMailerService } from '@nestjs-modules/mailer';
-import { ConfigService } from '@nestjs/config';
-import { ResendService } from '../resend/resend.service';
-
+import { Injectable, Logger } from "@nestjs/common";
+import { MailerService as NestMailerService } from "@nestjs-modules/mailer";
+import { ConfigService } from "@nestjs/config";
+import { ResendService } from "../resend/resend.service";
 
 @Injectable()
 export class AppMailerService {
@@ -12,13 +11,17 @@ export class AppMailerService {
     private readonly mailer: NestMailerService,
     private readonly configService: ConfigService,
     private readonly resendService: ResendService,
-  ) { }
+  ) {}
 
   /**
    * Dispatches mail through Resend if configured, otherwise falls back to defaults.
    */
-  private async dispatchMail(options: { to: string; subject: string; html: string }): Promise<void> {
-    const apiKey = this.configService.get<string>('RESEND_API_KEY');
+  private async dispatchMail(options: {
+    to: string;
+    subject: string;
+    html: string;
+  }): Promise<void> {
+    const apiKey = this.configService.get<string>("RESEND_API_KEY");
     if (apiKey) {
       await this.resendService.sendMail(options);
     } else {
@@ -32,8 +35,10 @@ export class AppMailerService {
    */
   private buildEmailLayout(content: string): string {
     const year = new Date().getFullYear();
-    const logoLight = 'https://kollabary.s3.ap-south-1.amazonaws.com/email-template-logo.png';
-    const logoDark = 'https://kollabary.s3.ap-south-1.amazonaws.com/email_template_dark_mode_logo.png';
+    const logoLight =
+      "https://kollabary.s3.ap-south-1.amazonaws.com/email-template-logo.png";
+    const logoDark =
+      "https://kollabary.s3.ap-south-1.amazonaws.com/email_template_dark_mode_logo.png";
 
     return `
 <!DOCTYPE html>
@@ -123,8 +128,15 @@ export class AppMailerService {
 </html>`;
   }
 
-  async sendPasswordResetEmail(email: string, resetToken: string, userId: string): Promise<boolean> {
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3001');
+  async sendPasswordResetEmail(
+    email: string,
+    resetToken: string,
+    userId: string,
+  ): Promise<boolean> {
+    const frontendUrl = this.configService.get<string>(
+      "FRONTEND_URL",
+      "http://localhost:3001",
+    );
     const resetLink = `${frontendUrl}/auth/reset-password?token=${resetToken}&id=${userId}`;
 
     const content = `
@@ -155,18 +167,28 @@ export class AppMailerService {
     try {
       await this.dispatchMail({
         to: email,
-        subject: 'Reset Your Kollabary Password',
+        subject: "Reset Your Kollabary Password",
         html: this.buildEmailLayout(content),
       });
       return true;
     } catch (error) {
-      this.logger.error(`Failed to send password reset email to ${email}`, error);
+      this.logger.error(
+        `Failed to send password reset email to ${email}`,
+        error,
+      );
       return false;
     }
   }
 
-  async sendCollaborationRequestEmail(email: string, requesterName: string, collaborationTitle: string): Promise<boolean> {
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3001');
+  async sendCollaborationRequestEmail(
+    email: string,
+    requesterName: string,
+    collaborationTitle: string,
+  ): Promise<boolean> {
+    const frontendUrl = this.configService.get<string>(
+      "FRONTEND_URL",
+      "http://localhost:3001",
+    );
     const dashboardLink = `${frontendUrl}/collaborations`;
 
     const content = `
@@ -208,20 +230,30 @@ export class AppMailerService {
       });
       return true;
     } catch (error) {
-      this.logger.error(`Failed to send collaboration email to ${email}`, error);
+      this.logger.error(
+        `Failed to send collaboration email to ${email}`,
+        error,
+      );
       return false;
     }
   }
 
-  async sendVerificationUpdateEmail(email: string, status: string): Promise<boolean> {
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3001');
+  async sendVerificationUpdateEmail(
+    email: string,
+    status: string,
+  ): Promise<boolean> {
+    const frontendUrl = this.configService.get<string>(
+      "FRONTEND_URL",
+      "http://localhost:3001",
+    );
     const settingsLink = `${frontendUrl}/settings`;
 
-    const isApproved = status.toLowerCase() === 'approved';
-    const statusColor = isApproved ? '#16a34a' : '#ea580c';
-    const statusBg = isApproved ? '#f0fdf4' : '#fff7ed';
-    const statusBorder = isApproved ? '#bbf7d0' : '#fed7aa';
-    const statusLabel = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+    const isApproved = status.toLowerCase() === "approved";
+    const statusColor = isApproved ? "#16a34a" : "#ea580c";
+    const statusBg = isApproved ? "#f0fdf4" : "#fff7ed";
+    const statusBorder = isApproved ? "#bbf7d0" : "#fed7aa";
+    const statusLabel =
+      status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
 
     const content = `
       <h1 class="text-main" style="margin: 0 0 12px 0; font-size: 22px; font-weight: 700; color: #1e293b; text-align: center; letter-spacing: -0.02em;">Verification Update</h1>
@@ -232,9 +264,11 @@ export class AppMailerService {
       <div style="background-color: ${statusBg}; border: 1px solid ${statusBorder}; border-radius: 8px; padding: 20px; margin-bottom: 24px; text-align: center;">
         <p style="margin: 0; font-size: 16px; font-weight: 700; color: ${statusColor}; text-transform: uppercase; letter-spacing: 0.05em;">${statusLabel}</p>
         <div class="text-sub" style="margin-top: 12px; font-size: 14px; color: #475569; line-height: 1.5;">
-          ${isApproved
-        ? 'Your profile is now verified. The badge is now live!'
-        : 'Your request was not approved. Please check feedback in settings.'}
+          ${
+            isApproved
+              ? "Your profile is now verified. The badge is now live!"
+              : "Your request was not approved. Please check feedback in settings."
+          }
         </div>
       </div>
 
@@ -242,7 +276,7 @@ export class AppMailerService {
         <a href="${settingsLink}"
            target="_blank"
            style="display: inline-block; background-color: #E91E8C; color: #ffffff; padding: 12px 32px; font-size: 14px; font-weight: 600; text-decoration: none; border-radius: 6px;">
-          ${isApproved ? 'View Profile' : 'Check Feedback'}
+          ${isApproved ? "View Profile" : "Check Feedback"}
         </a>
       </div>`;
 
@@ -282,7 +316,7 @@ export class AppMailerService {
     try {
       await this.dispatchMail({
         to: email,
-        subject: 'Verify Your Kollabary Account',
+        subject: "Verify Your Kollabary Account",
         html: this.buildEmailLayout(content),
       });
       return true;
@@ -292,8 +326,15 @@ export class AppMailerService {
     }
   }
 
-  async sendPaymentSuccessEmail(email: string, name: string, amount: number, coins: number, orderId: string): Promise<boolean> {
-    const coinUrl = 'https://kollabary.s3.ap-south-1.amazonaws.com/kollabary-coin.png';
+  async sendPaymentSuccessEmail(
+    email: string,
+    name: string,
+    amount: number,
+    coins: number,
+    orderId: string,
+  ): Promise<boolean> {
+    const coinUrl =
+      "https://kollabary.s3.ap-south-1.amazonaws.com/kollabary-coin.png";
 
     const content = `
       <div style="text-align: center; margin-bottom: 16px;">
@@ -332,20 +373,32 @@ export class AppMailerService {
     try {
       await this.dispatchMail({
         to: email,
-        subject: 'Top-up Successful - Kollabary',
+        subject: "Top-up Successful - Kollabary",
         html: this.buildEmailLayout(content),
       });
       this.logger.log(`Payment success email sent to ${email}`);
       return true;
     } catch (error) {
-      this.logger.error(`Failed to send payment success email to ${email}`, error);
+      this.logger.error(
+        `Failed to send payment success email to ${email}`,
+        error,
+      );
       return false;
     }
   }
 
-  async sendBidAcceptedEmail(email: string, auctionTitle: string, amount: number, brandName: string): Promise<boolean> {
-    const coinUrl = 'https://kollabary.s3.ap-south-1.amazonaws.com/kollabary-coin.png';
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3001');
+  async sendBidAcceptedEmail(
+    email: string,
+    auctionTitle: string,
+    amount: number,
+    brandName: string,
+  ): Promise<boolean> {
+    const coinUrl =
+      "https://kollabary.s3.ap-south-1.amazonaws.com/kollabary-coin.png";
+    const frontendUrl = this.configService.get<string>(
+      "FRONTEND_URL",
+      "http://localhost:3001",
+    );
     const collaborationsLink = `${frontendUrl}/collaborations`;
 
     const content = `
@@ -393,7 +446,7 @@ export class AppMailerService {
     try {
       await this.dispatchMail({
         to: email,
-        subject: 'Bid Accepted - Kollabary Auction',
+        subject: "Bid Accepted - Kollabary Auction",
         html: this.buildEmailLayout(content),
       });
       return true;

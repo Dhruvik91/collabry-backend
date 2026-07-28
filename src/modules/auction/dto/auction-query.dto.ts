@@ -1,6 +1,6 @@
-import { IsOptional, IsEnum, IsString } from 'class-validator';
-import { AuctionStatus } from '../../../database/entities/enums';
-import { PaginationQueryDto } from '../../../core/dto/pagination-query.dto';
+import { IsOptional, IsEnum, IsString } from "class-validator";
+import { AuctionStatus } from "../../../database/entities/enums";
+import { PaginationQueryDto } from "../../../core/dto/pagination-query.dto";
 
 export class AuctionQueryDto extends PaginationQueryDto {
   @IsOptional()

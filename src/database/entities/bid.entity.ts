@@ -1,60 +1,60 @@
 import {
-    Entity,
-    PrimaryGeneratedColumn,
-    Column,
-    ManyToOne,
-    CreateDateColumn,
-    UpdateDateColumn,
-    DeleteDateColumn,
-    JoinColumn,
-    Index,
-} from 'typeorm';
-import { ApiProperty } from '@nestjs/swagger';
-import { User } from './user.entity';
-import { Auction } from './auction.entity';
-import { BidStatus } from './enums';
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
+  JoinColumn,
+  Index,
+} from "typeorm";
+import { ApiProperty } from "@nestjs/swagger";
+import { User } from "./user.entity";
+import { Auction } from "./auction.entity";
+import { BidStatus } from "./enums";
 
-@Entity('bids')
+@Entity("bids")
 export class Bid {
-    @ApiProperty()
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+  @ApiProperty()
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
 
-    @ApiProperty({ type: () => Auction })
-    @Index()
-    @ManyToOne(() => Auction, (auction) => auction.bids, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'auctionId' })
-    auction: Auction;
+  @ApiProperty({ type: () => Auction })
+  @Index()
+  @ManyToOne(() => Auction, (auction) => auction.bids, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "auctionId" })
+  auction: Auction;
 
-    @ApiProperty({ type: () => User })
-    @Index()
-    @ManyToOne(() => User)
-    @JoinColumn({ name: 'influencerId' })
-    influencer: User;
+  @ApiProperty({ type: () => User })
+  @Index()
+  @ManyToOne(() => User)
+  @JoinColumn({ name: "influencerId" })
+  influencer: User;
 
-    @ApiProperty()
-    @Column({ type: 'decimal', precision: 10, scale: 2 })
-    amount: number;
+  @ApiProperty()
+  @Column({ type: "decimal", precision: 10, scale: 2 })
+  amount: number;
 
-    @ApiProperty()
-    @Column({ type: 'text' })
-    proposal: string;
+  @ApiProperty()
+  @Column({ type: "text" })
+  proposal: string;
 
-    @ApiProperty({ enum: BidStatus })
-    @Index()
-    @Column({
-        type: 'enum',
-        enum: BidStatus,
-        default: BidStatus.PENDING,
-    })
-    status: BidStatus;
+  @ApiProperty({ enum: BidStatus })
+  @Index()
+  @Column({
+    type: "enum",
+    enum: BidStatus,
+    default: BidStatus.PENDING,
+  })
+  status: BidStatus;
 
-    @CreateDateColumn()
-    createdAt: Date;
+  @CreateDateColumn()
+  createdAt: Date;
 
-    @UpdateDateColumn()
-    updatedAt: Date;
+  @UpdateDateColumn()
+  updatedAt: Date;
 
-    @DeleteDateColumn()
-    deletedAt: Date;
+  @DeleteDateColumn()
+  deletedAt: Date;
 }

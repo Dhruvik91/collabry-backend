@@ -1,12 +1,16 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Report } from '../../database/entities/report.entity';
-import { Profile } from '../../database/entities/profile.entity';
-import { InfluencerProfile } from '../../database/entities/influencer-profile.entity';
-import { Review } from '../../database/entities/review.entity';
-import { CreateReportDto } from './dto/create-report.dto';
-import { ReportStatus } from '../../database/entities/enums';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Report } from "../../database/entities/report.entity";
+import { Profile } from "../../database/entities/profile.entity";
+import { InfluencerProfile } from "../../database/entities/influencer-profile.entity";
+import { Review } from "../../database/entities/review.entity";
+import { CreateReportDto } from "./dto/create-report.dto";
+import { ReportStatus } from "../../database/entities/enums";
 
 @Injectable()
 export class ReportService {
@@ -19,30 +23,42 @@ export class ReportService {
     private readonly profileRepo: Repository<Profile>,
     @InjectRepository(Review)
     private readonly reviewRepo: Repository<Review>,
-  ) { }
+  ) {}
 
-  async createReport(reporterId: string, createDto: CreateReportDto): Promise<Report> {
+  async createReport(
+    reporterId: string,
+    createDto: CreateReportDto,
+  ): Promise<Report> {
     let resolvedTargetUserId = createDto.targetUserId;
 
     // Resolve target user ID if only targetId (profile ID) is provided
     if (!resolvedTargetUserId && createDto.targetId) {
-        // Try all possible profile owners and review authors in parallel
-        const [influencer, brand, review] = await Promise.all([
-            this.influencerProfileRepo.findOne({ where: { id: createDto.targetId }, relations: ['user'] }),
-            this.profileRepo.findOne({ where: { id: createDto.targetId }, relations: ['user'] }),
-            this.reviewRepo.findOne({ where: { id: createDto.targetId }, relations: ['reviewer'] })
-        ]);
+      // Try all possible profile owners and review authors in parallel
+      const [influencer, brand, review] = await Promise.all([
+        this.influencerProfileRepo.findOne({
+          where: { id: createDto.targetId },
+          relations: ["user"],
+        }),
+        this.profileRepo.findOne({
+          where: { id: createDto.targetId },
+          relations: ["user"],
+        }),
+        this.reviewRepo.findOne({
+          where: { id: createDto.targetId },
+          relations: ["reviewer"],
+        }),
+      ]);
 
-        if (influencer?.user) {
-            resolvedTargetUserId = influencer.user.id;
-        } else if (brand?.user) {
-            resolvedTargetUserId = brand.user.id;
-        } else if (review?.reviewer) {
-            resolvedTargetUserId = review.reviewer.id;
-        } else {
-            // Fallback: assume targetId might be the user ID if not found in profiles/reviews
-            resolvedTargetUserId = createDto.targetId;
-        }
+      if (influencer?.user) {
+        resolvedTargetUserId = influencer.user.id;
+      } else if (brand?.user) {
+        resolvedTargetUserId = brand.user.id;
+      } else if (review?.reviewer) {
+        resolvedTargetUserId = review.reviewer.id;
+      } else {
+        // Fallback: assume targetId might be the user ID if not found in profiles/reviews
+        resolvedTargetUserId = createDto.targetId;
+      }
     }
 
     const report = this.reportRepo.create({
@@ -57,24 +73,28 @@ export class ReportService {
     return await this.reportRepo.save(report);
   }
 
-  async getAllReports(search?: string, status?: ReportStatus): Promise<Report[]> {
-    const query = this.reportRepo.createQueryBuilder('report')
-      .leftJoinAndSelect('report.reporter', 'reporter')
-      .leftJoinAndSelect('report.targetUser', 'targetUser')
-      .leftJoinAndSelect('reporter.profile', 'reporterProfile')
-      .leftJoinAndSelect('targetUser.profile', 'targetProfile')
-      .leftJoinAndSelect('reporter.influencerProfile', 'reporterInfluencer')
-      .leftJoinAndSelect('targetUser.influencerProfile', 'targetInfluencer')
-      .orderBy('report.createdAt', 'DESC');
+  async getAllReports(
+    search?: string,
+    status?: ReportStatus,
+  ): Promise<Report[]> {
+    const query = this.reportRepo
+      .createQueryBuilder("report")
+      .leftJoinAndSelect("report.reporter", "reporter")
+      .leftJoinAndSelect("report.targetUser", "targetUser")
+      .leftJoinAndSelect("reporter.profile", "reporterProfile")
+      .leftJoinAndSelect("targetUser.profile", "targetProfile")
+      .leftJoinAndSelect("reporter.influencerProfile", "reporterInfluencer")
+      .leftJoinAndSelect("targetUser.influencerProfile", "targetInfluencer")
+      .orderBy("report.createdAt", "DESC");
 
     if (status) {
-      query.andWhere('report.status = :status', { status });
+      query.andWhere("report.status = :status", { status });
     }
 
     if (search) {
       query.andWhere(
-        '(report.reason ILike :search OR reporter.email ILike :search)',
-        { search: `%${search}%` }
+        "(report.reason ILike :search OR reporter.email ILike :search)",
+        { search: `%${search}%` },
       );
     }
 
@@ -85,12 +105,12 @@ export class ReportService {
     return await this.reportRepo.findOne({
       where: { id },
       relations: [
-        'reporter', 
-        'targetUser', 
-        'reporter.profile', 
-        'targetUser.profile',
-        'reporter.influencerProfile',
-        'targetUser.influencerProfile'
+        "reporter",
+        "targetUser",
+        "reporter.profile",
+        "targetUser.profile",
+        "reporter.influencerProfile",
+        "targetUser.influencerProfile",
       ],
     });
   }
@@ -108,13 +128,16 @@ export class ReportService {
   }
 
   async deleteReport(userId: string, id: string): Promise<void> {
-    const report = await this.reportRepo.findOne({ where: { id }, relations: ['reporter'] });
+    const report = await this.reportRepo.findOne({
+      where: { id },
+      relations: ["reporter"],
+    });
     if (!report) {
-      throw new NotFoundException('Report not found');
+      throw new NotFoundException("Report not found");
     }
 
     if (report.reporter.id !== userId) {
-      throw new ForbiddenException('You can only delete your own reports');
+      throw new ForbiddenException("You can only delete your own reports");
     }
 
     // Use softRemove for historical integrity

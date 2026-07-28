@@ -1,26 +1,26 @@
-import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { Collaboration } from '../../database/entities/collaboration.entity';
-import { InfluencerProfile } from '../../database/entities/influencer-profile.entity';
-import { CollaborationController } from './collaboration.controller';
-import { CollaborationService } from './collaboration.service';
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { Collaboration } from "../../database/entities/collaboration.entity";
+import { InfluencerProfile } from "../../database/entities/influencer-profile.entity";
+import { CollaborationController } from "./collaboration.controller";
+import { CollaborationService } from "./collaboration.service";
 
-import { User } from '../../database/entities/user.entity';
-import { MailerConfigModule } from '../mailer/mailer.module';
-import { RankingModule } from '../ranking/ranking.module';
-import { KcWalletModule } from '../kc-wallet/kc-wallet.module';
-import { KCSettingModule } from '../kc-setting/kc-setting.module';
+import { User } from "../../database/entities/user.entity";
+import { MailerConfigModule } from "../mailer/mailer.module";
+import { RankingModule } from "../ranking/ranking.module";
+import { KcWalletModule } from "../kc-wallet/kc-wallet.module";
+import { KCSettingModule } from "../kc-setting/kc-setting.module";
 
 @Module({
-    imports: [
-        TypeOrmModule.forFeature([Collaboration, User, InfluencerProfile]),
-        MailerConfigModule,
-        RankingModule,
-        KcWalletModule,
-        KCSettingModule,
-    ],
-    controllers: [CollaborationController],
-    providers: [CollaborationService],
-    exports: [CollaborationService],
+  imports: [
+    TypeOrmModule.forFeature([Collaboration, User, InfluencerProfile]),
+    MailerConfigModule,
+    RankingModule,
+    KcWalletModule,
+    KCSettingModule,
+  ],
+  controllers: [CollaborationController],
+  providers: [CollaborationService],
+  exports: [CollaborationService],
 })
-export class CollaborationModule { }
+export class CollaborationModule {}

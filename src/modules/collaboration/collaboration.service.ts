@@ -1,377 +1,487 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
-import { InfluencerProfile } from '../../database/entities/influencer-profile.entity';
-import { Collaboration } from '../../database/entities/collaboration.entity';
-import { User } from '../../database/entities/user.entity';
-import { AppMailerService } from '../mailer/mailer.service';
-import { RankingService } from '../ranking/ranking.service';
-import { CreateCollaborationDto } from './dto/create-collaboration.dto';
-import { UpdateCollaborationStatusDto } from './dto/update-collaboration-status.dto';
-import { UpdateCollaborationDto } from './dto/update-collaboration.dto';
-import { FilterCollaborationsDto } from './dto/filter-collaborations.dto';
-import { CollaborationStatus, UserRole, TransactionPurpose, UserStatus } from '../../database/entities/enums';
-import { WalletService } from '../kc-wallet/wallet.service';
-import { KCSettingService, KCSettingKey } from '../kc-setting/kc-setting.service';
-import { isEntityNotFoundError } from '../../database/errors/entity-not-found.type-guard';
-import { cif } from '../../database/errors/tryQuery';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, In } from "typeorm";
+import { InfluencerProfile } from "../../database/entities/influencer-profile.entity";
+import { Collaboration } from "../../database/entities/collaboration.entity";
+import { User } from "../../database/entities/user.entity";
+import { AppMailerService } from "../mailer/mailer.service";
+import { RankingService } from "../ranking/ranking.service";
+import { CreateCollaborationDto } from "./dto/create-collaboration.dto";
+import { UpdateCollaborationStatusDto } from "./dto/update-collaboration-status.dto";
+import { UpdateCollaborationDto } from "./dto/update-collaboration.dto";
+import { FilterCollaborationsDto } from "./dto/filter-collaborations.dto";
+import {
+  CollaborationStatus,
+  UserRole,
+  TransactionPurpose,
+  UserStatus,
+} from "../../database/entities/enums";
+import { WalletService } from "../kc-wallet/wallet.service";
+import {
+  KCSettingService,
+  KCSettingKey,
+} from "../kc-setting/kc-setting.service";
+import { isEntityNotFoundError } from "../../database/errors/entity-not-found.type-guard";
+import { cif } from "../../database/errors/tryQuery";
 
 @Injectable()
 export class CollaborationService {
-    constructor(
-        @InjectRepository(Collaboration)
-        private readonly collaborationRepo: Repository<Collaboration>,
-        @InjectRepository(User)
-        private readonly userRepo: Repository<User>,
-        @InjectRepository(InfluencerProfile)
-        private readonly influencerProfileRepo: Repository<InfluencerProfile>,
-        private readonly mailerService: AppMailerService,
-        private readonly rankingService: RankingService,
-        private readonly walletService: WalletService,
-        private readonly settingService: KCSettingService,
-    ) { }
+  constructor(
+    @InjectRepository(Collaboration)
+    private readonly collaborationRepo: Repository<Collaboration>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    @InjectRepository(InfluencerProfile)
+    private readonly influencerProfileRepo: Repository<InfluencerProfile>,
+    private readonly mailerService: AppMailerService,
+    private readonly rankingService: RankingService,
+    private readonly walletService: WalletService,
+    private readonly settingService: KCSettingService,
+  ) {}
 
-    async createCollaboration(requesterId: string, createDto: CreateCollaborationDto): Promise<Collaboration> {
-        const requester = await this.userRepo.findOne({ where: { id: requesterId }, relations: ['profile'] });
+  async createCollaboration(
+    requesterId: string,
+    createDto: CreateCollaborationDto,
+  ): Promise<Collaboration> {
+    const requester = await this.userRepo.findOne({
+      where: { id: requesterId },
+      relations: ["profile"],
+    });
 
-        if (!requester || requester.status !== UserStatus.ACTIVE) {
-            throw new ForbiddenException('Your account must be active to request collaborations');
-        }
+    if (!requester || requester.status !== UserStatus.ACTIVE) {
+      throw new ForbiddenException(
+        "Your account must be active to request collaborations",
+      );
+    }
 
-        // Robustly resolve influencer profile by either Profile ID or User ID in a single query
-        let influencerProfile = await this.influencerProfileRepo.findOne({
-            where: [
-                { id: createDto.influencerId },
-                { user: { id: createDto.influencerId } }
-            ],
-            relations: ['user']
+    // Robustly resolve influencer profile by either Profile ID or User ID in a single query
+    let influencerProfile = await this.influencerProfileRepo.findOne({
+      where: [
+        { id: createDto.influencerId },
+        { user: { id: createDto.influencerId } },
+      ],
+      relations: ["user"],
+    });
+
+    if (!influencerProfile) {
+      throw new BadRequestException(
+        "Target must be a valid influencer profile or user",
+      );
+    }
+
+    const influencerUser = influencerProfile.user;
+
+    if (!influencerUser || influencerUser.role !== UserRole.INFLUENCER) {
+      throw new BadRequestException("Target user must be an influencer");
+    }
+
+    if (influencerUser.status !== UserStatus.ACTIVE) {
+      throw new BadRequestException("Target influencer account is not active");
+    }
+
+    if (requesterId === influencerUser.id) {
+      throw new BadRequestException(
+        "You cannot request a collaboration with yourself",
+      );
+    }
+
+    if (
+      createDto.startDate &&
+      createDto.endDate &&
+      new Date(createDto.startDate) > new Date(createDto.endDate)
+    ) {
+      throw new BadRequestException("Start date cannot be after end date");
+    }
+
+    const savedCollaboration = await this.collaborationRepo.manager.transaction(
+      async (manager) => {
+        const collaboration = this.collaborationRepo.create({
+          requester: { id: requesterId } as any,
+          influencer: { id: influencerProfile.id } as any,
+          title: createDto.title,
+          description: createDto.description,
+          proposedTerms: createDto.proposedTerms,
+          startDate: createDto.startDate,
+          endDate: createDto.endDate,
+          status: CollaborationStatus.REQUESTED,
         });
 
-        if (!influencerProfile) {
-            throw new BadRequestException('Target must be a valid influencer profile or user');
-        }
+        const saved = await manager.save(collaboration);
 
-        const influencerUser = influencerProfile.user;
-
-        if (!influencerUser || influencerUser.role !== UserRole.INFLUENCER) {
-            throw new BadRequestException('Target user must be an influencer');
-        }
-
-        if (influencerUser.status !== UserStatus.ACTIVE) {
-            throw new BadRequestException('Target influencer account is not active');
-        }
-
-        if (requesterId === influencerUser.id) {
-            throw new BadRequestException('You cannot request a collaboration with yourself');
-        }
-
-        if (createDto.startDate && createDto.endDate && new Date(createDto.startDate) > new Date(createDto.endDate)) {
-            throw new BadRequestException('Start date cannot be after end date');
-        }
-
-        const savedCollaboration = await this.collaborationRepo.manager.transaction(async (manager) => {
-            const collaboration = this.collaborationRepo.create({
-                requester: { id: requesterId } as any,
-                influencer: { id: influencerProfile.id } as any,
-                title: createDto.title,
-                description: createDto.description,
-                proposedTerms: createDto.proposedTerms,
-                startDate: createDto.startDate,
-                endDate: createDto.endDate,
-                status: CollaborationStatus.REQUESTED,
-            });
-
-            const saved = await manager.save(collaboration);
-
-            // Deduct KC coins ONLY if NOT from an auction
-            if (!createDto.auctionId) {
-                const price = await this.settingService.getSetting(KCSettingKey.COLLABORATION_CREATION_PRICE);
-                if (price > 0) {
-                    await this.walletService.debit(
-                        requesterId,
-                        price,
-                        TransactionPurpose.COLLABORATION_CREATION,
-                        { collaborationId: saved.id },
-                        manager
-                    );
-                }
-            }
-            return saved;
-        });
-
-        // Update Ranking
-        await this.rankingService.updateRanking(influencerUser.id);
-
-        // Notify Influencer via Email
-        if (influencerUser && requester) {
-            await this.mailerService.sendCollaborationRequestEmail(
-                influencerUser.email,
-                requester.profile?.fullName || 'A brand/user',
-                createDto.title,
+        // Deduct KC coins ONLY if NOT from an auction
+        if (!createDto.auctionId) {
+          const price = await this.settingService.getSetting(
+            KCSettingKey.COLLABORATION_CREATION_PRICE,
+          );
+          if (price > 0) {
+            await this.walletService.debit(
+              requesterId,
+              price,
+              TransactionPurpose.COLLABORATION_CREATION,
+              { collaborationId: saved.id },
+              manager,
             );
+          }
         }
+        return saved;
+      },
+    );
 
-        return savedCollaboration;
+    // Update Ranking
+    await this.rankingService.updateRanking(influencerUser.id);
+
+    // Notify Influencer via Email
+    if (influencerUser && requester) {
+      await this.mailerService.sendCollaborationRequestEmail(
+        influencerUser.email,
+        requester.profile?.fullName || "A brand/user",
+        createDto.title,
+      );
     }
 
-    async getMyCollaborations(userId: string, filters?: FilterCollaborationsDto) {
-        const page = filters?.page ?? 1;
-        const limit = filters?.limit ?? 20;
+    return savedCollaboration;
+  }
 
-        const qb = this.collaborationRepo
-            .createQueryBuilder('collaboration')
-            .leftJoinAndSelect('collaboration.requester', 'requester')
-            .leftJoinAndSelect('requester.profile', 'requesterProfile')
-            .leftJoinAndSelect('collaboration.influencer', 'influencer')
-            .leftJoinAndSelect('influencer.user', 'influencerUser')
-            .leftJoinAndSelect('influencerUser.profile', 'influencerUserProfile')
-            .where(
-                '(requester.id = :userId OR influencerUser.id = :userId)',
-                { userId },
-            );
+  async getMyCollaborations(userId: string, filters?: FilterCollaborationsDto) {
+    const page = filters?.page ?? 1;
+    const limit = filters?.limit ?? 20;
 
-        if (filters?.status) {
-            qb.andWhere('collaboration.status = :status', { status: filters.status });
-        }
+    const qb = this.collaborationRepo
+      .createQueryBuilder("collaboration")
+      .leftJoinAndSelect("collaboration.requester", "requester")
+      .leftJoinAndSelect("requester.profile", "requesterProfile")
+      .leftJoinAndSelect("collaboration.influencer", "influencer")
+      .leftJoinAndSelect("influencer.user", "influencerUser")
+      .leftJoinAndSelect("influencerUser.profile", "influencerUserProfile")
+      .where("(requester.id = :userId OR influencerUser.id = :userId)", {
+        userId,
+      });
 
-        if (filters?.search) {
-            qb.andWhere('collaboration.title ILIKE :search', { search: `%${filters.search}%` });
-        }
-
-        const [items, total] = await qb
-            .orderBy('collaboration.createdAt', 'DESC')
-            .skip((page - 1) * limit)
-            .take(limit)
-            .getManyAndCount();
-
-        return {
-            items,
-            meta: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit),
-            },
-        };
+    if (filters?.status) {
+      qb.andWhere("collaboration.status = :status", { status: filters.status });
     }
 
-    async getCollaborationById(id: string, userId: string): Promise<Collaboration> {
-        try {
-            const collaboration = await this.collaborationRepo.findOne({
-                where: { id },
-                relations: ['requester', 'influencer', 'requester.profile', 'influencer.user', 'influencer.user.profile'],
-            });
-
-            if (!collaboration) {
-                throw new NotFoundException('Collaboration not found');
-            }
-
-            if (collaboration.requester?.id && collaboration.requester.id !== userId && 
-                collaboration.influencer?.user?.id && collaboration.influencer.user.id !== userId) {
-                throw new ForbiddenException('You do not have access to this collaboration');
-            }
-
-            return collaboration;
-        } catch (error) {
-            cif(isEntityNotFoundError, new NotFoundException('Collaboration not found'))(error);
-        }
+    if (filters?.search) {
+      qb.andWhere("collaboration.title ILIKE :search", {
+        search: `%${filters.search}%`,
+      });
     }
 
-    async updateStatus(id: string, userId: string, statusDto: UpdateCollaborationStatusDto): Promise<Collaboration> {
-        const collaboration = await this.getCollaborationById(id, userId);
+    const [items, total] = await qb
+      .orderBy("collaboration.createdAt", "DESC")
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
 
-        const isInfluencer = collaboration.influencer?.user?.id === userId;
-        const isRequester = collaboration.requester?.id === userId;
+    return {
+      items,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
 
-        // Validation based on current status and new status
-        switch (statusDto.status) {
-            case CollaborationStatus.ACCEPTED:
-            case CollaborationStatus.REJECTED:
-                if (!isInfluencer) throw new ForbiddenException('Only the influencer can accept or reject');
-                if (collaboration.status !== CollaborationStatus.REQUESTED) {
-                    throw new BadRequestException(`Cannot ${statusDto.status.toLowerCase()} from current state: ${collaboration.status}`);
-                }
-                break;
+  async getCollaborationById(
+    id: string,
+    userId: string,
+  ): Promise<Collaboration> {
+    try {
+      const collaboration = await this.collaborationRepo.findOne({
+        where: { id },
+        relations: [
+          "requester",
+          "influencer",
+          "requester.profile",
+          "influencer.user",
+          "influencer.user.profile",
+        ],
+      });
 
-            case CollaborationStatus.IN_PROGRESS:
-                if (collaboration.status !== CollaborationStatus.ACCEPTED) {
-                    throw new BadRequestException('Collaboration must be accepted before starting');
-                }
-                break;
+      if (!collaboration) {
+        throw new NotFoundException("Collaboration not found");
+      }
 
-            case CollaborationStatus.WORK_SUBMITTED:
-                if (!isInfluencer) throw new ForbiddenException('Only the influencer can submit work');
-                if (collaboration.status !== CollaborationStatus.IN_PROGRESS && collaboration.status !== CollaborationStatus.ACCEPTED) {
-                    throw new BadRequestException('Collaboration must be in progress or accepted to submit work');
-                }
-                break;
+      if (
+        collaboration.requester?.id &&
+        collaboration.requester.id !== userId &&
+        collaboration.influencer?.user?.id &&
+        collaboration.influencer.user.id !== userId
+      ) {
+        throw new ForbiddenException(
+          "You do not have access to this collaboration",
+        );
+      }
 
-            case CollaborationStatus.COMPLETED:
-                if (!isRequester) throw new ForbiddenException('Only the brand can mark the collaboration as completed');
-                if (collaboration.status !== CollaborationStatus.WORK_SUBMITTED) {
-                    throw new BadRequestException('Work must be submitted before completing the collaboration');
-                }
-                break;
+      return collaboration;
+    } catch (error) {
+      cif(
+        isEntityNotFoundError,
+        new NotFoundException("Collaboration not found"),
+      )(error);
+    }
+  }
 
-            case CollaborationStatus.CANCELLED:
-                if (collaboration.status === CollaborationStatus.COMPLETED) {
-                    throw new BadRequestException('Cannot cancel a completed collaboration');
-                }
-                break;
+  async updateStatus(
+    id: string,
+    userId: string,
+    statusDto: UpdateCollaborationStatusDto,
+  ): Promise<Collaboration> {
+    const collaboration = await this.getCollaborationById(id, userId);
+
+    const isInfluencer = collaboration.influencer?.user?.id === userId;
+    const isRequester = collaboration.requester?.id === userId;
+
+    // Validation based on current status and new status
+    switch (statusDto.status) {
+      case CollaborationStatus.ACCEPTED:
+      case CollaborationStatus.REJECTED:
+        if (!isInfluencer)
+          throw new ForbiddenException(
+            "Only the influencer can accept or reject",
+          );
+        if (collaboration.status !== CollaborationStatus.REQUESTED) {
+          throw new BadRequestException(
+            `Cannot ${statusDto.status.toLowerCase()} from current state: ${collaboration.status}`,
+          );
         }
+        break;
 
-        collaboration.status = statusDto.status;
+      case CollaborationStatus.IN_PROGRESS:
+        if (collaboration.status !== CollaborationStatus.ACCEPTED) {
+          throw new BadRequestException(
+            "Collaboration must be accepted before starting",
+          );
+        }
+        break;
 
-        // Wrap state changes and side effects in a transaction
-        const updatedCollaboration = await this.collaborationRepo.manager.transaction(async (manager) => {
-            const saved = await manager.save(collaboration);
-            // Update Ranking for the influencer
-            if (collaboration.influencer?.user?.id) {
-                await this.rankingService.updateRanking(collaboration.influencer.user.id);
-            }
-            return saved;
-        });
+      case CollaborationStatus.WORK_SUBMITTED:
+        if (!isInfluencer)
+          throw new ForbiddenException("Only the influencer can submit work");
+        if (
+          collaboration.status !== CollaborationStatus.IN_PROGRESS &&
+          collaboration.status !== CollaborationStatus.ACCEPTED
+        ) {
+          throw new BadRequestException(
+            "Collaboration must be in progress or accepted to submit work",
+          );
+        }
+        break;
 
-        return updatedCollaboration;
+      case CollaborationStatus.COMPLETED:
+        if (!isRequester)
+          throw new ForbiddenException(
+            "Only the brand can mark the collaboration as completed",
+          );
+        if (collaboration.status !== CollaborationStatus.WORK_SUBMITTED) {
+          throw new BadRequestException(
+            "Work must be submitted before completing the collaboration",
+          );
+        }
+        break;
+
+      case CollaborationStatus.CANCELLED:
+        if (collaboration.status === CollaborationStatus.COMPLETED) {
+          throw new BadRequestException(
+            "Cannot cancel a completed collaboration",
+          );
+        }
+        break;
     }
 
-    async updateCollaboration(id: string, userId: string, updateDto: UpdateCollaborationDto): Promise<Collaboration> {
-        const collaboration = await this.getCollaborationById(id, userId);
+    collaboration.status = statusDto.status;
 
-        // Only the requester (brand) can update the collaboration details (title, description, etc.) during REQUESTED/ACCEPTED
-        if (collaboration.requester?.id !== userId && (collaboration.status === CollaborationStatus.REQUESTED || collaboration.status === CollaborationStatus.ACCEPTED)) {
-            throw new ForbiddenException('Only the requester can update collaboration details at this stage');
+    // Wrap state changes and side effects in a transaction
+    const updatedCollaboration =
+      await this.collaborationRepo.manager.transaction(async (manager) => {
+        const saved = await manager.save(collaboration);
+        // Update Ranking for the influencer
+        if (collaboration.influencer?.user?.id) {
+          await this.rankingService.updateRanking(
+            collaboration.influencer.user.id,
+          );
         }
+        return saved;
+      });
 
-        // Only the influencer can update proof fields
-        const isInfluencer = collaboration.influencer?.user?.id === userId;
-        const updateKeys = Object.keys(updateDto);
-        const proofFields = ['proofUrls', 'proofSubmittedAt'];
-        const isUpdatingProof = updateKeys.some(key => proofFields.includes(key));
+    return updatedCollaboration;
+  }
 
-        if (isUpdatingProof && !isInfluencer) {
-            throw new ForbiddenException('Only the influencer can upload proof of work');
-        }
+  async updateCollaboration(
+    id: string,
+    userId: string,
+    updateDto: UpdateCollaborationDto,
+  ): Promise<Collaboration> {
+    const collaboration = await this.getCollaborationById(id, userId);
 
-        if (collaboration.status === CollaborationStatus.CANCELLED) {
-            throw new BadRequestException(`Cannot update a cancelled collaboration`);
-        }
-
-        const isCompleted = collaboration.status === CollaborationStatus.COMPLETED;
-
-        if (isCompleted) {
-            // For completed collaborations, ONLY proof fields are allowed to be updated
-            const updateKeys = Object.keys(updateDto);
-            const allowedProofFields = ['proofUrls', 'proofSubmittedAt'];
-            const containsForbiddenFields = updateKeys.some(key => !allowedProofFields.includes(key));
-
-            if (containsForbiddenFields) {
-                throw new BadRequestException('Only proof of completion can be updated after a collaboration is completed');
-            }
-
-            if (updateDto.proofUrls) collaboration.proofUrls = updateDto.proofUrls;
-            if (updateDto.proofSubmittedAt) collaboration.proofSubmittedAt = new Date(updateDto.proofSubmittedAt);
-        } else {
-            // For active collaborations, allow general updates
-            Object.assign(collaboration, updateDto);
-        }
-
-        // Wrap state changes and side effects in a transaction
-        const updated = await this.collaborationRepo.manager.transaction(async (manager) => {
-            const saved = await manager.save(collaboration);
-            // If proof was submitted, we might want to trigger a ranking update or notification
-            if (updateDto.proofUrls && collaboration.influencer?.user?.id) {
-                await this.rankingService.updateRanking(collaboration.influencer.user.id);
-            }
-            return saved;
-        });
-
-        return updated;
+    // Only the requester (brand) can update the collaboration details (title, description, etc.) during REQUESTED/ACCEPTED
+    if (
+      collaboration.requester?.id !== userId &&
+      (collaboration.status === CollaborationStatus.REQUESTED ||
+        collaboration.status === CollaborationStatus.ACCEPTED)
+    ) {
+      throw new ForbiddenException(
+        "Only the requester can update collaboration details at this stage",
+      );
     }
 
-    async deleteCollaboration(id: string, userId: string): Promise<void> {
-        const collaboration = await this.getCollaborationById(id, userId);
-        const influencerUserId = collaboration.influencer?.user?.id;
+    // Only the influencer can update proof fields
+    const isInfluencer = collaboration.influencer?.user?.id === userId;
+    const updateKeys = Object.keys(updateDto);
+    const proofFields = ["proofUrls", "proofSubmittedAt"];
+    const isUpdatingProof = updateKeys.some((key) => proofFields.includes(key));
 
-
-        // Use softRemove for historical integrity
-        await this.collaborationRepo.softRemove(collaboration);
-
-        // Update Ranking (though for REQUESTED it might not change much)
-        if (influencerUserId) {
-            await this.rankingService.updateRanking(influencerUserId);
-        }
+    if (isUpdatingProof && !isInfluencer) {
+      throw new ForbiddenException(
+        "Only the influencer can upload proof of work",
+      );
     }
 
-    async getMyInfluencers(userId: string, filters?: any) {
-        const page = filters?.page ?? 1;
-        const limit = filters?.limit ?? 10;
-        const search = filters?.search;
-        const niche = filters?.niche;
-
-        // Efficient aggregation using GROUP BY in database
-        // This avoids fetching potentially thousands of collaborations into memory
-        const statsQb = this.collaborationRepo
-            .createQueryBuilder('collaboration')
-            .select('collaboration.influencerId', 'influencerId')
-            .addSelect('COUNT(*)', 'totalCollaborations')
-            .addSelect(
-                `COUNT(*) FILTER (WHERE collaboration.status = '${CollaborationStatus.COMPLETED}')`,
-                'completedCollaborations'
-            )
-            .addSelect('MAX(collaboration.updatedAt)', 'lastCollaborationDate')
-            .innerJoin('collaboration.influencer', 'influencer')
-            .where('collaboration.requester.id = :userId', { userId });
-
-        if (search) {
-            statsQb.andWhere('influencer.fullName ILIKE :search', { search: `%${search}%` });
-        }
-
-        if (niche) {
-            statsQb.andWhere('influencer.categories @> :categories', { categories: JSON.stringify([niche]) });
-        }
-
-        const statsResults = await statsQb
-            .groupBy('collaboration.influencerId')
-            .orderBy('MAX(collaboration.updatedAt)', 'DESC')
-            .getRawMany();
-
-        const total = statsResults.length;
-        const startIndex = (page - 1) * limit;
-        const paginatedStats = statsResults.slice(startIndex, startIndex + limit);
-
-        if (paginatedStats.length === 0) {
-            return { items: [], meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
-        }
-
-        // Fetch the actual profiles for the paginated subset
-        const influencerIds = paginatedStats.map(s => s.influencerId);
-        const profiles = await this.influencerProfileRepo.find({
-            where: { id: In(influencerIds) },
-            relations: ['user', 'user.profile']
-        });
-
-        const items = paginatedStats.map(stat => {
-            const profile = profiles.find(p => p.id === stat.influencerId);
-            return {
-                influencer: profile,
-                totalCollaborations: parseInt(stat.totalCollaborations),
-                completedCollaborations: parseInt(stat.completedCollaborations),
-                lastCollaborationDate: stat.lastCollaborationDate,
-            };
-        });
-
-        // Re-sort to maintain exact date order
-        items.sort((a, b) => new Date(b.lastCollaborationDate).getTime() - new Date(a.lastCollaborationDate).getTime());
-
-        return {
-            items,
-            meta: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit),
-            },
-        };
+    if (collaboration.status === CollaborationStatus.CANCELLED) {
+      throw new BadRequestException(`Cannot update a cancelled collaboration`);
     }
+
+    const isCompleted = collaboration.status === CollaborationStatus.COMPLETED;
+
+    if (isCompleted) {
+      // For completed collaborations, ONLY proof fields are allowed to be updated
+      const updateKeys = Object.keys(updateDto);
+      const allowedProofFields = ["proofUrls", "proofSubmittedAt"];
+      const containsForbiddenFields = updateKeys.some(
+        (key) => !allowedProofFields.includes(key),
+      );
+
+      if (containsForbiddenFields) {
+        throw new BadRequestException(
+          "Only proof of completion can be updated after a collaboration is completed",
+        );
+      }
+
+      if (updateDto.proofUrls) collaboration.proofUrls = updateDto.proofUrls;
+      if (updateDto.proofSubmittedAt)
+        collaboration.proofSubmittedAt = new Date(updateDto.proofSubmittedAt);
+    } else {
+      // For active collaborations, allow general updates
+      Object.assign(collaboration, updateDto);
+    }
+
+    // Wrap state changes and side effects in a transaction
+    const updated = await this.collaborationRepo.manager.transaction(
+      async (manager) => {
+        const saved = await manager.save(collaboration);
+        // If proof was submitted, we might want to trigger a ranking update or notification
+        if (updateDto.proofUrls && collaboration.influencer?.user?.id) {
+          await this.rankingService.updateRanking(
+            collaboration.influencer.user.id,
+          );
+        }
+        return saved;
+      },
+    );
+
+    return updated;
+  }
+
+  async deleteCollaboration(id: string, userId: string): Promise<void> {
+    const collaboration = await this.getCollaborationById(id, userId);
+    const influencerUserId = collaboration.influencer?.user?.id;
+
+    // Use softRemove for historical integrity
+    await this.collaborationRepo.softRemove(collaboration);
+
+    // Update Ranking (though for REQUESTED it might not change much)
+    if (influencerUserId) {
+      await this.rankingService.updateRanking(influencerUserId);
+    }
+  }
+
+  async getMyInfluencers(userId: string, filters?: any) {
+    const page = filters?.page ?? 1;
+    const limit = filters?.limit ?? 10;
+    const search = filters?.search;
+    const niche = filters?.niche;
+
+    // Efficient aggregation using GROUP BY in database
+    // This avoids fetching potentially thousands of collaborations into memory
+    const statsQb = this.collaborationRepo
+      .createQueryBuilder("collaboration")
+      .select("collaboration.influencerId", "influencerId")
+      .addSelect("COUNT(*)", "totalCollaborations")
+      .addSelect(
+        `COUNT(*) FILTER (WHERE collaboration.status = '${CollaborationStatus.COMPLETED}')`,
+        "completedCollaborations",
+      )
+      .addSelect("MAX(collaboration.updatedAt)", "lastCollaborationDate")
+      .innerJoin("collaboration.influencer", "influencer")
+      .where("collaboration.requester.id = :userId", { userId });
+
+    if (search) {
+      statsQb.andWhere("influencer.fullName ILIKE :search", {
+        search: `%${search}%`,
+      });
+    }
+
+    if (niche) {
+      statsQb.andWhere("influencer.categories @> :categories", {
+        categories: JSON.stringify([niche]),
+      });
+    }
+
+    const statsResults = await statsQb
+      .groupBy("collaboration.influencerId")
+      .orderBy("MAX(collaboration.updatedAt)", "DESC")
+      .getRawMany();
+
+    const total = statsResults.length;
+    const startIndex = (page - 1) * limit;
+    const paginatedStats = statsResults.slice(startIndex, startIndex + limit);
+
+    if (paginatedStats.length === 0) {
+      return {
+        items: [],
+        meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+      };
+    }
+
+    // Fetch the actual profiles for the paginated subset
+    const influencerIds = paginatedStats.map((s) => s.influencerId);
+    const profiles = await this.influencerProfileRepo.find({
+      where: { id: In(influencerIds) },
+      relations: ["user", "user.profile"],
+    });
+
+    const items = paginatedStats.map((stat) => {
+      const profile = profiles.find((p) => p.id === stat.influencerId);
+      return {
+        influencer: profile,
+        totalCollaborations: parseInt(stat.totalCollaborations),
+        completedCollaborations: parseInt(stat.completedCollaborations),
+        lastCollaborationDate: stat.lastCollaborationDate,
+      };
+    });
+
+    // Re-sort to maintain exact date order
+    items.sort(
+      (a, b) =>
+        new Date(b.lastCollaborationDate).getTime() -
+        new Date(a.lastCollaborationDate).getTime(),
+    );
+
+    return {
+      items,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
 }

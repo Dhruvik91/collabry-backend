@@ -1,14 +1,14 @@
-import { NestFactory, Reflector } from '@nestjs/core';
-import helmet from 'helmet';
-import basicAuth from 'express-basic-auth';
-import { AppModule } from './app.module';
-import { FailureResponseTransformer } from './core/exception-filters/failure-exception';
-import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
-import { SuccessResponseTransformer } from './core/interceptor/success-response-interceptor';
-import { LoggingInterceptor } from './core/interceptor/logging.interceptor';
-import { ConfigService } from '@nestjs/config';
-import { JwtAuthGuard } from './modules/auth/Guards/jwt-guard';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { NestFactory, Reflector } from "@nestjs/core";
+import helmet from "helmet";
+import basicAuth from "express-basic-auth";
+import { AppModule } from "./app.module";
+import { FailureResponseTransformer } from "./core/exception-filters/failure-exception";
+import { ClassSerializerInterceptor, ValidationPipe } from "@nestjs/common";
+import { SuccessResponseTransformer } from "./core/interceptor/success-response-interceptor";
+import { LoggingInterceptor } from "./core/interceptor/logging.interceptor";
+import { ConfigService } from "@nestjs/config";
+import { JwtAuthGuard } from "./modules/auth/Guards/jwt-guard";
+import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
@@ -18,8 +18,8 @@ async function bootstrap() {
   app.enableCors({
     origin: true,
     credentials: false,
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: 'Content-Type, Authorization',
+    methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
+    allowedHeaders: "Content-Type, Authorization",
   });
 
   app.use(helmet());
@@ -40,30 +40,30 @@ async function bootstrap() {
   );
 
   app.useGlobalGuards(new JwtAuthGuard(reflector));
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix("api");
 
   app.use(
-    ['/docs', '/docs-json'],
+    ["/docs", "/docs-json"],
     basicAuth({
       challenge: true,
       users: {
-        [config.get<string>('SWAGGER_USER') || 'admin']:
-          config.get<string>('SWAGGER_PASSWORD') || 'kollabary@2026',
+        [config.get<string>("SWAGGER_USER") || "admin"]:
+          config.get<string>("SWAGGER_PASSWORD") || "kollabary@2026",
       },
     }),
   );
 
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('Kollabary API')
-    .setDescription('API documentation for the Kollabary backend')
-    .setVersion('1.0')
+    .setTitle("Kollabary API")
+    .setDescription("API documentation for the Kollabary backend")
+    .setVersion("1.0")
     .addBearerAuth()
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('docs', app, document);
+  SwaggerModule.setup("docs", app, document);
 
-  const PORT = config.get<number>('PORT');
+  const PORT = config.get<number>("PORT");
 
   await app.listen(PORT);
 }

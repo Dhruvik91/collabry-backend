@@ -1,50 +1,57 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, DeleteDateColumn } from 'typeorm';
-import { ApiProperty } from '@nestjs/swagger';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
+} from "typeorm";
+import { ApiProperty } from "@nestjs/swagger";
 
-@Entity('top_up_plans')
+@Entity("top_up_plans")
 export class TopUpPlan {
-    @ApiProperty()
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+  @ApiProperty()
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
 
-    @ApiProperty()
-    @Column({ type: 'varchar', length: 100 })
-    name: string;
+  @ApiProperty()
+  @Column({ type: "varchar", length: 100 })
+  name: string;
 
-    @ApiProperty()
-    @Column({ type: 'decimal', precision: 10, scale: 2 })
-    amount: number;
+  @ApiProperty()
+  @Column({ type: "decimal", precision: 10, scale: 2 })
+  amount: number;
 
-    @ApiProperty()
-    @Column({ type: 'int' })
-    coins: number;
+  @ApiProperty()
+  @Column({ type: "int" })
+  coins: number;
 
-    @ApiProperty()
-    @Column({ type: 'int', default: 0 })
-    bonusCoins: number;
+  @ApiProperty()
+  @Column({ type: "int", default: 0 })
+  bonusCoins: number;
 
-    @ApiProperty()
-    @Column({ default: true })
-    isActive: boolean;
+  @ApiProperty()
+  @Column({ default: true })
+  isActive: boolean;
 
-    @ApiProperty({ required: false })
-    @Column({ type: 'text', nullable: true })
-    description: string;
+  @ApiProperty({ required: false })
+  @Column({ type: "text", nullable: true })
+  description: string;
 
-    @ApiProperty({ required: false })
-    @Column({ type: 'text', nullable: true })
-    imageUrl: string;
+  @ApiProperty({ required: false })
+  @Column({ type: "text", nullable: true })
+  imageUrl: string;
 
-    @ApiProperty()
-    @Column({ default: false })
-    isPopular: boolean;
+  @ApiProperty()
+  @Column({ default: false })
+  isPopular: boolean;
 
-    @CreateDateColumn()
-    createdAt: Date;
+  @CreateDateColumn()
+  createdAt: Date;
 
-    @UpdateDateColumn()
-    updatedAt: Date;
+  @UpdateDateColumn()
+  updatedAt: Date;
 
-    @DeleteDateColumn()
-    deletedAt: Date;
+  @DeleteDateColumn()
+  deletedAt: Date;
 }

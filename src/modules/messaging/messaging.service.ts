@@ -1,255 +1,349 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Conversation } from '../../database/entities/conversation.entity';
-import { Message } from '../../database/entities/message.entity';
-import { StartConversationDto } from './dto/start-conversation.dto';
-import { SendMessageDto } from './dto/send-message.dto';
-import { isUniqueConstraintError } from '../../database/errors/unique-constraint.type-guard';
-import { SocketGateway } from '../socket/socket.gateway';
-import { NotificationsService } from '../notifications/notifications.service';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Conversation } from "../../database/entities/conversation.entity";
+import { Message } from "../../database/entities/message.entity";
+import { StartConversationDto } from "./dto/start-conversation.dto";
+import { SendMessageDto } from "./dto/send-message.dto";
+import { isUniqueConstraintError } from "../../database/errors/unique-constraint.type-guard";
+import { SocketGateway } from "../socket/socket.gateway";
+import { NotificationsService } from "../notifications/notifications.service";
 
 @Injectable()
 export class MessagingService {
-    constructor(
-        @InjectRepository(Conversation)
-        private readonly conversationRepo: Repository<Conversation>,
-        @InjectRepository(Message)
-        private readonly messageRepo: Repository<Message>,
-        private readonly socketGateway: SocketGateway,
-        private readonly notificationsService: NotificationsService,
-    ) { }
+  constructor(
+    @InjectRepository(Conversation)
+    private readonly conversationRepo: Repository<Conversation>,
+    @InjectRepository(Message)
+    private readonly messageRepo: Repository<Message>,
+    private readonly socketGateway: SocketGateway,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
-    async getOrCreateConversation(userId: string, startDto: StartConversationDto): Promise<Conversation> {
-        const { recipientId } = startDto;
+  async getOrCreateConversation(
+    userId: string,
+    startDto: StartConversationDto,
+  ): Promise<Conversation> {
+    const { recipientId } = startDto;
 
-        // Ensure userOne ID < userTwo ID for consistent storage
-        const [userOneId, userTwoId] = [userId, recipientId].sort();
+    // Ensure userOne ID < userTwo ID for consistent storage
+    const [userOneId, userTwoId] = [userId, recipientId].sort();
 
-        let conversation = await this.conversationRepo.findOne({
+    let conversation = await this.conversationRepo.findOne({
+      where: {
+        userOne: { id: userOneId },
+        userTwo: { id: userTwoId },
+      },
+      relations: [
+        "userOne",
+        "userTwo",
+        "userOne.profile",
+        "userTwo.profile",
+        "userOne.influencerProfile",
+        "userTwo.influencerProfile",
+      ],
+    });
+
+    if (!conversation) {
+      let isNew = false;
+      try {
+        conversation = this.conversationRepo.create({
+          userOne: { id: userOneId } as any,
+          userTwo: { id: userTwoId } as any,
+        });
+        conversation = await this.conversationRepo.save(conversation);
+        isNew = true;
+      } catch (error) {
+        if (isUniqueConstraintError(error)) {
+          // Conversation was likely created by a concurrent request, fetch it
+          conversation = await this.conversationRepo.findOne({
             where: {
-                userOne: { id: userOneId },
-                userTwo: { id: userTwoId },
+              userOne: { id: userOneId },
+              userTwo: { id: userTwoId },
             },
-            relations: ['userOne', 'userTwo', 'userOne.profile', 'userTwo.profile', 'userOne.influencerProfile', 'userTwo.influencerProfile'],
-        });
-
-        if (!conversation) {
-            let isNew = false;
-            try {
-                conversation = this.conversationRepo.create({
-                    userOne: { id: userOneId } as any,
-                    userTwo: { id: userTwoId } as any,
-                });
-                conversation = await this.conversationRepo.save(conversation);
-                isNew = true;
-            } catch (error) {
-                if (isUniqueConstraintError(error)) {
-                    // Conversation was likely created by a concurrent request, fetch it
-                    conversation = await this.conversationRepo.findOne({
-                        where: {
-                            userOne: { id: userOneId },
-                            userTwo: { id: userTwoId },
-                        },
-                        relations: ['userOne', 'userTwo', 'userOne.profile', 'userTwo.profile', 'userOne.influencerProfile', 'userTwo.influencerProfile'],
-                    });
-                } else {
-                    throw error;
-                }
-            }
-
-            // Reload to get relations if they weren't fetched yet
-            if (conversation) {
-                conversation = await this.conversationRepo.findOne({
-                    where: { id: conversation.id },
-                    relations: ['userOne', 'userTwo', 'userOne.profile', 'userTwo.profile', 'userOne.influencerProfile', 'userTwo.influencerProfile'],
-                });
-
-                // Emit new conversation event to both users if it's actually new
-                if (isNew && conversation) {
-                    this.socketGateway.emitToUser(userOneId, 'new_conversation', conversation);
-                    this.socketGateway.emitToUser(userTwoId, 'new_conversation', conversation);
-                }
-            }
-        }
-
-        return conversation;
-    }
-
-    async getMyConversations(userId: string): Promise<Conversation[]> {
-        return await this.conversationRepo.find({
-            where: [
-                { userOne: { id: userId } },
-                { userTwo: { id: userId } },
-            ],
-            relations: ['userOne', 'userTwo', 'userOne.profile', 'userTwo.profile', 'userOne.influencerProfile', 'userTwo.influencerProfile'],
-            order: { lastMessageAt: 'DESC' },
-        });
-    }
-
-    async sendMessage(conversationId: string, userId: string, sendDto: SendMessageDto): Promise<Message> {
-        const conversation = await this.conversationRepo.findOne({
-            where: { id: conversationId },
             relations: [
-                'userOne',
-                'userTwo',
-                'userOne.profile',
-                'userTwo.profile',
-                'userOne.influencerProfile',
-                'userTwo.influencerProfile'
+              "userOne",
+              "userTwo",
+              "userOne.profile",
+              "userTwo.profile",
+              "userOne.influencerProfile",
+              "userTwo.influencerProfile",
             ],
+          });
+        } else {
+          throw error;
+        }
+      }
+
+      // Reload to get relations if they weren't fetched yet
+      if (conversation) {
+        conversation = await this.conversationRepo.findOne({
+          where: { id: conversation.id },
+          relations: [
+            "userOne",
+            "userTwo",
+            "userOne.profile",
+            "userTwo.profile",
+            "userOne.influencerProfile",
+            "userTwo.influencerProfile",
+          ],
         });
 
-        if (!conversation) {
-            throw new NotFoundException('Conversation not found');
+        // Emit new conversation event to both users if it's actually new
+        if (isNew && conversation) {
+          this.socketGateway.emitToUser(
+            userOneId,
+            "new_conversation",
+            conversation,
+          );
+          this.socketGateway.emitToUser(
+            userTwoId,
+            "new_conversation",
+            conversation,
+          );
         }
-
-        const isUserOne = conversation.userOne?.id === userId;
-        const isUserTwo = conversation.userTwo?.id === userId;
-
-        if (!isUserOne && !isUserTwo) {
-            throw new ForbiddenException('You are not a participant in this conversation');
-        }
-
-        const sender = isUserOne ? conversation.userOne : conversation.userTwo;
-
-        const message = this.messageRepo.create({
-            conversation: { id: conversationId } as any,
-            sender: sender,
-            message: sendDto.message,
-        });
-
-        const savedMessage = await this.messageRepo.save(message);
-
-        // Update lastMessageAt in conversation
-        conversation.lastMessageAt = new Date();
-        await this.conversationRepo.save(conversation);
-
-        // Emit new message event to the room (for the active chat window)
-        // savedMessage now contains the sender with profile info from the conversation relations
-        this.socketGateway.emitToConversation(conversationId, 'new_message', savedMessage);
-
-        // Also emit to both users' private rooms (for sidebar/list updates)
-        if (conversation.userOne?.id) {
-            this.socketGateway.emitToUser(conversation.userOne.id, 'new_message', savedMessage);
-        }
-        if (conversation.userTwo?.id) {
-            this.socketGateway.emitToUser(conversation.userTwo.id, 'new_message', savedMessage);
-        }
-
-        // Trigger push notification to the recipient in the background
-        const recipient = isUserOne ? conversation.userTwo : conversation.userOne;
-        const senderName = sender.influencerProfile?.fullName ||
-            sender.profile?.fullName ||
-            sender.username ||
-            'A user';
-
-        this.notificationsService.sendPushToUser(recipient.id, {
-            title: `New message from ${senderName}`,
-            body: savedMessage.message,
-            url: `/messages`,
-            icon: sender.profile?.avatarUrl || sender.influencerProfile?.avatarUrl,
-        }).catch((err) => {
-            // Log it but do not crash the message sending process
-            this.notificationsService['logger'].error(`Failed to send background push: ${err.message}`);
-        });
-
-        return savedMessage;
+      }
     }
 
-    async getMessageHistory(conversationId: string, userId: string): Promise<Message[]> {
-        const conversation = await this.conversationRepo.findOne({
-            where: { id: conversationId },
-            relations: ['userOne', 'userTwo'],
-        });
+    return conversation;
+  }
 
-        if (!conversation) {
-            throw new NotFoundException('Conversation not found');
-        }
+  async getMyConversations(userId: string): Promise<Conversation[]> {
+    return await this.conversationRepo.find({
+      where: [{ userOne: { id: userId } }, { userTwo: { id: userId } }],
+      relations: [
+        "userOne",
+        "userTwo",
+        "userOne.profile",
+        "userTwo.profile",
+        "userOne.influencerProfile",
+        "userTwo.influencerProfile",
+      ],
+      order: { lastMessageAt: "DESC" },
+    });
+  }
 
-        if (conversation.userOne?.id !== userId && conversation.userTwo?.id !== userId) {
-            throw new ForbiddenException('You are not a participant in this conversation');
-        }
+  async sendMessage(
+    conversationId: string,
+    userId: string,
+    sendDto: SendMessageDto,
+  ): Promise<Message> {
+    const conversation = await this.conversationRepo.findOne({
+      where: { id: conversationId },
+      relations: [
+        "userOne",
+        "userTwo",
+        "userOne.profile",
+        "userTwo.profile",
+        "userOne.influencerProfile",
+        "userTwo.influencerProfile",
+      ],
+    });
 
-        return await this.messageRepo.find({
-            where: { conversation: { id: conversationId } },
-            order: { createdAt: 'ASC' },
-            relations: ['sender', 'sender.profile', 'sender.influencerProfile'],
-        });
+    if (!conversation) {
+      throw new NotFoundException("Conversation not found");
     }
 
-    async updateMessage(messageId: string, userId: string, updateDto: SendMessageDto): Promise<Message> {
-        const message = await this.messageRepo.findOne({
-            where: { id: messageId },
-            relations: ['sender', 'conversation'],
-        });
+    const isUserOne = conversation.userOne?.id === userId;
+    const isUserTwo = conversation.userTwo?.id === userId;
 
-        if (!message) {
-            throw new NotFoundException('Message not found');
-        }
-
-        if (message.sender?.id !== userId) {
-            throw new ForbiddenException('You can only update your own messages');
-        }
-
-        message.message = updateDto.message;
-        message.updatedAt = new Date();
-        const savedMessage = await this.messageRepo.save(message);
-
-        // Reload for WebSocket
-        const fullMessage = await this.messageRepo.findOne({
-            where: { id: savedMessage.id },
-            relations: ['sender', 'sender.profile', 'sender.influencerProfile'],
-        });
-
-        // Emit updated message event
-        this.socketGateway.emitToConversation(message.conversation?.id || '', 'message_updated', fullMessage || savedMessage);
-
-        return savedMessage;
+    if (!isUserOne && !isUserTwo) {
+      throw new ForbiddenException(
+        "You are not a participant in this conversation",
+      );
     }
 
-    async deleteMessage(messageId: string, userId: string): Promise<void> {
-        const message = await this.messageRepo.findOne({
-            where: { id: messageId },
-            relations: ['sender'],
-        });
+    const sender = isUserOne ? conversation.userOne : conversation.userTwo;
 
-        if (!message) {
-            throw new NotFoundException('Message not found');
-        }
+    const message = this.messageRepo.create({
+      conversation: { id: conversationId } as any,
+      sender: sender,
+      message: sendDto.message,
+    });
 
-        if (message.sender?.id !== userId) {
-            throw new ForbiddenException('You can only delete your own messages');
-        }
+    const savedMessage = await this.messageRepo.save(message);
 
-        const conversationId = message.conversation?.id;
-        await this.messageRepo.remove(message);
+    // Update lastMessageAt in conversation
+    conversation.lastMessageAt = new Date();
+    await this.conversationRepo.save(conversation);
 
-        // Emit deleted message event
-        if (conversationId) {
-            this.socketGateway.emitToConversation(conversationId, 'message_deleted', { messageId, conversationId });
-        }
+    // Emit new message event to the room (for the active chat window)
+    // savedMessage now contains the sender with profile info from the conversation relations
+    this.socketGateway.emitToConversation(
+      conversationId,
+      "new_message",
+      savedMessage,
+    );
+
+    // Also emit to both users' private rooms (for sidebar/list updates)
+    if (conversation.userOne?.id) {
+      this.socketGateway.emitToUser(
+        conversation.userOne.id,
+        "new_message",
+        savedMessage,
+      );
+    }
+    if (conversation.userTwo?.id) {
+      this.socketGateway.emitToUser(
+        conversation.userTwo.id,
+        "new_message",
+        savedMessage,
+      );
     }
 
-    async deleteConversation(conversationId: string, userId: string): Promise<void> {
-        const conversation = await this.conversationRepo.findOne({
-            where: { id: conversationId },
-            relations: ['userOne', 'userTwo'],
-        });
+    // Trigger push notification to the recipient in the background
+    const recipient = isUserOne ? conversation.userTwo : conversation.userOne;
+    const senderName =
+      sender.influencerProfile?.fullName ||
+      sender.profile?.fullName ||
+      sender.username ||
+      "A user";
 
-        if (!conversation) {
-            throw new NotFoundException('Conversation not found');
-        }
+    this.notificationsService
+      .sendPushToUser(recipient.id, {
+        title: `New message from ${senderName}`,
+        body: savedMessage.message,
+        url: `/messages`,
+        icon: sender.profile?.avatarUrl || sender.influencerProfile?.avatarUrl,
+      })
+      .catch((err) => {
+        // Log it but do not crash the message sending process
+        this.notificationsService["logger"].error(
+          `Failed to send background push: ${err.message}`,
+        );
+      });
 
-        if (conversation.userOne?.id !== userId && conversation.userTwo?.id !== userId) {
-            throw new ForbiddenException('You are not a participant in this conversation');
-        }
+    return savedMessage;
+  }
 
-        // Delete all messages in the conversation first (TypeORM might handle this if cascade is set, but let's be explicit if not sure)
-        await this.messageRepo.delete({ conversation: { id: conversationId } });
-        await this.conversationRepo.remove(conversation);
+  async getMessageHistory(
+    conversationId: string,
+    userId: string,
+  ): Promise<Message[]> {
+    const conversation = await this.conversationRepo.findOne({
+      where: { id: conversationId },
+      relations: ["userOne", "userTwo"],
+    });
 
-        // Emit conversation deleted event
-        this.socketGateway.emitToConversation(conversationId, 'conversation_deleted', { conversationId });
+    if (!conversation) {
+      throw new NotFoundException("Conversation not found");
     }
+
+    if (
+      conversation.userOne?.id !== userId &&
+      conversation.userTwo?.id !== userId
+    ) {
+      throw new ForbiddenException(
+        "You are not a participant in this conversation",
+      );
+    }
+
+    return await this.messageRepo.find({
+      where: { conversation: { id: conversationId } },
+      order: { createdAt: "ASC" },
+      relations: ["sender", "sender.profile", "sender.influencerProfile"],
+    });
+  }
+
+  async updateMessage(
+    messageId: string,
+    userId: string,
+    updateDto: SendMessageDto,
+  ): Promise<Message> {
+    const message = await this.messageRepo.findOne({
+      where: { id: messageId },
+      relations: ["sender", "conversation"],
+    });
+
+    if (!message) {
+      throw new NotFoundException("Message not found");
+    }
+
+    if (message.sender?.id !== userId) {
+      throw new ForbiddenException("You can only update your own messages");
+    }
+
+    message.message = updateDto.message;
+    message.updatedAt = new Date();
+    const savedMessage = await this.messageRepo.save(message);
+
+    // Reload for WebSocket
+    const fullMessage = await this.messageRepo.findOne({
+      where: { id: savedMessage.id },
+      relations: ["sender", "sender.profile", "sender.influencerProfile"],
+    });
+
+    // Emit updated message event
+    this.socketGateway.emitToConversation(
+      message.conversation?.id || "",
+      "message_updated",
+      fullMessage || savedMessage,
+    );
+
+    return savedMessage;
+  }
+
+  async deleteMessage(messageId: string, userId: string): Promise<void> {
+    const message = await this.messageRepo.findOne({
+      where: { id: messageId },
+      relations: ["sender"],
+    });
+
+    if (!message) {
+      throw new NotFoundException("Message not found");
+    }
+
+    if (message.sender?.id !== userId) {
+      throw new ForbiddenException("You can only delete your own messages");
+    }
+
+    const conversationId = message.conversation?.id;
+    await this.messageRepo.remove(message);
+
+    // Emit deleted message event
+    if (conversationId) {
+      this.socketGateway.emitToConversation(conversationId, "message_deleted", {
+        messageId,
+        conversationId,
+      });
+    }
+  }
+
+  async deleteConversation(
+    conversationId: string,
+    userId: string,
+  ): Promise<void> {
+    const conversation = await this.conversationRepo.findOne({
+      where: { id: conversationId },
+      relations: ["userOne", "userTwo"],
+    });
+
+    if (!conversation) {
+      throw new NotFoundException("Conversation not found");
+    }
+
+    if (
+      conversation.userOne?.id !== userId &&
+      conversation.userTwo?.id !== userId
+    ) {
+      throw new ForbiddenException(
+        "You are not a participant in this conversation",
+      );
+    }
+
+    // Delete all messages in the conversation first (TypeORM might handle this if cascade is set, but let's be explicit if not sure)
+    await this.messageRepo.delete({ conversation: { id: conversationId } });
+    await this.conversationRepo.remove(conversation);
+
+    // Emit conversation deleted event
+    this.socketGateway.emitToConversation(
+      conversationId,
+      "conversation_deleted",
+      { conversationId },
+    );
+  }
 }

@@ -3,8 +3,8 @@ import {
   Catch,
   ExceptionFilter,
   HttpException,
-} from '@nestjs/common';
-import { Response } from 'express';
+} from "@nestjs/common";
+import { Response } from "express";
 
 type ErrorData = {
   message: string | string[];
@@ -20,7 +20,7 @@ export class FailureResponseTransformer implements ExceptionFilter {
     const status = exception.getStatus();
     const errorData: ErrorData = exception.getResponse() as ErrorData;
     const messageArray =
-      typeof errorData.message === 'string'
+      typeof errorData.message === "string"
         ? [errorData.message]
         : errorData.message;
 

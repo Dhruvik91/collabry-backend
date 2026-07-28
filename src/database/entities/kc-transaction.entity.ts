@@ -1,42 +1,49 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, Index } from 'typeorm';
-import { ApiProperty } from '@nestjs/swagger';
-import { Wallet } from './wallet.entity';
-import { TransactionType, TransactionPurpose } from './enums';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  Index,
+} from "typeorm";
+import { ApiProperty } from "@nestjs/swagger";
+import { Wallet } from "./wallet.entity";
+import { TransactionType, TransactionPurpose } from "./enums";
 
-@Entity('kc_transactions')
+@Entity("kc_transactions")
 export class KCTransaction {
-    @ApiProperty()
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+  @ApiProperty()
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
 
-    @ApiProperty({ type: () => Wallet })
-    @ManyToOne(() => Wallet)
-    @Index()
-    wallet: Wallet;
+  @ApiProperty({ type: () => Wallet })
+  @ManyToOne(() => Wallet)
+  @Index()
+  wallet: Wallet;
 
-    @ApiProperty()
-    @Column({ type: 'decimal', precision: 12, scale: 2 })
-    amount: number;
+  @ApiProperty()
+  @Column({ type: "decimal", precision: 12, scale: 2 })
+  amount: number;
 
-    @ApiProperty({ enum: TransactionType })
-    @Column({
-        type: 'enum',
-        enum: TransactionType,
-    })
-    type: TransactionType;
+  @ApiProperty({ enum: TransactionType })
+  @Column({
+    type: "enum",
+    enum: TransactionType,
+  })
+  type: TransactionType;
 
-    @ApiProperty({ enum: TransactionPurpose })
-    @Column({
-        type: 'enum',
-        enum: TransactionPurpose,
-    })
-    purpose: TransactionPurpose;
+  @ApiProperty({ enum: TransactionPurpose })
+  @Column({
+    type: "enum",
+    enum: TransactionPurpose,
+  })
+  purpose: TransactionPurpose;
 
-    @ApiProperty()
-    @Column({ type: 'jsonb', nullable: true })
-    metadata: any;
+  @ApiProperty()
+  @Column({ type: "jsonb", nullable: true })
+  metadata: any;
 
-    @ApiProperty()
-    @CreateDateColumn()
-    createdAt: Date;
+  @ApiProperty()
+  @CreateDateColumn()
+  createdAt: Date;
 }
