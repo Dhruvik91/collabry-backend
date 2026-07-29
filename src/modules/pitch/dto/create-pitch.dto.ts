@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsNotEmpty, IsString, IsUUID } from "class-validator";
+import { IsNotEmpty, IsOptional, IsString, IsUUID } from "class-validator";
 
 export class CreatePitchDto {
   @ApiProperty()
@@ -13,7 +13,8 @@ export class CreatePitchDto {
   message: string;
 
   @ApiProperty({ required: false })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   workUrl?: string;
 }
+
