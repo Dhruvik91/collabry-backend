@@ -1,292 +1,345 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
-import { Profile } from '../../database/entities/profile.entity';
-import { User } from '../../database/entities/user.entity';
-import { InfluencerProfile } from '../../database/entities/influencer-profile.entity';
-import { Auction } from '../../database/entities/auction.entity';
-import { Bid } from '../../database/entities/bid.entity';
-import { Pitch } from '../../database/entities/pitch.entity';
-import { Collaboration } from '../../database/entities/collaboration.entity';
-import { AuctionStatus, CollaborationStatus, UserStatus, BidStatus, PitchStatus } from '../../database/entities/enums';
-import { UpdateProfileDto } from './dto/update-profile.dto';
-import { SaveProfileDto } from './dto/save-profile.dto';
-import { SearchProfilesDto } from './dto/search-profiles.dto';
-import { isEntityNotFoundError } from '../../database/errors/entity-not-found.type-guard';
-import { cif } from '../../database/errors/tryQuery';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, DataSource } from "typeorm";
+import { Profile } from "../../database/entities/profile.entity";
+import { User } from "../../database/entities/user.entity";
+import { InfluencerProfile } from "../../database/entities/influencer-profile.entity";
+import { Auction } from "../../database/entities/auction.entity";
+import { Bid } from "../../database/entities/bid.entity";
+import { Pitch } from "../../database/entities/pitch.entity";
+import { Collaboration } from "../../database/entities/collaboration.entity";
+import {
+  AuctionStatus,
+  CollaborationStatus,
+  UserStatus,
+  BidStatus,
+  PitchStatus,
+} from "../../database/entities/enums";
+import { UpdateProfileDto } from "./dto/update-profile.dto";
+import { SaveProfileDto } from "./dto/save-profile.dto";
+import { SearchProfilesDto } from "./dto/search-profiles.dto";
+import { isEntityNotFoundError } from "../../database/errors/entity-not-found.type-guard";
+import { cif } from "../../database/errors/tryQuery";
 
 @Injectable()
 export class ProfileService {
-    constructor(
-        @InjectRepository(Profile)
-        private readonly profileRepo: Repository<Profile>,
-        @InjectRepository(User)
-        private readonly userRepo: Repository<User>,
-        @InjectRepository(InfluencerProfile)
-        private readonly influencerRepo: Repository<InfluencerProfile>,
-        @InjectRepository(Auction)
-        private readonly auctionRepo: Repository<Auction>,
-        @InjectRepository(Collaboration)
-        private readonly collaborationRepo: Repository<Collaboration>,
-        private readonly dataSource: DataSource,
-    ) { }
+  constructor(
+    @InjectRepository(Profile)
+    private readonly profileRepo: Repository<Profile>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    @InjectRepository(InfluencerProfile)
+    private readonly influencerRepo: Repository<InfluencerProfile>,
+    @InjectRepository(Auction)
+    private readonly auctionRepo: Repository<Auction>,
+    @InjectRepository(Collaboration)
+    private readonly collaborationRepo: Repository<Collaboration>,
+    private readonly dataSource: DataSource,
+  ) {}
 
-    async getProfile(userId: string): Promise<Profile> {
-        try {
-            const profile = await this.profileRepo.findOne({
-                where: { user: { id: userId } },
-                relations: ['user'],
-            });
+  async getProfile(userId: string): Promise<Profile> {
+    try {
+      const profile = await this.profileRepo.findOne({
+        where: { user: { id: userId } },
+        relations: ["user"],
+      });
 
-            if (!profile) {
-                throw new NotFoundException('Profile not found');
-            }
+      if (!profile) {
+        throw new NotFoundException("Profile not found");
+      }
 
-            return profile;
-        } catch (error) {
-            cif(isEntityNotFoundError, new NotFoundException('Profile not found'))(error);
-        }
+      return profile;
+    } catch (error) {
+      cif(
+        isEntityNotFoundError,
+        new NotFoundException("Profile not found"),
+      )(error);
+    }
+  }
+
+  async saveProfile(userId: string, saveDto: SaveProfileDto): Promise<Profile> {
+    if (saveDto.username) {
+      const existingProfile = await this.profileRepo.findOne({
+        where: { username: saveDto.username },
+        relations: ["user"],
+      });
+
+      if (
+        existingProfile &&
+        existingProfile.user?.id &&
+        existingProfile.user.id !== userId
+      ) {
+        throw new ConflictException("Username already taken");
+      }
     }
 
-    async saveProfile(userId: string, saveDto: SaveProfileDto): Promise<Profile> {
-        if (saveDto.username) {
-            const existingProfile = await this.profileRepo.findOne({
-                where: { username: saveDto.username },
-                relations: ['user'],
-            });
+    let profile = await this.profileRepo.findOne({
+      where: { user: { id: userId } },
+    });
 
-            if (existingProfile && existingProfile.user?.id && existingProfile.user.id !== userId) {
-                throw new ConflictException('Username already taken');
-            }
-        }
+    if (!profile) {
+      profile = this.profileRepo.create({
+        user: { id: userId } as any,
+        ...saveDto,
+      });
+    } else {
+      Object.assign(profile, saveDto);
+    }
 
-        let profile = await this.profileRepo.findOne({
-            where: { user: { id: userId } },
+    return await this.profileRepo.save(profile);
+  }
+
+  async updateProfile(
+    userId: string,
+    updateDto: UpdateProfileDto,
+  ): Promise<Profile> {
+    return this.saveProfile(userId, updateDto as SaveProfileDto);
+  }
+
+  async searchProfiles(searchDto: SearchProfilesDto) {
+    const { name, username, location, role, page, limit } = searchDto;
+    const query = this.profileRepo
+      .createQueryBuilder("profile")
+      .leftJoinAndSelect("profile.user", "user")
+      .where("user.status = :userStatus", { userStatus: UserStatus.ACTIVE });
+
+    if (name) {
+      query.andWhere("profile.fullName ILIKE :name", { name: `%${name}%` });
+    }
+
+    if (username) {
+      query.andWhere("profile.username ILIKE :username", {
+        username: `%${username}%`,
+      });
+    }
+
+    if (location) {
+      query.andWhere("profile.location ILIKE :location", {
+        location: `%${location}%`,
+      });
+    }
+
+    if (role) {
+      query.andWhere("user.role = :role", { role });
+    }
+
+    // Add subqueries for counts
+    query.addSelect((subQuery) => {
+      return subQuery
+        .select("COUNT(auction.id)", "count")
+        .from(Auction, "auction")
+        .where("auction.creatorId = user.id");
+    }, "totalAuctions");
+
+    query.addSelect((subQuery) => {
+      return subQuery
+        .select("COUNT(collaboration.id)", "count")
+        .from(Collaboration, "collaboration")
+        .where("collaboration.requesterId = user.id")
+        .andWhere("collaboration.status = :collabStatus", {
+          collabStatus: CollaborationStatus.COMPLETED,
         });
+    }, "completed_collaborations");
 
-        if (!profile) {
-            profile = this.profileRepo.create({
-                user: { id: userId } as any,
-                ...saveDto,
-            });
-        } else {
-            Object.assign(profile, saveDto);
-        }
+    query
+      .orderBy("completed_collaborations", "DESC")
+      .addOrderBy("profile.createdAt", "DESC");
 
-        return await this.profileRepo.save(profile);
+    const { entities, raw } = await query
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getRawAndEntities();
+
+    const total = await query.getCount();
+
+    const items = entities.map((profile, index) => {
+      const rawItem = raw[index];
+      return {
+        ...profile,
+        stats: {
+          totalAuctions: parseInt(rawItem.totalAuctions || "0"),
+          completedCollaborations: parseInt(
+            rawItem.completed_collaborations || "0",
+          ),
+          activeAuctionsCount: 0, // We don't calculate this in list view for performance
+        },
+      };
+    });
+
+    return {
+      items,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getProfileById(id: string): Promise<Profile> {
+    try {
+      const profile = await this.profileRepo.findOne({
+        where: { id },
+        relations: ["user"],
+      });
+
+      if (!profile) {
+        throw new NotFoundException("Profile not found");
+      }
+
+      return profile;
+    } catch (error) {
+      cif(
+        isEntityNotFoundError,
+        new NotFoundException("Profile not found"),
+      )(error);
+    }
+  }
+
+  async getBrandProfile(profileId: string) {
+    const profile = await this.getProfileById(profileId);
+    const userId = profile.user?.id;
+
+    if (!userId) {
+      throw new BadRequestException("Profile user not found or deleted");
     }
 
-    async updateProfile(userId: string, updateDto: UpdateProfileDto): Promise<Profile> {
-        return this.saveProfile(userId, updateDto as SaveProfileDto);
-    }
-
-    async searchProfiles(searchDto: SearchProfilesDto) {
-        const { name, username, location, role, page, limit } = searchDto;
-        const query = this.profileRepo.createQueryBuilder('profile')
-            .leftJoinAndSelect('profile.user', 'user')
-            .where('user.status = :userStatus', { userStatus: UserStatus.ACTIVE });
-
-        if (name) {
-            query.andWhere('profile.fullName ILIKE :name', { name: `%${name}%` });
-        }
-
-        if (username) {
-            query.andWhere('profile.username ILIKE :username', { username: `%${username}%` });
-        }
-
-        if (location) {
-            query.andWhere('profile.location ILIKE :location', { location: `%${location}%` });
-        }
-
-        if (role) {
-            query.andWhere('user.role = :role', { role });
-        }
-
-        // Add subqueries for counts
-        query.addSelect((subQuery) => {
-            return subQuery
-                .select('COUNT(auction.id)', 'count')
-                .from(Auction, 'auction')
-                .where('auction.creatorId = user.id');
-        }, 'totalAuctions');
-
-        query.addSelect((subQuery) => {
-            return subQuery
-                .select('COUNT(collaboration.id)', 'count')
-                .from(Collaboration, 'collaboration')
-                .where('collaboration.requesterId = user.id')
-                .andWhere('collaboration.status = :collabStatus', { collabStatus: CollaborationStatus.COMPLETED });
-        }, 'completed_collaborations');
-
-        query.orderBy('completed_collaborations', 'DESC')
-            .addOrderBy('profile.createdAt', 'DESC');
-
-        const { entities, raw } = await query
-            .skip((page - 1) * limit)
-            .take(limit)
-            .getRawAndEntities();
-
-        const total = await query.getCount();
-
-        const items = entities.map((profile, index) => {
-            const rawItem = raw[index];
-            return {
-                ...profile,
-                stats: {
-                    totalAuctions: parseInt(rawItem.totalAuctions || '0'),
-                    completedCollaborations: parseInt(rawItem.completed_collaborations || '0'),
-                    activeAuctionsCount: 0, // We don't calculate this in list view for performance
-                },
-            };
-        });
-
-        return {
-            items,
-            meta: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit),
+    const [totalAuctions, auctions, completedCollaborations] =
+      await Promise.all([
+        this.auctionRepo.count({ where: { creator: { id: userId } } }),
+        this.auctionRepo.find({
+          where: { creator: { id: userId } },
+          order: { createdAt: "DESC" },
+          take: 50,
+        }),
+        this.collaborationRepo.count({
+          where: [
+            {
+              requester: { id: userId },
+              status: CollaborationStatus.COMPLETED,
             },
-        };
-    }
+          ],
+        }),
+      ]);
 
-    async getProfileById(id: string): Promise<Profile> {
-        try {
-            const profile = await this.profileRepo.findOne({
-                where: { id },
-                relations: ['user'],
-            });
+    return {
+      ...profile,
+      stats: {
+        totalAuctions,
+        activeAuctionsCount: auctions.filter(
+          (a) => a.status === AuctionStatus.OPEN,
+        ).length,
+        completedCollaborations,
+      },
+      auctions,
+    };
+  }
 
-            if (!profile) {
-                throw new NotFoundException('Profile not found');
-            }
+  async updateStatus(userId: string, status: UserStatus) {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException("User not found");
 
-            return profile;
-        } catch (error) {
-            cif(isEntityNotFoundError, new NotFoundException('Profile not found'))(error);
-        }
-    }
+    // If suspending or deactivating, handle active auctions/bids
+    if (status === UserStatus.SUSPENDED || status === UserStatus.INACTIVE) {
+      await this.dataSource.transaction(async (manager) => {
+        // Cancel active auctions created by the user
+        await manager.update(
+          Auction,
+          { creator: { id: userId }, status: AuctionStatus.OPEN },
+          { status: AuctionStatus.CANCELLED },
+        );
 
-    async getBrandProfile(profileId: string) {
-        const profile = await this.getProfileById(profileId);
-        const userId = profile.user?.id;
+        // Reject pending bids placed by the user
+        await manager.update(
+          Bid,
+          { influencer: { id: userId }, status: BidStatus.PENDING },
+          { status: BidStatus.REJECTED },
+        );
 
-        if (!userId) {
-            throw new BadRequestException('Profile user not found or deleted');
-        }
-
-        const [totalAuctions, auctions, completedCollaborations] = await Promise.all([
-            this.auctionRepo.count({ where: { creator: { id: userId } } }),
-            this.auctionRepo.find({
-                where: { creator: { id: userId } },
-                order: { createdAt: 'DESC' },
-                take: 50
-            }),
-            this.collaborationRepo.count({
-                where: [
-                    { requester: { id: userId }, status: CollaborationStatus.COMPLETED },
-                ]
-            })
-        ]);
-
-        return {
-            ...profile,
-            stats: {
-                totalAuctions,
-                activeAuctionsCount: auctions.filter(a => a.status === AuctionStatus.OPEN).length,
-                completedCollaborations,
-            },
-            auctions,
-        };
-    }
-
-    async updateStatus(userId: string, status: UserStatus) {
-        const user = await this.userRepo.findOne({ where: { id: userId } });
-        if (!user) throw new NotFoundException('User not found');
-
-        // If suspending or deactivating, handle active auctions/bids
-        if (status === UserStatus.SUSPENDED || status === UserStatus.INACTIVE) {
-            await this.dataSource.transaction(async (manager) => {
-                // Cancel active auctions created by the user
-                await manager.update(Auction,
-                    { creator: { id: userId }, status: AuctionStatus.OPEN },
-                    { status: AuctionStatus.CANCELLED }
-                );
-
-                // Reject pending bids placed by the user
-                await manager.update(Bid,
-                    { influencer: { id: userId }, status: BidStatus.PENDING },
-                    { status: BidStatus.REJECTED }
-                );
-
-                // Update user status
-                user.status = status;
-                await manager.save(user);
-            });
-            return user;
-        }
-
+        // Update user status
         user.status = status;
-        return await this.userRepo.save(user);
+        await manager.save(user);
+      });
+      return user;
     }
 
-    async deactivateAccount(userId: string) {
-        return this.updateStatus(userId, UserStatus.INACTIVE);
-    }
+    user.status = status;
+    return await this.userRepo.save(user);
+  }
 
-    async activateAccount(userId: string) {
-        return this.updateStatus(userId, UserStatus.ACTIVE);
-    }
+  async deactivateAccount(userId: string) {
+    return this.updateStatus(userId, UserStatus.INACTIVE);
+  }
 
-    /**
-     * Soft delete user, profile, influencer profile, and related active content
-     */
-    async deleteAccount(userId: string) {
-        return await this.dataSource.transaction(async (manager) => {
-            // Find all related entities
-            const user = await manager.findOne(User, {
-                where: { id: userId },
-                relations: ['profile', 'influencerProfile']
-            });
+  async activateAccount(userId: string) {
+    return this.updateStatus(userId, UserStatus.ACTIVE);
+  }
 
-            if (!user) throw new NotFoundException('User not found');
+  /**
+   * Soft delete user, profile, influencer profile, and related active content
+   */
+  async deleteAccount(userId: string) {
+    return await this.dataSource.transaction(async (manager) => {
+      // Find all related entities
+      const user = await manager.findOne(User, {
+        where: { id: userId },
+        relations: ["profile", "influencerProfile"],
+      });
 
-            // 1. Soft delete related content first to preserve data integrity
-            // Soft delete user's auctions
-            await manager.getRepository(Auction).softDelete({ creator: { id: userId } });
+      if (!user) throw new NotFoundException("User not found");
 
-            // Soft delete user's bids
-            await manager.getRepository(Bid).softDelete({ influencer: { id: userId } });
+      // 1. Soft delete related content first to preserve data integrity
+      // Soft delete user's auctions
+      await manager
+        .getRepository(Auction)
+        .softDelete({ creator: { id: userId } });
 
-            // Soft delete user's pitches (sent and received)
-            await manager.getRepository(Pitch).softDelete({ influencer: { id: userId } });
-            await manager.getRepository(Pitch).softDelete({ target: { id: userId } });
+      // Soft delete user's bids
+      await manager
+        .getRepository(Bid)
+        .softDelete({ influencer: { id: userId } });
 
-            // Cancel active collaborations (optional - keeping completed ones for history)
-            await manager.update(Collaboration,
-                { requester: { id: userId }, status: CollaborationStatus.REQUESTED },
-                { status: CollaborationStatus.CANCELLED }
-            );
-            // Also as influencer (Note: influencerId in Collaboration refers to InfluencerProfile.id)
-            if (user.influencerProfile) {
-                await manager.update(Collaboration,
-                    { influencer: { id: user.influencerProfile.id }, status: CollaborationStatus.REQUESTED },
-                    { status: CollaborationStatus.CANCELLED }
-                );
-            }
+      // Soft delete user's pitches (sent and received)
+      await manager
+        .getRepository(Pitch)
+        .softDelete({ influencer: { id: userId } });
+      await manager.getRepository(Pitch).softDelete({ target: { id: userId } });
 
-            // 2. Soft delete profiles
-            if (user.influencerProfile) {
-                await manager.softRemove(InfluencerProfile, user.influencerProfile);
-            }
+      // Cancel active collaborations (optional - keeping completed ones for history)
+      await manager.update(
+        Collaboration,
+        { requester: { id: userId }, status: CollaborationStatus.REQUESTED },
+        { status: CollaborationStatus.CANCELLED },
+      );
+      // Also as influencer (Note: influencerId in Collaboration refers to InfluencerProfile.id)
+      if (user.influencerProfile) {
+        await manager.update(
+          Collaboration,
+          {
+            influencer: { id: user.influencerProfile.id },
+            status: CollaborationStatus.REQUESTED,
+          },
+          { status: CollaborationStatus.CANCELLED },
+        );
+      }
 
-            if (user.profile) {
-                await manager.softRemove(Profile, user.profile);
-            }
+      // 2. Soft delete profiles
+      if (user.influencerProfile) {
+        await manager.softRemove(InfluencerProfile, user.influencerProfile);
+      }
 
-            // 3. Soft delete the user
-            return await manager.softRemove(User, user);
-        });
-    }
+      if (user.profile) {
+        await manager.softRemove(Profile, user.profile);
+      }
+
+      // 3. Soft delete the user
+      return await manager.softRemove(User, user);
+    });
+  }
 }

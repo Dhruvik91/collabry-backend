@@ -1,5 +1,5 @@
-import { IsEmail, IsStrongPassword } from 'class-validator';
-import { UUID } from 'crypto';
+import { IsEmail, IsStrongPassword } from "class-validator";
+import { UUID } from "crypto";
 
 export interface PayloadDataResponse {
   id: UUID;
@@ -9,8 +9,8 @@ export interface PayloadDataResponse {
 }
 
 export enum ROLES {
-  SUPER_ADMIN = 'super_admin',
-  PROPERTY_OWNER = 'property_owner',
+  SUPER_ADMIN = "super_admin",
+  PROPERTY_OWNER = "property_owner",
 }
 
 export class ForgotPasswordDto {

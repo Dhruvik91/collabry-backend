@@ -7,20 +7,22 @@ import {
   SubscribeMessage,
   ConnectedSocket,
   MessageBody,
-} from '@nestjs/websockets';
-import { Server, Socket } from 'socket.io';
-import { Logger, UseGuards } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
+} from "@nestjs/websockets";
+import { Server, Socket } from "socket.io";
+import { Logger, UseGuards } from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import { ConfigService } from "@nestjs/config";
 
 @WebSocketGateway({
   cors: {
-    origin: '*',
+    origin: "*",
   },
 })
-export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+export class SocketGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer() server: Server;
-  private logger: Logger = new Logger('SocketGateway');
+  private logger: Logger = new Logger("SocketGateway");
 
   constructor(
     private readonly jwtService: JwtService,
@@ -28,7 +30,7 @@ export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGate
   ) {}
 
   afterInit(server: Server) {
-    this.logger.log('WebSocket Gateway Initialized');
+    this.logger.log("WebSocket Gateway Initialized");
   }
 
   async handleConnection(client: Socket) {
@@ -39,7 +41,7 @@ export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       if (!token) {
         const authHeader = client.handshake.headers.authorization;
         if (authHeader) {
-          token = authHeader.split(' ')[1] || authHeader;
+          token = authHeader.split(" ")[1] || authHeader;
         }
       }
 
@@ -47,12 +49,12 @@ export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       if (!token) {
         const cookieHeader = client.handshake.headers.cookie;
         if (cookieHeader) {
-          const cookies = cookieHeader.split(';').reduce((acc, curr) => {
-            const [key, value] = curr.split('=');
+          const cookies = cookieHeader.split(";").reduce((acc, curr) => {
+            const [key, value] = curr.split("=");
             acc[key.trim()] = value;
             return acc;
           }, {});
-          token = cookies['access_token'];
+          token = cookies["access_token"];
         }
       }
 
@@ -63,11 +65,11 @@ export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       }
 
       const payload = await this.jwtService.verifyAsync(token, {
-        secret: this.configService.get('JWT_SECRET_KEY'),
+        secret: this.configService.get("JWT_SECRET_KEY"),
       });
 
       client.data.user = payload;
-      
+
       // Join self-room for personal notifications
       client.join(`user_${payload.id}`);
       this.logger.log(`Client connected: ${client.id} (User: ${payload.id})`);
@@ -81,28 +83,40 @@ export class SocketGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     this.logger.log(`Client disconnected: ${client.id}`);
   }
 
-  @SubscribeMessage('join_conversation')
-  handleJoinConversation(@ConnectedSocket() client: Socket, @MessageBody() conversationId: string) {
+  @SubscribeMessage("join_conversation")
+  handleJoinConversation(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() conversationId: string,
+  ) {
     client.join(`conversation_${conversationId}`);
-    return { event: 'joined_conversation', data: conversationId };
+    return { event: "joined_conversation", data: conversationId };
   }
 
-  @SubscribeMessage('leave_conversation')
-  handleLeaveConversation(@ConnectedSocket() client: Socket, @MessageBody() conversationId: string) {
+  @SubscribeMessage("leave_conversation")
+  handleLeaveConversation(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() conversationId: string,
+  ) {
     client.leave(`conversation_${conversationId}`);
-    return { event: 'left_conversation', data: conversationId };
+    return { event: "left_conversation", data: conversationId };
   }
 
-  @SubscribeMessage('join_auction')
-  handleJoinAuction(@ConnectedSocket() client: Socket, @MessageBody() auctionId: string) {
+  @SubscribeMessage("join_auction")
+  handleJoinAuction(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() auctionId: string,
+  ) {
     client.join(`auction_${auctionId}`);
-    return { event: 'joined_auction', data: auctionId };
+    return { event: "joined_auction", data: auctionId };
   }
 
-  @SubscribeMessage('leave_auction')
-  handleLeaveAuction(@ConnectedSocket() client: Socket, @MessageBody() auctionId: string) {
+  @SubscribeMessage("leave_auction")
+  handleLeaveAuction(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() auctionId: string,
+  ) {
     client.leave(`auction_${auctionId}`);
-    return { event: 'left_auction', data: auctionId };
+    return { event: "left_auction", data: auctionId };
   }
 
   // Helper methods to emit events from services

@@ -1,4 +1,4 @@
-import { QueryFailedError } from 'typeorm';
+import { QueryFailedError } from "typeorm";
 
 export const isQueryFailedError = <T extends Error>(
   e: Error,

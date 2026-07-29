@@ -1,29 +1,29 @@
 import {
-    Entity,
-    PrimaryGeneratedColumn,
-    Column,
-    ManyToOne,
-    CreateDateColumn,
-} from 'typeorm';
-import { User } from './user.entity';
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  CreateDateColumn,
+} from "typeorm";
+import { User } from "./user.entity";
 
-@Entity('auth_sessions')
+@Entity("auth_sessions")
 export class AuthSession {
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
 
-    @ManyToOne(() => User)
-    user: User;
+  @ManyToOne(() => User)
+  user: User;
 
-    @Column({ length: 45, nullable: true })
-    ipAddress: string;
+  @Column({ length: 45, nullable: true })
+  ipAddress: string;
 
-    @Column({ type: 'text', nullable: true })
-    userAgent: string;
+  @Column({ type: "text", nullable: true })
+  userAgent: string;
 
-    @Column({ nullable: true })
-    lastActiveAt: Date;
+  @Column({ nullable: true })
+  lastActiveAt: Date;
 
-    @CreateDateColumn()
-    createdAt: Date;
+  @CreateDateColumn()
+  createdAt: Date;
 }

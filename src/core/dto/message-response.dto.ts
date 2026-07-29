@@ -1,11 +1,11 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty } from "@nestjs/swagger";
 
 export class MessageResponseDto {
-    @ApiProperty({ example: 'Operation successful' })
-    message: string;
+  @ApiProperty({ example: "Operation successful" })
+  message: string;
 }
 
 export class SuccessResponseDto {
-    @ApiProperty({ example: true })
-    success: boolean;
+  @ApiProperty({ example: true })
+  success: boolean;
 }

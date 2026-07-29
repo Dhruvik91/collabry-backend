@@ -1,7 +1,7 @@
-import { CanActivate, ExecutionContext } from '@nestjs/common';
-import { Request } from 'express';
+import { CanActivate, ExecutionContext } from "@nestjs/common";
+import { Request } from "express";
 
-import { ROLES } from 'src/modules/auth/types/types';
+import { ROLES } from "src/modules/auth/types/types";
 
 export class RoleGuard implements CanActivate {
   constructor(private readonly role: ROLES) {}

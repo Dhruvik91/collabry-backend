@@ -1,26 +1,35 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, OneToOne, JoinColumn, Index } from 'typeorm';
-import { ApiProperty } from '@nestjs/swagger';
-import { User } from './user.entity';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  OneToOne,
+  JoinColumn,
+  Index,
+} from "typeorm";
+import { ApiProperty } from "@nestjs/swagger";
+import { User } from "./user.entity";
 
-@Entity('referrals')
+@Entity("referrals")
 export class Referral {
-    @ApiProperty()
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+  @ApiProperty()
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
 
-    @ManyToOne(() => User)
-    @Index()
-    referrer: User;
+  @ManyToOne(() => User)
+  @Index()
+  referrer: User;
 
-    @OneToOne(() => User)
-    @JoinColumn()
-    @Index()
-    referred: User;
+  @OneToOne(() => User)
+  @JoinColumn()
+  @Index()
+  referred: User;
 
-    @ApiProperty()
-    @Column({ default: false })
-    rewarded: boolean;
+  @ApiProperty()
+  @Column({ default: false })
+  rewarded: boolean;
 
-    @CreateDateColumn()
-    createdAt: Date;
+  @CreateDateColumn()
+  createdAt: Date;
 }

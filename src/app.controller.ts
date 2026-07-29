@@ -1,10 +1,10 @@
-import { Controller, Get } from '@nestjs/common';
-import { AppService } from './app.service';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Controller, Get } from "@nestjs/common";
+import { AppService } from "./app.service";
+import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 
-@ApiTags('Dashboard')
+@ApiTags("Dashboard")
 @ApiBearerAuth()
-@Controller('dashboard')
+@Controller("dashboard")
 export class AppController {
   constructor(private readonly appService: AppService) {}
 

@@ -1,4 +1,4 @@
-import { applyDecorators, Type } from '@nestjs/common';
+import { applyDecorators, Type } from "@nestjs/common";
 import {
   ApiBadRequestResponse,
   ApiConflictResponse,
@@ -10,7 +10,7 @@ import {
   ApiProperty,
   ApiUnauthorizedResponse,
   getSchemaPath,
-} from '@nestjs/swagger';
+} from "@nestjs/swagger";
 
 export class PaginationMetaDataDto {
   @ApiProperty()
@@ -65,7 +65,7 @@ export const ApiOkResponseEnvelope = <TModel extends Type<unknown>>(
           {
             properties: {
               data: isArray
-                ? { type: 'array', items: { $ref: getSchemaPath(model) } }
+                ? { type: "array", items: { $ref: getSchemaPath(model) } }
                 : { $ref: getSchemaPath(model) },
             },
           },
@@ -87,7 +87,7 @@ export const ApiCreatedResponseEnvelope = <TModel extends Type<unknown>>(
           {
             properties: {
               data: isArray
-                ? { type: 'array', items: { $ref: getSchemaPath(model) } }
+                ? { type: "array", items: { $ref: getSchemaPath(model) } }
                 : { $ref: getSchemaPath(model) },
             },
           },
@@ -96,7 +96,7 @@ export const ApiCreatedResponseEnvelope = <TModel extends Type<unknown>>(
     }),
   );
 
-export const ApiBadRequestResponseEnvelope = (description = 'Bad Request') =>
+export const ApiBadRequestResponseEnvelope = (description = "Bad Request") =>
   applyDecorators(
     ApiExtraModels(ResponseEnvelope),
     ApiBadRequestResponse({
@@ -105,7 +105,7 @@ export const ApiBadRequestResponseEnvelope = (description = 'Bad Request') =>
     }),
   );
 
-export const ApiUnauthorizedResponseEnvelope = (description = 'Unauthorized') =>
+export const ApiUnauthorizedResponseEnvelope = (description = "Unauthorized") =>
   applyDecorators(
     ApiExtraModels(ResponseEnvelope),
     ApiUnauthorizedResponse({
@@ -114,7 +114,7 @@ export const ApiUnauthorizedResponseEnvelope = (description = 'Unauthorized') =>
     }),
   );
 
-export const ApiForbiddenResponseEnvelope = (description = 'Forbidden') =>
+export const ApiForbiddenResponseEnvelope = (description = "Forbidden") =>
   applyDecorators(
     ApiExtraModels(ResponseEnvelope),
     ApiForbiddenResponse({
@@ -123,7 +123,7 @@ export const ApiForbiddenResponseEnvelope = (description = 'Forbidden') =>
     }),
   );
 
-export const ApiNotFoundResponseEnvelope = (description = 'Not Found') =>
+export const ApiNotFoundResponseEnvelope = (description = "Not Found") =>
   applyDecorators(
     ApiExtraModels(ResponseEnvelope),
     ApiNotFoundResponse({
@@ -132,7 +132,7 @@ export const ApiNotFoundResponseEnvelope = (description = 'Not Found') =>
     }),
   );
 
-export const ApiConflictResponseEnvelope = (description = 'Conflict') =>
+export const ApiConflictResponseEnvelope = (description = "Conflict") =>
   applyDecorators(
     ApiExtraModels(ResponseEnvelope),
     ApiConflictResponse({

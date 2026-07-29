@@ -1,101 +1,101 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 class PublicBrandPartnerDto {
-    @ApiProperty()
-    id: string;
+  @ApiProperty()
+  id: string;
 
-    @ApiProperty()
-    fullName: string;
+  @ApiProperty()
+  fullName: string;
 
-    @ApiPropertyOptional()
-    avatarUrl?: string;
+  @ApiPropertyOptional()
+  avatarUrl?: string;
 
-    @ApiPropertyOptional()
-    username?: string;
+  @ApiPropertyOptional()
+  username?: string;
 }
 
 export class PublicInfluencerProfileDto {
-    @ApiProperty()
-    id: string;
+  @ApiProperty()
+  id: string;
 
-    @ApiProperty()
-    fullName: string;
+  @ApiProperty()
+  fullName: string;
 
-    @ApiPropertyOptional()
-    slug?: string;
+  @ApiPropertyOptional()
+  slug?: string;
 
-    @ApiPropertyOptional()
-    avatarUrl?: string;
+  @ApiPropertyOptional()
+  avatarUrl?: string;
 
-    @ApiPropertyOptional()
-    bio?: string;
+  @ApiPropertyOptional()
+  bio?: string;
 
-    @ApiPropertyOptional()
-    platforms?: Record<string, any>;
+  @ApiPropertyOptional()
+  platforms?: Record<string, any>;
 
-    @ApiPropertyOptional()
-    categories?: string[];
+  @ApiPropertyOptional()
+  categories?: string[];
 
-    @ApiPropertyOptional()
-    locationCountry?: string;
+  @ApiPropertyOptional()
+  locationCountry?: string;
 
-    @ApiPropertyOptional()
-    locationCity?: string;
+  @ApiPropertyOptional()
+  locationCity?: string;
 
-    @ApiProperty()
-    totalFollowers: number;
+  @ApiProperty()
+  totalFollowers: number;
 
-    @ApiProperty()
-    avgEngagementRate: number;
+  @ApiProperty()
+  avgEngagementRate: number;
 
-    @ApiPropertyOptional()
-    rankingTier?: string;
+  @ApiPropertyOptional()
+  rankingTier?: string;
 
-    @ApiProperty()
-    verified: boolean;
+  @ApiProperty()
+  verified: boolean;
 
-    @ApiProperty()
-    username: string;
+  @ApiProperty()
+  username: string;
 
-    @ApiProperty({ type: [Object] })
-    reviews: any[];
+  @ApiProperty({ type: [Object] })
+  reviews: any[];
 
-    @ApiPropertyOptional()
-    ranking?: any;
+  @ApiPropertyOptional()
+  ranking?: any;
 
-    @ApiProperty({ type: [PublicBrandPartnerDto] })
-    brandPartners: PublicBrandPartnerDto[];
+  @ApiProperty({ type: [PublicBrandPartnerDto] })
+  brandPartners: PublicBrandPartnerDto[];
 
-    @ApiProperty()
-    brandPartnerCount: number;
+  @ApiProperty()
+  brandPartnerCount: number;
 
-    @ApiProperty()
-    avgRating: number;
+  @ApiProperty()
+  avgRating: number;
 
-    @ApiProperty()
-    totalReviews: number;
+  @ApiProperty()
+  totalReviews: number;
 
-    @ApiProperty()
-    completedCollabCount: number;
+  @ApiProperty()
+  completedCollabCount: number;
 
-    @ApiPropertyOptional()
-    languages?: string[];
+  @ApiPropertyOptional()
+  languages?: string[];
 
-    @ApiPropertyOptional()
-    audienceGenderRatio?: any;
+  @ApiPropertyOptional()
+  audienceGenderRatio?: any;
 
-    @ApiPropertyOptional()
-    audienceAgeBrackets?: any;
+  @ApiPropertyOptional()
+  audienceAgeBrackets?: any;
 
-    @ApiPropertyOptional()
-    audienceTopCountries?: string[];
+  @ApiPropertyOptional()
+  audienceTopCountries?: string[];
 
-    @ApiPropertyOptional()
-    minPrice?: number;
+  @ApiPropertyOptional()
+  minPrice?: number;
 
-    @ApiPropertyOptional()
-    maxPrice?: number;
+  @ApiPropertyOptional()
+  maxPrice?: number;
 
-    @ApiPropertyOptional({ type: [String] })
-    collaborationTypes?: string[];
+  @ApiPropertyOptional({ type: [String] })
+  collaborationTypes?: string[];
 }

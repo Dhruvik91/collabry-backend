@@ -1,19 +1,28 @@
-import { Injectable, ConflictException, UnauthorizedException, BadRequestException, NotFoundException } from '@nestjs/common';
-import { randomBytes, randomInt } from 'crypto';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
+import {
+  Injectable,
+  ConflictException,
+  UnauthorizedException,
+  BadRequestException,
+  NotFoundException,
+} from "@nestjs/common";
+import { randomBytes, randomInt } from "crypto";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, DataSource } from "typeorm";
+import { JwtService } from "@nestjs/jwt";
+import { ConfigService } from "@nestjs/config";
 
-import { User } from '../../database/entities/user.entity';
-import { UserRole, UserStatus } from '../../database/entities/enums';
-import { HashingService } from '../../core/hashing/hashing';
-import { AppMailerService } from '../mailer/mailer.service';
-import { ReferralService } from '../referral/referral.service';
-import { WalletService } from '../kc-wallet/wallet.service';
-import { VerifyEmailDto } from './dto/verify-email.dto';
-import { KCSettingService, KCSettingKey } from '../kc-setting/kc-setting.service';
-import { TransactionPurpose } from '../../database/entities/enums';
+import { User } from "../../database/entities/user.entity";
+import { UserRole, UserStatus } from "../../database/entities/enums";
+import { HashingService } from "../../core/hashing/hashing";
+import { AppMailerService } from "../mailer/mailer.service";
+import { ReferralService } from "../referral/referral.service";
+import { WalletService } from "../kc-wallet/wallet.service";
+import { VerifyEmailDto } from "./dto/verify-email.dto";
+import {
+  KCSettingService,
+  KCSettingKey,
+} from "../kc-setting/kc-setting.service";
+import { TransactionPurpose } from "../../database/entities/enums";
 
 export type JwtPayload = { id: string; email: string; role: UserRole };
 
@@ -29,25 +38,36 @@ export class UserAuthService {
     private readonly settingService: KCSettingService,
     private readonly dataSource: DataSource,
     private readonly configService: ConfigService,
-  ) { }
+  ) {}
 
-  async signup(email: string, password: string, confirmPassword: string, role: UserRole = UserRole.USER, referredBy?: string, username?: string) {
+  async signup(
+    email: string,
+    password: string,
+    confirmPassword: string,
+    role: UserRole = UserRole.USER,
+    referredBy?: string,
+    username?: string,
+  ) {
     // Validate password confirmation
     if (password !== confirmPassword) {
-      throw new BadRequestException('Password and confirm password do not match');
+      throw new BadRequestException(
+        "Password and confirm password do not match",
+      );
     }
 
     // Prevent direct signup for ADMIN role
     if (role === UserRole.ADMIN) {
-      throw new BadRequestException('Cannot sign up with Admin role');
+      throw new BadRequestException("Cannot sign up with Admin role");
     }
 
     const exists = await this.usersRepo.findOne({ where: { email } });
-    if (exists) throw new ConflictException('Email already registered');
+    if (exists) throw new ConflictException("Email already registered");
 
     if (username) {
-      const usernameExists = await this.usersRepo.findOne({ where: { username } });
-      if (usernameExists) throw new ConflictException('Username already taken');
+      const usernameExists = await this.usersRepo.findOne({
+        where: { username },
+      });
+      if (usernameExists) throw new ConflictException("Username already taken");
     }
 
     const passwordHash = await this.hashing.hash(password);
@@ -59,7 +79,8 @@ export class UserAuthService {
     otpExpires.setMinutes(otpExpires.getMinutes() + 10); // 10 minutes expiry
 
     // Generate unique referral code for the new user
-    const referralCode = await this.referralService.generateUniqueReferralCode();
+    const referralCode =
+      await this.referralService.generateUniqueReferralCode();
 
     // Create user with PENDING status
     const user = this.usersRepo.create({
@@ -84,42 +105,53 @@ export class UserAuthService {
 
       // Link referral if provided
       if (referredBy) {
-        await this.referralService.registerReferral(savedUser.id, referredBy, manager);
+        await this.referralService.registerReferral(
+          savedUser.id,
+          referredBy,
+          manager,
+        );
       }
     });
 
     // Send verification email
     await this.mailerService.sendVerificationEmail(email, otp);
 
-    return { message: 'Verification code sent to your email. Please verify your account to continue.' };
+    return {
+      message:
+        "Verification code sent to your email. Please verify your account to continue.",
+    };
   }
 
   async verifyEmail(dto: VerifyEmailDto) {
     const { email, otp } = dto;
     const user = await this.usersRepo.findOne({
       where: { email },
-      select: ['id', 'email', 'role', 'status', 'otp', 'otpExpires']
+      select: ["id", "email", "role", "status", "otp", "otpExpires"],
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException("User not found");
     }
 
     if (user.status !== UserStatus.PENDING) {
-      throw new BadRequestException('Account is already verified or not in pending state');
+      throw new BadRequestException(
+        "Account is already verified or not in pending state",
+      );
     }
 
     if (!user.otp || !user.otpExpires) {
-      throw new BadRequestException('No verification code found for this account');
+      throw new BadRequestException(
+        "No verification code found for this account",
+      );
     }
 
     if (new Date() > user.otpExpires) {
-      throw new BadRequestException('Verification code has expired');
+      throw new BadRequestException("Verification code has expired");
     }
 
     const isOtpValid = await this.hashing.compare(otp, user.otp);
     if (!isOtpValid) {
-      throw new BadRequestException('Invalid verification code');
+      throw new BadRequestException("Invalid verification code");
     }
 
     // Update user to ACTIVE
@@ -134,35 +166,37 @@ export class UserAuthService {
     await this.referralService.rewardReferral(user.id);
 
     // Award New Arrival Bonus
-    const bonusAmount = await this.settingService.getSetting(KCSettingKey.NEW_ARRIVAL_BONUS_AMOUNT);
+    const bonusAmount = await this.settingService.getSetting(
+      KCSettingKey.NEW_ARRIVAL_BONUS_AMOUNT,
+    );
     if (bonusAmount > 0) {
       await this.walletService.credit(
         user.id,
         bonusAmount,
-        TransactionPurpose.NEW_ARRIVAL_BONUS
+        TransactionPurpose.NEW_ARRIVAL_BONUS,
       );
     }
 
     const loginData = await this.login(savedUser, true);
 
     return {
-      message: 'Email verified successfully',
-      ...loginData
+      message: "Email verified successfully",
+      ...loginData,
     };
   }
 
   async resendVerifyEmail(email: string) {
     const user = await this.usersRepo.findOne({
       where: { email },
-      select: ['id', 'email', 'status']
+      select: ["id", "email", "status"],
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException("User not found");
     }
 
     if (user.status !== UserStatus.PENDING) {
-      throw new BadRequestException('Account is already verified');
+      throw new BadRequestException("Account is already verified");
     }
 
     // Generate secure new OTP
@@ -179,13 +213,22 @@ export class UserAuthService {
     // Send new verification email
     await this.mailerService.sendVerificationEmail(email, otp);
 
-    return { message: 'New verification code sent to your email.' };
+    return { message: "New verification code sent to your email." };
   }
 
   async validateUser(email: string, password: string) {
     const user = await this.usersRepo.findOne({
       where: { email },
-      select: ['id', 'email', 'role', 'status', 'emailVerified', 'passwordHash', 'createdAt', 'updatedAt']
+      select: [
+        "id",
+        "email",
+        "role",
+        "status",
+        "emailVerified",
+        "passwordHash",
+        "createdAt",
+        "updatedAt",
+      ],
     });
     if (!user || !user.passwordHash) return null;
     const match = await this.hashing.compare(password, user.passwordHash);
@@ -199,11 +242,15 @@ export class UserAuthService {
 
     // Ensure user is verified/active
     if (user.status === UserStatus.SUSPENDED) {
-      throw new UnauthorizedException('Your account has been suspended. Please contact support.');
+      throw new UnauthorizedException(
+        "Your account has been suspended. Please contact support.",
+      );
     }
 
     if (user.status !== UserStatus.ACTIVE) {
-      throw new UnauthorizedException('Please verify your email address before logging in.');
+      throw new UnauthorizedException(
+        "Please verify your email address before logging in.",
+      );
     }
 
     return user;
@@ -214,30 +261,48 @@ export class UserAuthService {
   }
 
   async login(user: User, isNewUser = false) {
-    const token = this.generateToken({ id: user.id, email: user.email, role: user.role });
+    const token = this.generateToken({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    });
 
     // Exclude passwordHash from response
     const { passwordHash: _, ...userWithoutPassword } = user;
     return { access_token: token, user: userWithoutPassword, isNewUser };
   }
 
-  async createInfluencer(email: string, password: string, confirmPassword: string, username?: string) {
+  async createInfluencer(
+    email: string,
+    password: string,
+    confirmPassword: string,
+    username?: string,
+  ) {
     // Validate password confirmation
     if (password !== confirmPassword) {
-      throw new BadRequestException('Password and confirm password do not match');
+      throw new BadRequestException(
+        "Password and confirm password do not match",
+      );
     }
 
     const exists = await this.usersRepo.findOne({ where: { email } });
-    if (exists) throw new ConflictException('Email already registered');
+    if (exists) throw new ConflictException("Email already registered");
 
     if (username) {
-      const usernameExists = await this.usersRepo.findOne({ where: { username } });
-      if (usernameExists) throw new ConflictException('Username already taken');
+      const usernameExists = await this.usersRepo.findOne({
+        where: { username },
+      });
+      if (usernameExists) throw new ConflictException("Username already taken");
     }
 
     const passwordHash = await this.hashing.hash(password);
     // Create user with INFLUENCER role
-    const user = this.usersRepo.create({ email, role: UserRole.INFLUENCER, passwordHash, username });
+    const user = this.usersRepo.create({
+      email,
+      role: UserRole.INFLUENCER,
+      passwordHash,
+      username,
+    });
     const saved = await this.usersRepo.save(user);
 
     // Exclude passwordHash from response
@@ -247,25 +312,33 @@ export class UserAuthService {
 
   async upsertGoogleUser(profile: { email: string; name?: string }) {
     const email = profile.email;
-    if (!email) throw new UnauthorizedException('Google profile missing email');
+    if (!email) throw new UnauthorizedException("Google profile missing email");
     let user = await this.usersRepo.findOne({ where: { email } });
     if (!user) {
       // Generate unique referral code
-      const referralCode = await this.referralService.generateUniqueReferralCode();
+      const referralCode =
+        await this.referralService.generateUniqueReferralCode();
 
-      user = this.usersRepo.create({ email, role: UserRole.USER, passwordHash: null, referralCode });
+      user = this.usersRepo.create({
+        email,
+        role: UserRole.USER,
+        passwordHash: null,
+        referralCode,
+      });
       user = await this.usersRepo.save(user);
 
       // Create wallet
       await this.walletService.createWallet(user.id, 0);
 
       // Award New Arrival Bonus
-      const bonusAmount = await this.settingService.getSetting(KCSettingKey.NEW_ARRIVAL_BONUS_AMOUNT);
+      const bonusAmount = await this.settingService.getSetting(
+        KCSettingKey.NEW_ARRIVAL_BONUS_AMOUNT,
+      );
       if (bonusAmount > 0) {
         await this.walletService.credit(
           user.id,
           bonusAmount,
-          TransactionPurpose.NEW_ARRIVAL_BONUS
+          TransactionPurpose.NEW_ARRIVAL_BONUS,
         );
       }
       return this.login(user, true);
@@ -287,11 +360,14 @@ export class UserAuthService {
 
     // Always return success message to prevent email enumeration
     if (!user) {
-      return { message: 'If an account with that email exists, a password reset link has been sent.' };
+      return {
+        message:
+          "If an account with that email exists, a password reset link has been sent.",
+      };
     }
 
     // Generate a secure random token
-    const resetToken = randomBytes(32).toString('hex');
+    const resetToken = randomBytes(32).toString("hex");
     const resetTokenHash = await this.hashing.hash(resetToken);
 
     // Set token expiry to 1 hour from now
@@ -306,31 +382,38 @@ export class UserAuthService {
     // Send email with the plain token (not hashed) and user ID for O(1) lookup
     await this.mailerService.sendPasswordResetEmail(email, resetToken, user.id);
 
-    return { message: 'If an account with that email exists, a password reset link has been sent.' };
+    return {
+      message:
+        "If an account with that email exists, a password reset link has been sent.",
+    };
   }
 
-  async resetPassword(userId: string, token: string, newPassword: string): Promise<{ message: string }> {
+  async resetPassword(
+    userId: string,
+    token: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
     // 1. Efficient O(1) lookup by user ID
     const user = await this.usersRepo
-      .createQueryBuilder('user')
-      .addSelect('user.passwordResetToken')
-      .addSelect('user.passwordResetExpires')
-      .where('user.id = :userId', { userId })
+      .createQueryBuilder("user")
+      .addSelect("user.passwordResetToken")
+      .addSelect("user.passwordResetExpires")
+      .where("user.id = :userId", { userId })
       .getOne();
 
     if (!user || !user.passwordResetToken || !user.passwordResetExpires) {
-      throw new BadRequestException('Invalid or expired password reset token');
+      throw new BadRequestException("Invalid or expired password reset token");
     }
 
     // 2. Check expiry
     if (new Date() > user.passwordResetExpires) {
-      throw new BadRequestException('Password reset token has expired');
+      throw new BadRequestException("Password reset token has expired");
     }
 
     // 3. Verify token hash
     const isMatch = await this.hashing.compare(token, user.passwordResetToken);
     if (!isMatch) {
-      throw new BadRequestException('Invalid or expired password reset token');
+      throw new BadRequestException("Invalid or expired password reset token");
     }
 
     // 4. Hash the new password and clear reset token
@@ -339,32 +422,44 @@ export class UserAuthService {
     user.passwordResetExpires = null;
     await this.usersRepo.save(user);
 
-    return { message: 'Password has been reset successfully. You can now log in with your new password.' };
+    return {
+      message:
+        "Password has been reset successfully. You can now log in with your new password.",
+    };
   }
 
-  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<{ message: string }> {
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
     const user = await this.usersRepo.findOne({
       where: { id: userId },
-      select: ['id', 'passwordHash']
+      select: ["id", "passwordHash"],
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException("User not found");
     }
 
     if (!user.passwordHash) {
-      throw new BadRequestException('User does not have a password set (likely a Google user). Please use forgot password to set one.');
+      throw new BadRequestException(
+        "User does not have a password set (likely a Google user). Please use forgot password to set one.",
+      );
     }
 
-    const isMatch = await this.hashing.compare(currentPassword, user.passwordHash);
+    const isMatch = await this.hashing.compare(
+      currentPassword,
+      user.passwordHash,
+    );
     if (!isMatch) {
-      throw new BadRequestException('Current password is incorrect');
+      throw new BadRequestException("Current password is incorrect");
     }
 
     user.passwordHash = await this.hashing.hash(newPassword);
     await this.usersRepo.save(user);
 
-    return { message: 'Password updated successfully' };
+    return { message: "Password updated successfully" };
   }
 
   private firebaseApp: any = null;
@@ -373,46 +468,65 @@ export class UserAuthService {
     if (this.firebaseApp) return this.firebaseApp;
 
     try {
-      const admin = require('firebase-admin');
+      const admin = require("firebase-admin");
       if (admin.apps.length === 0) {
         let credential;
 
-        const serviceAccountVar = this.configService.get<string>('FIREBASE_SERVICE_ACCOUNT');
-        const fs = require('fs');
-        const path = require('path');
+        const serviceAccountVar = this.configService.get<string>(
+          "FIREBASE_SERVICE_ACCOUNT",
+        );
+        const fs = require("fs");
+        const path = require("path");
         let serviceAccountObj: any = null;
 
         if (serviceAccountVar) {
           const trimmed = serviceAccountVar.trim();
-          if (trimmed.startsWith('{')) {
+          if (trimmed.startsWith("{")) {
             try {
               serviceAccountObj = JSON.parse(trimmed);
             } catch (e) {
-              throw new Error(`FIREBASE_SERVICE_ACCOUNT is set as JSON but parsing failed: ${e.message}`);
+              throw new Error(
+                `FIREBASE_SERVICE_ACCOUNT is set as JSON but parsing failed: ${e.message}`,
+              );
             }
           } else {
             // Treat it as a file path
             try {
-              const filePath = path.isAbsolute(trimmed) ? trimmed : path.join(process.cwd(), trimmed);
+              const filePath = path.isAbsolute(trimmed)
+                ? trimmed
+                : path.join(process.cwd(), trimmed);
               if (fs.existsSync(filePath)) {
-                serviceAccountObj = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                serviceAccountObj = JSON.parse(
+                  fs.readFileSync(filePath, "utf8"),
+                );
               } else {
-                throw new Error(`Service account file not found at path: ${filePath}`);
+                throw new Error(
+                  `Service account file not found at path: ${filePath}`,
+                );
               }
             } catch (e) {
-              throw new Error(`Failed to load service account file from path: ${e.message}`);
+              throw new Error(
+                `Failed to load service account file from path: ${e.message}`,
+              );
             }
           }
         }
 
         // If not found in environment variable, check for default local file
         if (!serviceAccountObj) {
-          const defaultFilePath = path.join(process.cwd(), 'firebase-service-account.json');
+          const defaultFilePath = path.join(
+            process.cwd(),
+            "firebase-service-account.json",
+          );
           if (fs.existsSync(defaultFilePath)) {
             try {
-              serviceAccountObj = JSON.parse(fs.readFileSync(defaultFilePath, 'utf8'));
+              serviceAccountObj = JSON.parse(
+                fs.readFileSync(defaultFilePath, "utf8"),
+              );
             } catch (e) {
-              throw new Error(`Failed to parse default firebase-service-account.json file: ${e.message}`);
+              throw new Error(
+                `Failed to parse default firebase-service-account.json file: ${e.message}`,
+              );
             }
           }
         }
@@ -422,12 +536,18 @@ export class UserAuthService {
           credential = admin.credential.cert(serviceAccountObj);
         } else {
           // Fallback to individual keys
-          const projectId = this.configService.get<string>('FIREBASE_PROJECT_ID');
-          const clientEmail = this.configService.get<string>('FIREBASE_CLIENT_EMAIL');
-          const privateKey = this.configService.get<string>('FIREBASE_PRIVATE_KEY');
+          const projectId = this.configService.get<string>(
+            "FIREBASE_PROJECT_ID",
+          );
+          const clientEmail = this.configService.get<string>(
+            "FIREBASE_CLIENT_EMAIL",
+          );
+          const privateKey = this.configService.get<string>(
+            "FIREBASE_PRIVATE_KEY",
+          );
 
           if (projectId && clientEmail && privateKey) {
-            const formattedPrivateKey = privateKey.replace(/\\n/g, '\n');
+            const formattedPrivateKey = privateKey.replace(/\\n/g, "\n");
             credential = admin.credential.cert({
               projectId,
               clientEmail,
@@ -437,7 +557,7 @@ export class UserAuthService {
             credential = admin.credential.applicationDefault();
           } else {
             throw new Error(
-              'Firebase Admin credentials are not configured. Please define FIREBASE_SERVICE_ACCOUNT (JSON string or path to JSON file), place a firebase-service-account.json file in the project root, or configure individual keys (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY).'
+              "Firebase Admin credentials are not configured. Please define FIREBASE_SERVICE_ACCOUNT (JSON string or path to JSON file), place a firebase-service-account.json file in the project root, or configure individual keys (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY).",
             );
           }
         }
@@ -450,27 +570,35 @@ export class UserAuthService {
       }
       return this.firebaseApp;
     } catch (error) {
-      throw new BadRequestException(`Failed to initialize Firebase Admin SDK: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to initialize Firebase Admin SDK: ${error.message}`,
+      );
     }
   }
 
   async verifyFirebaseToken(idToken: string): Promise<any> {
     this.getFirebaseApp();
     try {
-      const admin = require('firebase-admin');
+      const admin = require("firebase-admin");
       const decodedToken = await admin.auth().verifyIdToken(idToken);
       return decodedToken;
     } catch (error) {
-      throw new UnauthorizedException(`Invalid Firebase token: ${error.message}`);
+      throw new UnauthorizedException(
+        `Invalid Firebase token: ${error.message}`,
+      );
     }
   }
 
-  async loginWithFirebase(idToken: string, requestedRole: UserRole = UserRole.USER, referralCode?: string) {
+  async loginWithFirebase(
+    idToken: string,
+    requestedRole: UserRole = UserRole.USER,
+    referralCode?: string,
+  ) {
     const decodedToken = await this.verifyFirebaseToken(idToken);
     const { email, uid: firebaseUid } = decodedToken;
 
     if (!email) {
-      throw new BadRequestException('Firebase token does not contain email');
+      throw new BadRequestException("Firebase token does not contain email");
     }
 
     let user = await this.usersRepo.findOne({
@@ -479,7 +607,8 @@ export class UserAuthService {
 
     if (!user) {
       // Create user if they don't exist
-      const userReferralCode = await this.referralService.generateUniqueReferralCode();
+      const userReferralCode =
+        await this.referralService.generateUniqueReferralCode();
       user = this.usersRepo.create({
         email,
         firebaseUid,
@@ -500,7 +629,11 @@ export class UserAuthService {
 
         // Link referral if provided
         if (referralCode) {
-          await this.referralService.registerReferral(user.id, referralCode, manager);
+          await this.referralService.registerReferral(
+            user.id,
+            referralCode,
+            manager,
+          );
         }
       });
 
@@ -510,12 +643,14 @@ export class UserAuthService {
       }
 
       // Award New Arrival Bonus
-      const bonusAmount = await this.settingService.getSetting(KCSettingKey.NEW_ARRIVAL_BONUS_AMOUNT);
+      const bonusAmount = await this.settingService.getSetting(
+        KCSettingKey.NEW_ARRIVAL_BONUS_AMOUNT,
+      );
       if (bonusAmount > 0) {
         await this.walletService.credit(
           user.id,
           bonusAmount,
-          TransactionPurpose.NEW_ARRIVAL_BONUS
+          TransactionPurpose.NEW_ARRIVAL_BONUS,
         );
       }
 

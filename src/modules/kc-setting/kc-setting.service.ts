@@ -1,66 +1,70 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { KCSetting } from '../../database/entities/kc-setting.entity';
+import { Injectable, OnModuleInit } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { KCSetting } from "../../database/entities/kc-setting.entity";
 
 export enum KCSettingKey {
-    AUCTION_CREATION_PRICE = 'AUCTION_CREATION_PRICE',
-    COLLABORATION_CREATION_PRICE = 'COLLABORATION_CREATION_PRICE',
-    BID_PLACEMENT_PRICE = 'BID_PLACEMENT_PRICE',
-    WEEKLY_REWARD_BRAND = 'WEEKLY_REWARD_BRAND',
-    WEEKLY_REWARD_INFLUENCER = 'WEEKLY_REWARD_INFLUENCER',
-    NEW_ARRIVAL_BONUS_AMOUNT = 'NEW_ARRIVAL_BONUS_AMOUNT',
-    REFERRAL_REWARD_REFERRER = 'REFERRAL_REWARD_REFERRER',
-    REFERRAL_REWARD_REFERRED = 'REFERRAL_REWARD_REFERRED',
-    PITCH_PRICE = 'PITCH_PRICE',
+  AUCTION_CREATION_PRICE = "AUCTION_CREATION_PRICE",
+  COLLABORATION_CREATION_PRICE = "COLLABORATION_CREATION_PRICE",
+  BID_PLACEMENT_PRICE = "BID_PLACEMENT_PRICE",
+  WEEKLY_REWARD_BRAND = "WEEKLY_REWARD_BRAND",
+  WEEKLY_REWARD_INFLUENCER = "WEEKLY_REWARD_INFLUENCER",
+  NEW_ARRIVAL_BONUS_AMOUNT = "NEW_ARRIVAL_BONUS_AMOUNT",
+  REFERRAL_REWARD_REFERRER = "REFERRAL_REWARD_REFERRER",
+  REFERRAL_REWARD_REFERRED = "REFERRAL_REWARD_REFERRED",
+  PITCH_PRICE = "PITCH_PRICE",
+  VIDEO_PRICE = "VIDEO_PRICE",
 }
 
 @Injectable()
 export class KCSettingService implements OnModuleInit {
-    constructor(
-        @InjectRepository(KCSetting)
-        private readonly settingRepo: Repository<KCSetting>,
-    ) { }
+  constructor(
+    @InjectRepository(KCSetting)
+    private readonly settingRepo: Repository<KCSetting>,
+  ) {}
 
-    async onModuleInit() {
-        // Initialize default settings if they don't exist
-        const defaults = [
-            { key: KCSettingKey.AUCTION_CREATION_PRICE, value: 250 },
-            { key: KCSettingKey.COLLABORATION_CREATION_PRICE, value: 200 },
-            { key: KCSettingKey.BID_PLACEMENT_PRICE, value: 25 },
-            { key: KCSettingKey.WEEKLY_REWARD_BRAND, value: 1000 },
-            { key: KCSettingKey.WEEKLY_REWARD_INFLUENCER, value: 500 },
-            { key: KCSettingKey.NEW_ARRIVAL_BONUS_AMOUNT, value: 500 },
-            { key: KCSettingKey.REFERRAL_REWARD_REFERRER, value: 1000 },
-            { key: KCSettingKey.REFERRAL_REWARD_REFERRED, value: 500 },
-            { key: KCSettingKey.PITCH_PRICE, value: 250 },
-        ];
+  async onModuleInit() {
+    // Initialize default settings if they don't exist
+    const defaults = [
+      { key: KCSettingKey.AUCTION_CREATION_PRICE, value: 250 },
+      { key: KCSettingKey.COLLABORATION_CREATION_PRICE, value: 200 },
+      { key: KCSettingKey.BID_PLACEMENT_PRICE, value: 25 },
+      { key: KCSettingKey.WEEKLY_REWARD_BRAND, value: 1000 },
+      { key: KCSettingKey.WEEKLY_REWARD_INFLUENCER, value: 500 },
+      { key: KCSettingKey.NEW_ARRIVAL_BONUS_AMOUNT, value: 500 },
+      { key: KCSettingKey.REFERRAL_REWARD_REFERRER, value: 1000 },
+      { key: KCSettingKey.REFERRAL_REWARD_REFERRED, value: 500 },
+      { key: KCSettingKey.PITCH_PRICE, value: 250 },
+      { key: KCSettingKey.VIDEO_PRICE, value: 250 },
+    ];
 
-        for (const item of defaults) {
-            const exists = await this.settingRepo.findOne({ where: { key: item.key } });
-            if (!exists) {
-                await this.settingRepo.save(this.settingRepo.create(item));
-            }
-        }
+    for (const item of defaults) {
+      const exists = await this.settingRepo.findOne({
+        where: { key: item.key },
+      });
+      if (!exists) {
+        await this.settingRepo.save(this.settingRepo.create(item));
+      }
     }
+  }
 
-    async getSetting(key: KCSettingKey): Promise<number> {
-        const setting = await this.settingRepo.findOne({ where: { key } });
-        const val = setting ? Number(setting.value) : 0;
-        return val;
-    }
+  async getSetting(key: KCSettingKey): Promise<number> {
+    const setting = await this.settingRepo.findOne({ where: { key } });
+    const val = setting ? Number(setting.value) : 0;
+    return val;
+  }
 
-    async getAllSettings(): Promise<KCSetting[]> {
-        return await this.settingRepo.find();
-    }
+  async getAllSettings(): Promise<KCSetting[]> {
+    return await this.settingRepo.find();
+  }
 
-    async updateSetting(key: KCSettingKey, value: number): Promise<KCSetting> {
-        let setting = await this.settingRepo.findOne({ where: { key } });
-        if (!setting) {
-            setting = this.settingRepo.create({ key, value });
-        } else {
-            setting.value = value;
-        }
-        return await this.settingRepo.save(setting);
+  async updateSetting(key: KCSettingKey, value: number): Promise<KCSetting> {
+    let setting = await this.settingRepo.findOne({ where: { key } });
+    if (!setting) {
+      setting = this.settingRepo.create({ key, value });
+    } else {
+      setting.value = value;
     }
+    return await this.settingRepo.save(setting);
+  }
 }

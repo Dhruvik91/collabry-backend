@@ -1,79 +1,79 @@
 import {
-    Entity,
-    PrimaryGeneratedColumn,
-    Column,
-    ManyToOne,
-    OneToMany,
-    CreateDateColumn,
-    UpdateDateColumn,
-    DeleteDateColumn,
-    JoinColumn,
-    Index,
-} from 'typeorm';
-import { ApiProperty } from '@nestjs/swagger';
-import { User } from './user.entity';
-import { AuctionStatus, CollaborationType } from './enums';
-import { Bid } from './bid.entity';
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  OneToMany,
+  CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
+  JoinColumn,
+  Index,
+} from "typeorm";
+import { ApiProperty } from "@nestjs/swagger";
+import { User } from "./user.entity";
+import { AuctionStatus, CollaborationType } from "./enums";
+import { Bid } from "./bid.entity";
 
-@Entity('auctions')
+@Entity("auctions")
 export class Auction {
-    @ApiProperty()
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+  @ApiProperty()
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
 
-    @ApiProperty()
-    @Column()
-    title: string;
+  @ApiProperty()
+  @Column()
+  title: string;
 
-    @ApiProperty()
-    @Column({ type: 'text' })
-    description: string;
+  @ApiProperty()
+  @Column({ type: "text" })
+  description: string;
 
-    @ApiProperty()
-    @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
-    minBudget: number;
+  @ApiProperty()
+  @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
+  minBudget: number;
 
-    @ApiProperty()
-    @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
-    maxBudget: number;
+  @ApiProperty()
+  @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
+  maxBudget: number;
 
-    @ApiProperty()
-    @Column({ type: 'timestamp' })
-    deadline: Date;
+  @ApiProperty()
+  @Column({ type: "timestamp" })
+  deadline: Date;
 
-    @ApiProperty({ enum: AuctionStatus })
-    @Index()
-    @Column({
-        type: 'enum',
-        enum: AuctionStatus,
-        default: AuctionStatus.OPEN,
-    })
-    status: AuctionStatus;
+  @ApiProperty({ enum: AuctionStatus })
+  @Index()
+  @Column({
+    type: "enum",
+    enum: AuctionStatus,
+    default: AuctionStatus.OPEN,
+  })
+  status: AuctionStatus;
 
-    @ApiProperty({ enum: CollaborationType })
-    @Column({
-        type: 'enum',
-        enum: CollaborationType,
-        nullable: true,
-    })
-    category: CollaborationType;
+  @ApiProperty({ enum: CollaborationType })
+  @Column({
+    type: "enum",
+    enum: CollaborationType,
+    nullable: true,
+  })
+  category: CollaborationType;
 
-    @ApiProperty({ type: () => User })
-    @Index()
-    @ManyToOne(() => User)
-    @JoinColumn({ name: 'creatorId' })
-    creator: User;
+  @ApiProperty({ type: () => User })
+  @Index()
+  @ManyToOne(() => User)
+  @JoinColumn({ name: "creatorId" })
+  creator: User;
 
-    @ApiProperty({ type: () => [Bid] })
-    @OneToMany(() => Bid, (bid) => (bid as any).auction)
-    bids: Bid[];
+  @ApiProperty({ type: () => [Bid] })
+  @OneToMany(() => Bid, (bid) => (bid as any).auction)
+  bids: Bid[];
 
-    @CreateDateColumn()
-    createdAt: Date;
+  @CreateDateColumn()
+  createdAt: Date;
 
-    @UpdateDateColumn()
-    updatedAt: Date;
+  @UpdateDateColumn()
+  updatedAt: Date;
 
-    @DeleteDateColumn()
-    deletedAt: Date;
+  @DeleteDateColumn()
+  deletedAt: Date;
 }

@@ -1,99 +1,108 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToOne, DeleteDateColumn, Index } from 'typeorm';
-import { ApiProperty } from '@nestjs/swagger';
-import { UserRole, UserStatus } from './enums';
-import { InfluencerProfile } from './influencer-profile.entity';
-import { Profile } from './profile.entity';
-import { Wallet } from './wallet.entity';
-import { Exclude } from 'class-transformer';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToOne,
+  DeleteDateColumn,
+  Index,
+} from "typeorm";
+import { ApiProperty } from "@nestjs/swagger";
+import { UserRole, UserStatus } from "./enums";
+import { InfluencerProfile } from "./influencer-profile.entity";
+import { Profile } from "./profile.entity";
+import { Wallet } from "./wallet.entity";
+import { Exclude } from "class-transformer";
 
-@Entity('users')
+@Entity("users")
 export class User {
-    @ApiProperty()
-    @PrimaryGeneratedColumn('uuid')
-    id: string;
+  @ApiProperty()
+  @PrimaryGeneratedColumn("uuid")
+  id: string;
 
-    @Index({ unique: true, where: '"deletedAt" IS NULL' })
-    @Column()
-    email: string;
-    
-    @ApiProperty()
-    @Index({ unique: true, where: '"deletedAt" IS NULL' })
-    @Column({ nullable: true })
-    username: string;
+  @Index({ unique: true, where: '"deletedAt" IS NULL' })
+  @Column()
+  email: string;
 
-    @Exclude()
-    @Column({ nullable: true, select: false })
-    passwordHash: string;
+  @ApiProperty()
+  @Index({ unique: true, where: '"deletedAt" IS NULL' })
+  @Column({ nullable: true })
+  username: string;
 
-    @ApiProperty({ enum: UserRole })
-    @Index()
-    @Column({
-        type: 'enum',
-        enum: UserRole,
-        default: UserRole.USER,
-    })
-    role: UserRole;
+  @Exclude()
+  @Column({ nullable: true, select: false })
+  passwordHash: string;
 
-    @ApiProperty({ enum: UserStatus })
-    @Index()
-    @Column({
-        type: 'enum',
-        enum: UserStatus,
-        default: UserStatus.ACTIVE,
-    })
-    status: UserStatus;
+  @ApiProperty({ enum: UserRole })
+  @Index()
+  @Column({
+    type: "enum",
+    enum: UserRole,
+    default: UserRole.USER,
+  })
+  role: UserRole;
 
-    @Column({ default: false })
-    emailVerified: boolean;
+  @ApiProperty({ enum: UserStatus })
+  @Index()
+  @Column({
+    type: "enum",
+    enum: UserStatus,
+    default: UserStatus.ACTIVE,
+  })
+  status: UserStatus;
 
-    @ApiProperty()
-    @Index({ unique: true, where: '"deletedAt" IS NULL' })
-    @Column({ nullable: true })
-    firebaseUid: string;
+  @Column({ default: false })
+  emailVerified: boolean;
 
-    @Exclude()
-    @Column({ nullable: true, select: false })
-    passwordResetToken: string;
+  @ApiProperty()
+  @Index({ unique: true, where: '"deletedAt" IS NULL' })
+  @Column({ nullable: true })
+  firebaseUid: string;
 
-    @Column({ nullable: true })
-    passwordResetExpires: Date;
-    
-    @Exclude()
-    @Column({ nullable: true, select: false })
-    otp: string;
+  @Exclude()
+  @Column({ nullable: true, select: false })
+  passwordResetToken: string;
 
-    @Exclude()
-    @Column({ nullable: true, select: false })
-    otpExpires: Date;
+  @Column({ nullable: true })
+  passwordResetExpires: Date;
 
-    @ApiProperty({ type: () => Profile })
-    @OneToOne(() => Profile, (profile) => profile.user, { cascade: true })
-    profile: Profile;
+  @Exclude()
+  @Column({ nullable: true, select: false })
+  otp: string;
 
-    @ApiProperty({ type: () => InfluencerProfile })
-    @OneToOne(() => InfluencerProfile, (profile) => profile.user)
-    influencerProfile: InfluencerProfile;
+  @Exclude()
+  @Column({ nullable: true, select: false })
+  otpExpires: Date;
 
-    @ApiProperty()
-    @Index({ unique: true, where: '"deletedAt" IS NULL' })
-    @Column({ nullable: true })
-    referralCode: string;
+  @ApiProperty({ type: () => Profile })
+  @OneToOne(() => Profile, (profile) => profile.user, { cascade: true })
+  profile: Profile;
 
-    @ApiProperty()
-    @Column({ nullable: true })
-    @Index()
-    referredBy: string;
+  @ApiProperty({ type: () => InfluencerProfile })
+  @OneToOne(() => InfluencerProfile, (profile) => profile.user)
+  influencerProfile: InfluencerProfile;
 
-    @ApiProperty({ type: () => Wallet })
-    @OneToOne(() => Wallet, (wallet) => wallet.user, { cascade: true })
-    wallet: Wallet;
+  @ApiProperty()
+  @Index({ unique: true, where: '"deletedAt" IS NULL' })
+  @Column({ nullable: true })
+  referralCode: string;
 
-    @CreateDateColumn()
-    createdAt: Date;
+  @ApiProperty()
+  @Column({ nullable: true })
+  @Index()
+  referredBy: string;
 
-    @UpdateDateColumn()
-    updatedAt: Date;
+  @ApiProperty({ type: () => Wallet })
+  @OneToOne(() => Wallet, (wallet) => wallet.user, { cascade: true })
+  wallet: Wallet;
 
-    @DeleteDateColumn()
-    deletedAt: Date;
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+
+  @DeleteDateColumn()
+  deletedAt: Date;
 }

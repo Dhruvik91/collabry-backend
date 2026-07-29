@@ -1,18 +1,18 @@
-import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { Conversation } from '../../database/entities/conversation.entity';
-import { Message } from '../../database/entities/message.entity';
-import { MessagingController } from './messaging.controller';
-import { MessagingService } from './messaging.service';
-import { NotificationsModule } from '../notifications/notifications.module';
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { Conversation } from "../../database/entities/conversation.entity";
+import { Message } from "../../database/entities/message.entity";
+import { MessagingController } from "./messaging.controller";
+import { MessagingService } from "./messaging.service";
+import { NotificationsModule } from "../notifications/notifications.module";
 
 @Module({
-    imports: [
-        TypeOrmModule.forFeature([Conversation, Message]),
-        NotificationsModule,
-    ],
-    controllers: [MessagingController],
-    providers: [MessagingService],
-    exports: [MessagingService],
+  imports: [
+    TypeOrmModule.forFeature([Conversation, Message]),
+    NotificationsModule,
+  ],
+  controllers: [MessagingController],
+  providers: [MessagingService],
+  exports: [MessagingService],
 })
-export class MessagingModule { }
+export class MessagingModule {}
