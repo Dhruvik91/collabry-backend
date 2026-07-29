@@ -4,29 +4,55 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { Repository, DataSource } from "typeorm";
 import { VideoForSale } from "../../database/entities/video-for-sale.entity";
 import { CreateVideoForSaleDto } from "./dto/create-video-for-sale.dto";
 import { UpdateVideoForSaleDto } from "./dto/update-video-for-sale.dto";
 import { SearchVideosForSaleDto } from "./dto/search-videos-for-sale.dto";
+import {
+  KCSettingService,
+  KCSettingKey,
+} from "../kc-setting/kc-setting.service";
+import { WalletService } from "../kc-wallet/wallet.service";
+import { TransactionPurpose } from "../../database/entities/enums";
 
 @Injectable()
 export class VideoForSaleService {
   constructor(
     @InjectRepository(VideoForSale)
     private readonly videoRepo: Repository<VideoForSale>,
+    private readonly settingService: KCSettingService,
+    private readonly walletService: WalletService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(
     userId: string,
     createDto: CreateVideoForSaleDto,
   ): Promise<VideoForSale> {
-    const video = this.videoRepo.create({
-      influencer: { id: userId } as any,
-      ...createDto,
+    const fee = await this.settingService.getSetting(KCSettingKey.VIDEO_PRICE);
+
+    return await this.dataSource.transaction(async (manager) => {
+      // Debit coins
+      await this.walletService.debit(
+        userId,
+        fee,
+        TransactionPurpose.VIDEO_UPLOAD,
+        { title: createDto.title },
+        manager,
+      );
+
+      // Create video for sale
+      const video = this.videoRepo.create({
+        influencer: { id: userId } as any,
+        ...createDto,
+      });
+
+      const videoRepo = manager.getRepository(VideoForSale);
+      return await videoRepo.save(video);
     });
-    return this.videoRepo.save(video);
   }
+
 
   async findAll(searchDto: SearchVideosForSaleDto) {
     const {
