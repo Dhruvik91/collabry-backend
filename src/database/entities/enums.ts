@@ -102,6 +102,10 @@ export enum RazorpayWebhookEvent {
   PAYMENT_AUTHORIZED = "payment.authorized",
   ORDER_PAID = "order.paid",
   REFUND_PROCESSED = "refund.processed",
+  SUBSCRIPTION_ACTIVATED = "subscription.activated",
+  SUBSCRIPTION_CHARGED = "subscription.charged",
+  SUBSCRIPTION_HALTED = "subscription.halted",
+  SUBSCRIPTION_CANCELLED = "subscription.cancelled",
 }
 
 export enum TransactionPurpose {

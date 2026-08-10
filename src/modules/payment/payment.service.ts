@@ -18,6 +18,7 @@ import { WalletService } from "../kc-wallet/wallet.service";
 import { InitiateTopUpDto, VerifyPaymentDto } from "./dto/payment.dto";
 import { ConfigService } from "@nestjs/config";
 import { User } from "../../database/entities/user.entity";
+import { UserSubscription, UserSubscriptionStatus } from "../../database/entities/user-subscription.entity";
 import { AppMailerService } from "../mailer/mailer.service";
 
 @Injectable()
@@ -31,6 +32,8 @@ export class PaymentService {
     private readonly planRepo: Repository<TopUpPlan>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    @InjectRepository(UserSubscription)
+    private readonly userSubRepo: Repository<UserSubscription>,
     private readonly razorpayService: RazorpayService,
     private readonly walletService: WalletService,
     private readonly dataSource: DataSource,
@@ -306,6 +309,66 @@ export class PaymentService {
     }
 
     const event = payload.event as RazorpayWebhookEvent;
+
+    if (
+      event === RazorpayWebhookEvent.SUBSCRIPTION_ACTIVATED ||
+      event === RazorpayWebhookEvent.SUBSCRIPTION_CHARGED ||
+      event === RazorpayWebhookEvent.SUBSCRIPTION_HALTED ||
+      event === RazorpayWebhookEvent.SUBSCRIPTION_CANCELLED
+    ) {
+      const subscriptionPayload = payload.payload.subscription?.entity;
+      if (!subscriptionPayload) {
+        this.logger.warn(`Subscription payload missing for event: ${event}`);
+        return;
+      }
+      const razorpaySubId = subscriptionPayload.id;
+
+      const userSub = await this.userSubRepo.findOne({
+        where: { razorpaySubscriptionId: razorpaySubId },
+        relations: ["user"],
+      });
+
+      if (!userSub) {
+        this.logger.warn(
+          `Webhook received for unknown subscription: ${razorpaySubId}`,
+        );
+        return;
+      }
+
+      switch (event) {
+        case RazorpayWebhookEvent.SUBSCRIPTION_ACTIVATED:
+        case RazorpayWebhookEvent.SUBSCRIPTION_CHARGED:
+          userSub.status = UserSubscriptionStatus.ACTIVE;
+          userSub.currentPeriodStart = new Date(
+            subscriptionPayload.current_start * 1000,
+          );
+          userSub.currentPeriodEnd = new Date(
+            subscriptionPayload.current_end * 1000,
+          );
+          await this.userSubRepo.save(userSub);
+          this.logger.log(
+            `Subscription ${razorpaySubId} activated/charged. Status: ACTIVE.`,
+          );
+          break;
+
+        case RazorpayWebhookEvent.SUBSCRIPTION_HALTED:
+          userSub.status = UserSubscriptionStatus.HALTED;
+          await this.userSubRepo.save(userSub);
+          this.logger.log(`Subscription ${razorpaySubId} halted. Status: HALTED.`);
+          break;
+
+        case RazorpayWebhookEvent.SUBSCRIPTION_CANCELLED:
+          userSub.status = UserSubscriptionStatus.CANCELLED;
+          userSub.cancelledAt = new Date();
+          await this.userSubRepo.save(userSub);
+          this.logger.log(
+            `Subscription ${razorpaySubId} cancelled. Status: CANCELLED.`,
+          );
+          break;
+      }
+      return;
+    }
+
     const razorpayOrderId =
       payload.payload.payment?.entity?.order_id ||
       payload.payload.order?.entity?.id;

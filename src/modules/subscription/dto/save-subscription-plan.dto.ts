@@ -43,4 +43,14 @@ export class SaveSubscriptionPlanDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  razorpayPlanId?: string;
+
+  @ApiProperty({ required: false, default: "monthly" })
+  @IsOptional()
+  @IsString()
+  billingPeriod?: string;
 }

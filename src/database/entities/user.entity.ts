@@ -13,6 +13,7 @@ import { UserRole, UserStatus } from "./enums";
 import { InfluencerProfile } from "./influencer-profile.entity";
 import { Profile } from "./profile.entity";
 import { Wallet } from "./wallet.entity";
+import { UserSubscription } from "./user-subscription.entity";
 import { Exclude } from "class-transformer";
 
 @Entity("users")
@@ -96,6 +97,10 @@ export class User {
   @ApiProperty({ type: () => Wallet })
   @OneToOne(() => Wallet, (wallet) => wallet.user, { cascade: true })
   wallet: Wallet;
+
+  @ApiProperty({ type: () => UserSubscription, required: false })
+  @OneToOne(() => UserSubscription, (subscription) => subscription.user)
+  subscription?: UserSubscription;
 
   @CreateDateColumn()
   createdAt: Date;

@@ -112,4 +112,97 @@ export class RazorpayService {
       return false;
     }
   }
+
+  async createRazorpayPlan(
+    name: string,
+    amount: number,
+    period: "daily" | "weekly" | "monthly" | "yearly",
+  ) {
+    try {
+      return await this.razorpay.plans.create({
+        period,
+        interval: 1,
+        item: {
+          name: `${name} Subscription Plan`,
+          amount: Math.round(amount * 100), // in paise
+          currency: "INR",
+          description: `Plan for ${name} access`,
+        },
+      });
+    } catch (error) {
+      this.logger.error("Razorpay Plan Creation Error:", error);
+      throw new InternalServerErrorException("Failed to create plan on Razorpay");
+    }
+  }
+
+  async createSubscription(
+    razorpayPlanId: string,
+    totalCount = 120,
+    customerDetails?: { email: string; name: string },
+  ) {
+    try {
+      const payload: any = {
+        plan_id: razorpayPlanId,
+        total_count: totalCount,
+        quantity: 1,
+        customer_notify: 1,
+      };
+
+      if (customerDetails) {
+        payload.notes = {
+          email: customerDetails.email,
+          name: customerDetails.name,
+        };
+      }
+
+      return await this.razorpay.subscriptions.create(payload);
+    } catch (error) {
+      this.logger.error("Razorpay Subscription Creation Error:", error);
+      throw new InternalServerErrorException(
+        "Failed to create subscription on Razorpay",
+      );
+    }
+  }
+
+  async cancelSubscription(subscriptionId: string, cancelAtCycleEnd = true) {
+    try {
+      return await this.razorpay.subscriptions.cancel(subscriptionId, {
+        cancel_at_cycle_end: cancelAtCycleEnd ? 1 : 0,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Razorpay Subscription Cancel Error for ${subscriptionId}:`,
+        error,
+      );
+      throw new InternalServerErrorException("Failed to cancel subscription");
+    }
+  }
+
+  async fetchSubscription(subscriptionId: string) {
+    try {
+      return await this.razorpay.subscriptions.fetch(subscriptionId);
+    } catch (error) {
+      this.logger.error(
+        `Razorpay Subscription Fetch Error for ${subscriptionId}:`,
+        error,
+      );
+      throw new InternalServerErrorException(
+        "Failed to fetch subscription details from Razorpay",
+      );
+    }
+  }
+
+  verifySubscriptionSignature(
+    subscriptionId: string,
+    paymentId: string,
+    signature: string,
+  ): boolean {
+    const secret = this.configService.get<string>("RAZORPAY_KEY_SECRET");
+    const generatedSignature = crypto
+      .createHmac("sha256", secret)
+      .update(paymentId + "|" + subscriptionId)
+      .digest("hex");
+
+    return generatedSignature === signature;
+  }
 }

@@ -347,7 +347,10 @@ export class UserAuthService {
   }
 
   async me(userId: string) {
-    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    const user = await this.usersRepo.findOne({
+      where: { id: userId },
+      relations: ["subscription", "subscription.plan"],
+    });
     if (!user) return null;
 
     // Exclude passwordHash from response

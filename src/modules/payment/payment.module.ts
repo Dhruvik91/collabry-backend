@@ -9,15 +9,16 @@ import { PaymentController } from "./payment.controller";
 import { KcWalletModule } from "../kc-wallet/kc-wallet.module";
 import { MailerConfigModule } from "../mailer/mailer.module";
 import { User } from "../../database/entities/user.entity";
+import { UserSubscription } from "../../database/entities/user-subscription.entity";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([PaymentOrder, TopUpPlan, User]),
+    TypeOrmModule.forFeature([PaymentOrder, TopUpPlan, User, UserSubscription]),
     KcWalletModule,
     MailerConfigModule,
   ],
   providers: [PaymentService, RazorpayService, PaymentCleanupService],
   controllers: [PaymentController],
-  exports: [PaymentService],
+  exports: [PaymentService, RazorpayService],
 })
 export class PaymentModule {}

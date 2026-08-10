@@ -13,6 +13,7 @@ import { Profile } from "./entities/profile.entity";
 import { Report } from "./entities/report.entity";
 import { Review } from "./entities/review.entity";
 import { SubscriptionPlan } from "./entities/subscription-plan.entity";
+import { UserSubscription } from "./entities/user-subscription.entity";
 import { User } from "./entities/user.entity";
 import { VerificationRequest } from "./entities/verification-request.entity";
 import { Wallet } from "./entities/wallet.entity";
@@ -41,6 +42,7 @@ export const AllEntities = [
   Report,
   Review,
   SubscriptionPlan,
+  UserSubscription,
   User,
   VerificationRequest,
   Wallet,

@@ -39,4 +39,12 @@ export class SubscriptionPlan {
   @ApiProperty()
   @Column({ default: true })
   isActive: boolean;
+
+  @ApiProperty({ required: false })
+  @Column({ type: "varchar", nullable: true })
+  razorpayPlanId: string;
+
+  @ApiProperty({ default: "monthly" })
+  @Column({ type: "varchar", default: "monthly" })
+  billingPeriod: string;
 }
