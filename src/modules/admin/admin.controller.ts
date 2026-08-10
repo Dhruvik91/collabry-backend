@@ -294,4 +294,15 @@ export class AdminController {
     await this.adminService.addCoinsToUser(id, amount);
     return { success: true };
   }
+
+  @Delete("users/:id/coins")
+  @ApiOperation({ summary: "Deduct/delete coins directly from user wallet" })
+  @ApiOkResponseEnvelope(SuccessResponseDto)
+  @ApiUnauthorizedResponseEnvelope()
+  @ApiForbiddenResponseEnvelope()
+  @ApiNotFoundResponseEnvelope("User not found")
+  async removeCoins(@Param("id") id: string, @Body("amount") amount: number) {
+    await this.adminService.removeCoinsFromUser(id, amount);
+    return { success: true };
+  }
 }
