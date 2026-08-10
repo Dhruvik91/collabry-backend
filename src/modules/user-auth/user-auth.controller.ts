@@ -164,6 +164,7 @@ export class UserAuthController {
 
   // Initiate Google OAuth
   @AllowUnauthorized()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Get("google")
   @UseGuards(AuthGuard("google"))
   @ApiOperation({ summary: "Initiate Google OAuth login flow" })
@@ -173,6 +174,7 @@ export class UserAuthController {
 
   // Google OAuth callback
   @AllowUnauthorized()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Get("google/callback")
   @UseGuards(AuthGuard("google"))
   @ApiOperation({

@@ -186,9 +186,7 @@ export class InfluencerService {
     return { ...reloadedProfile, completedCollaborations } as any;
   }
 
-  async searchInfluencers(
-    searchDto: SearchInfluencersDto,
-  ): Promise<{
+  async searchInfluencers(searchDto: SearchInfluencersDto): Promise<{
     items: (InfluencerProfile & { completedCollaborations: number })[];
     meta: any;
   }> {
