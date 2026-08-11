@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, MoreThan } from "typeorm";
 import { User } from "../../database/entities/user.entity";
@@ -537,6 +537,7 @@ export class AdminService {
       .createQueryBuilder("user")
       .leftJoinAndSelect("user.profile", "profile")
       .leftJoinAndSelect("user.influencerProfile", "influencer")
+      .leftJoinAndSelect("user.wallet", "wallet")
       .orderBy("user.createdAt", "DESC")
       .skip((page - 1) * limit)
       .take(limit);
@@ -671,6 +672,21 @@ export class AdminService {
    */
   async addCoinsToUser(userId: string, amount: number) {
     return await this.walletService.credit(
+      userId,
+      amount,
+      TransactionPurpose.SYSTEM_ADJUSTMENT,
+      { adminAction: true, timestamp: new Date().toISOString() },
+    );
+  }
+
+  /**
+   * Deduct coins directly from a user's wallet (Admin Only)
+   */
+  async removeCoinsFromUser(userId: string, amount: number) {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException("User not found");
+
+    return await this.walletService.debit(
       userId,
       amount,
       TransactionPurpose.SYSTEM_ADJUSTMENT,

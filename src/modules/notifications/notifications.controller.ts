@@ -8,6 +8,7 @@ import {
   Headers,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
 import { ConfigService } from "@nestjs/config";
 import { NotificationsService } from "./notifications.service";
 import { SubscribeDto, UnsubscribeDto } from "./dto/subscribe.dto";
@@ -28,6 +29,7 @@ export class NotificationsController {
   ) {}
 
   @AllowUnauthorized()
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
   @Get("vapid-key")
   @ApiOperation({ summary: "Get VAPID Public Key for subscription" })
   async getVapidKey() {

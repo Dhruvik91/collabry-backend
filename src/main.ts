@@ -1,6 +1,7 @@
 import { NestFactory, Reflector } from "@nestjs/core";
 import helmet from "helmet";
 import basicAuth from "express-basic-auth";
+import { NestExpressApplication } from "@nestjs/platform-express";
 import { AppModule } from "./app.module";
 import { FailureResponseTransformer } from "./core/exception-filters/failure-exception";
 import { ClassSerializerInterceptor, ValidationPipe } from "@nestjs/common";
@@ -11,7 +12,10 @@ import { JwtAuthGuard } from "./modules/auth/Guards/jwt-guard";
 import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true,
+  });
+  app.set("trust proxy", 1);
   const reflector = app.get(Reflector);
   const config = app.get(ConfigService);
 

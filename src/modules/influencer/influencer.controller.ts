@@ -79,6 +79,7 @@ export class InfluencerController {
   }
 
   @AllowUnauthorized()
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @Get("search")
   @ApiOperation({ summary: "Search influencers" })
   @ApiOkResponseEnvelope(InfluencerProfile, true)

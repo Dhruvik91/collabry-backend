@@ -62,9 +62,7 @@ export class RankingService {
   /**
    * Internal method to calculate ranking and return the profile to avoid redundant lookups
    */
-  private async calculateRankingForInternal(
-    influencerId: string,
-  ): Promise<{
+  private async calculateRankingForInternal(influencerId: string): Promise<{
     profile: InfluencerProfile | null;
     breakdown: RankingBreakdownDto;
   }> {

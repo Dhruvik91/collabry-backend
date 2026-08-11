@@ -70,6 +70,7 @@ export class ProfileController {
   }
 
   @AllowUnauthorized()
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @Get("search")
   @ApiOperation({ summary: "Search profiles" })
   @ApiOkResponseEnvelope(Profile, true)
@@ -101,6 +102,7 @@ export class ProfileController {
   }
 
   @AllowUnauthorized()
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
   @Get("brand/:id")
   @ApiOperation({ summary: "Get professional brand profile with stats" })
   @ApiOkResponseEnvelope(Profile)
@@ -110,6 +112,7 @@ export class ProfileController {
   }
 
   @AllowUnauthorized()
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
   @Get(":id")
   @ApiOperation({ summary: "Get a specific profile by ID" })
   @ApiOkResponseEnvelope(Profile)

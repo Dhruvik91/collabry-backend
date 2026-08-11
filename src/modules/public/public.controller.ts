@@ -1,5 +1,6 @@
 import { Controller, Get, Param } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiOkResponse } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
 import { PublicService } from "./public.service";
 import { AllowUnauthorized } from "../auth/unauthorized/allow-unauthorixed";
 import { PublicInfluencerProfileDto } from "./dto/public-influencer-profile.dto";
@@ -11,6 +12,7 @@ export class PublicController {
   constructor(private readonly publicService: PublicService) {}
 
   @AllowUnauthorized()
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
   @Get("influencer/:id")
   @ApiOperation({ summary: "Get aggregate public data for an influencer" })
   @ApiOkResponse({ type: PublicInfluencerProfileDto })
@@ -19,6 +21,7 @@ export class PublicController {
   }
 
   @AllowUnauthorized()
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
   @Get("influencer/p/:slug")
   @ApiOperation({
     summary: "Get aggregate public data for an influencer by slug",
@@ -29,6 +32,7 @@ export class PublicController {
   }
 
   @AllowUnauthorized()
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
   @Get("brand/:id")
   @ApiOperation({ summary: "Get aggregate public data for a brand" })
   @ApiOkResponse({ type: PublicBrandProfileDto })

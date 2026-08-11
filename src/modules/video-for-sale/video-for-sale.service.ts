@@ -53,7 +53,6 @@ export class VideoForSaleService {
     });
   }
 
-
   async findAll(searchDto: SearchVideosForSaleDto) {
     const {
       search,

@@ -48,6 +48,7 @@ export class ReviewController {
   }
 
   @AllowUnauthorized()
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
   @Get("influencer/:influencerId")
   @ApiOperation({ summary: "Get all reviews for a specific influencer" })
   @ApiOkResponseEnvelope(Review, true)

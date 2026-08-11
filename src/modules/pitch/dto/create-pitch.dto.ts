@@ -17,4 +17,3 @@ export class CreatePitchDto {
   @IsString()
   workUrl?: string;
 }
-

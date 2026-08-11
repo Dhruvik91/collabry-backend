@@ -8,7 +8,7 @@ import {
   Query,
   Param,
 } from "@nestjs/common";
-import { Throttle } from "@nestjs/throttler";
+import { Throttle, SkipThrottle } from "@nestjs/throttler";
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 import {
   ApiOkResponseEnvelope,
@@ -99,6 +99,7 @@ export class PaymentController {
 
   @Post("webhook/razorpay")
   @AllowUnauthorized()
+  @SkipThrottle()
   @ApiOperation({ summary: "Razorpay Webhook handler" })
   async handleWebhook(@Body() payload: any, @Req() req: any) {
     const signature = req.headers["x-razorpay-signature"];

@@ -9,6 +9,7 @@ import {
   HttpCode,
   HttpStatus,
 } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import {
   ApiTags,
   ApiOperation,
@@ -44,6 +45,7 @@ export class RankingController {
   constructor(private readonly rankingService: RankingService) {}
 
   @AllowUnauthorized()
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @Get("breakdown/:influencerId")
   @ApiOperation({
     summary: "Get ranking breakdown for an influencer",
@@ -114,6 +116,7 @@ export class RankingController {
   }
 
   @AllowUnauthorized()
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
   @Get("tier-guide")
   @ApiOperation({
     summary: "Get tier requirements guide",

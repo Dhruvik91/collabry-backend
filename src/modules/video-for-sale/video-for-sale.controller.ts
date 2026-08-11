@@ -11,6 +11,7 @@ import {
   Query,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
 import { VideoForSaleService } from "./video-for-sale.service";
 import { CreateVideoForSaleDto } from "./dto/create-video-for-sale.dto";
 import { UpdateVideoForSaleDto } from "./dto/update-video-for-sale.dto";
@@ -50,6 +51,7 @@ export class VideoForSaleController {
 
   @Get()
   @AllowUnauthorized()
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @ApiOperation({ summary: "List and search all videos for sale" })
   @ApiOkResponseEnvelope(VideoForSale, true)
   findAll(@Query() searchDto: SearchVideosForSaleDto) {
@@ -71,6 +73,7 @@ export class VideoForSaleController {
 
   @Get(":id")
   @AllowUnauthorized()
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
   @ApiOperation({ summary: "Get details of a video for sale" })
   @ApiOkResponseEnvelope(VideoForSale)
   @ApiNotFoundResponseEnvelope("Video not found")
