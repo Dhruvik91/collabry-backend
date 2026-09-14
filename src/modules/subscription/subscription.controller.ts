@@ -36,6 +36,15 @@ export class SubscriptionController {
     return this.subscriptionService.getAllPlans();
   }
 
+  @Get("me")
+  @Roles(UserRole.USER, UserRole.INFLUENCER)
+  @ApiOperation({ summary: "Get current user subscription" })
+  @ApiOkResponseEnvelope(SubscriptionPlan)
+  @ApiUnauthorizedResponseEnvelope()
+  async getMySubscription(@Req() req: any) {
+    return this.subscriptionService.getMySubscription(req.user.id);
+  }
+
   @Post("initiate")
   @Roles(UserRole.USER, UserRole.INFLUENCER)
   @ApiOperation({ summary: "Initiate a Razorpay subscription" })

@@ -222,21 +222,39 @@ export class SubscriptionService {
     return await this.userSubRepo.save(userSub);
   }
 
+  async getMySubscription(userId: string): Promise<UserSubscription | null> {
+    return await this.userSubRepo.findOne({
+      where: { userId },
+      relations: ["plan"],
+      order: { createdAt: "DESC" },
+    });
+  }
+
   async cancelSubscription(userId: string) {
     const userSub = await this.userSubRepo.findOne({
       where: { userId, status: UserSubscriptionStatus.ACTIVE },
+      relations: ["plan"],
     });
 
     if (!userSub) {
       throw new NotFoundException("No active subscription found for this user");
     }
 
-    await this.razorpayService.cancelSubscription(
-      userSub.razorpaySubscriptionId,
-      true,
-    );
+    if (userSub.razorpaySubscriptionId) {
+      try {
+        await this.razorpayService.cancelSubscription(
+          userSub.razorpaySubscriptionId,
+          true,
+        );
+      } catch (error) {
+        // Log error but proceed with marking as cancelled if Razorpay sub cancellation fails or is already cancelled
+        console.error("Razorpay subscription cancel error:", error);
+      }
+    }
 
     userSub.cancelledAt = new Date();
+    userSub.status = UserSubscriptionStatus.CANCELLED;
     return await this.userSubRepo.save(userSub);
   }
 }
+
